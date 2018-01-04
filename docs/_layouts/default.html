@@ -27,9 +27,8 @@
         <a href="{{ site.github.url }}"> <h1>{{ site.title | default: site.github.repository_name }}</h1> </a>
         <p>{{ site.description | default: site.github.project_tagline }}</p>
 
-        {% if site.github.is_project_page %}
-          <p class="view"><a href="{{ site.github.repository_url }}">View the Project on GitHub <small>{{ github_name }}</small></a></p>
-        {% endif %}
+        <!-- home page link -->
+        <p class="view"><a href="https://jpgard.github.io/morf/">Home</a></p>
 
         {% if site.github.is_user_page %}
           <p class="view"><a href="{{ site.github.owner_url }}">View My GitHub Profile</a></p>
@@ -46,6 +45,11 @@
         <p class="view"><a href="https://jpgard.github.io/morf/getting-started/">Getting Started</a></p>
         <p class="view"><a href="https://jpgard.github.io/morf/publications/">Publications</a></p>
         <p class="view"><a href="https://jpgard.github.io/morf/about/">About</a></p>
+
+        {% if site.github.is_project_page %}
+          <p class="view"><a href="{{ site.github.repository_url }}">View the Project on GitHub <small>{{ github_name }}</small></a></p>
+        {% endif %}
+
 
       </header>
       <section>
