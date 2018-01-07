@@ -1,4 +1,5 @@
 *.tar
 *.pyc
 *__pycache__*
+*.Rhistory
 
