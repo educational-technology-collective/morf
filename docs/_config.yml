@@ -1,1 +1,4 @@
 theme: jekyll-theme-minimal
+kramdown:
+  auto_ids: true # Auto-generate ID's for headings
+
