@@ -102,6 +102,76 @@ MORF provides flexibility over how features are extracted for predictive model e
 
 For more detailed information on MORF's input-output contract, see `documentation/input-output/README.md`
 
+# MORF input-output contract
+
+MORF's predictive modeling API places some minimal, but strict, restrictions on the output format for each step of a predictive modeling job (`extract`, `extract-holdout`, `train`, and `test`.) This page documents these restrictions, which exist for security and ease of platform use. MORF predictive modeling jobs must conform to these restrictions exactly, or risk cancellation of jobs due to errors.
+
+This document is organized by `mode`. Your Docker container should expect different input formats, and write different output formats, depending on the `mode` of the job.
+
+Each section describes the INPUT, the files that will be mounted in the `/input/` directory for jobs in that mode; and the OUTPUT, the file that your script should produce in the `/output/` directory (there should only be one output file, regardless of mode).
+
+## Extract and Extract-Holdout
+
+INPUT: course directories, containing session subdirectories, which each contain the complete set of [raw data exports](https://spark-public.s3.amazonaws.com/mooc/data_exports.pdf) for a course. As shown below, the exact data that is expected depends on the MORF API function you use:
+
++ If you use *session-level* extraction, your script should output a unique data file for each session; 
++ If you use *course-level* extraction, your script should output a unique data file for each course (with a column named `session` that indicates the session of the course); 
++ If you use *all-level* extraction, your scruot should output a single data file for all of the data (with a column named `session` that indicates the session of the course, and a column named `course` that indicates the course).
+
+Session numbers and course names should exactly match the names in the course- and session-level directories.
+
+![MORF extract input output](extract.png "Extract")
+
+In addition, we provide a file called `coursera_course_dates.csv` in each session-level directory. This file contains the start and end date of each course; a sample (with fake course names) is shown below:
+
+``` 
+course,fullname,start_date,end_date
+somecourse-001,Some Course: An Introduction to Topic,2/2/15,4/13/15
+somecourse-002,Some Course: An Introduction to Topic,6/1/15,8/6/15
+somecourse-003,Some Course: An Introduction to Topic,10/5/15,12/21/15
+othercourse-001,Another Course: Advanced Applications,10/6/14,11/21/14
+othercourse-002,Another Course: Advanced Applications,2/2/15,4/13/15
+othercourse-003,Another Course: Advanced Applications,2/2/15,3/13/15
+othercourse-004,Another Course: Advanced Applications,5/4/15,7/15/15
+```
+
+This file is intended to easily provide the official start and end dates that a course opened and closed to learners, for calculating information related to course weeks or course duration.
+
+### Extract-Holdout
+
+`extract-holdout` follows a workflow nearly identical to `extract`. There is no `extract_course()` function because there is only one session per course (the last session) that is used for holdout/model testing in MORF.
+
+## Train
+
+INPUT: a csv file with labels named `labels-train.csv` and a csv file with your extracted features with the name your script gave it during the `extract` phase. Each set of features and labels is mounted in a session-level directory for consistency, regardless of the API function used.
+
+OUTPUT: a single model file, in any format. There are no current restrictions on the size, name, or format of the model, except that it should be a single file. If your model requires multiple files, try zipping them before saving to the `output/` directory.
+
+![MORF train input output](train.png "train")
+
+
+## Test
+
+INPUT: a csv file with labels named `labels-test.csv` and a csv file with your extracted features with the name your script gave it during the `extract-holdout` phase. Each set of features and labels is mounted in a session-level directory for consistency, regardless of the API function used.
+
+OUTPUT: a csv file of predictions. Currently, MORF requires a csv file with the following format:
+
+``` 
+userID,prob,pred
+577565faad64aee5941e5cfe0bfb771f494ef38c,0.854974830451673,1
+3a123c4b417a4d2581705bd1745b733e49044a88,0.854974830451673,1
+af74b2124ed39c35ae4bd172d77f8925c05bee7d,0.854974830451673,1
+92d4d4d8f7d8d11b7c8dc6035aa9daf027cc7b13,0.854974830451673,1
+7c14ee25f4484a92656201a336f45e8c61ff30d1,0.854974830451673,1
+083f2a394144d0ce95d0c4fb4fbbd12c16f2bf86,0.854974830451673,1
+6ce838c981b18de252e987c263bb78292e628fd0,0.854974830451673,1
+0ec50cd0bf925830789241daa7529a5d00f481de,0.854974830451673,1
+```
+
+`userID` is the session user ID; `prob` is the predicted probability of being in the positive class (required for many model evlauation metrics, such as AUC and log loss); `pred` is the predicted class label (for dropout prediction, this should be 0 or 1).
+
+![MORF test input output](test.png "test")
+
 # Docker Image environment
 
 The Docker image you provide will be run in a non-networked environment with `/input/` and `/output/` directories mounted in its filesystem. Because the Docker image does not have network access (for security reasons), any required libraries or software packages should be already installed in the Docker image.
