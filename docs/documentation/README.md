@@ -4,7 +4,7 @@
 
 This document describes available functions for predictive model training and testing in the MOOC Replication Framework (MORF) version 2.0. If you're new to MORF, this is the first document you should read.
 
-[introduction](#introduction) 
+# Introduction 
 
 The MORF API is used to construct and evaluate *predictive models* from raw MOOC platform data. There are three main steps to using the platform:
 
@@ -16,7 +16,7 @@ The MORF API is used to construct and evaluate *predictive models* from raw MOOC
 
 To execute a complete example on MORF which extracts features from course clickstream data, trains a predictive model using logistic regression, and evaluates its dropout predictions, see the examples in  `morf-test-examples`.
 
-[api-overview](#api-overview)
+# API Overview
 
 Because there are several different levels at which feature extraction and modeling may take place (once per iteration, once per course, or simply once for the entire collective dataset), we provide multiple APIs for the `extract` and `train` steps of model-building. These functions are documented below, but each works in fundamentally the same way: the raw MORF data is mounted into a root-level `/input/` volume of the image along with the user-provided Docker image, and the Docker image is iteratively called using the `docker run` command with a `--mode` parameter specifying whether that image should `extract`, `train`, or `test`.
 
