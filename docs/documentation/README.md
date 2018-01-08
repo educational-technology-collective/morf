@@ -1,5 +1,7 @@
-# Documentation 
+# Documentation (under construction!)
+{:.no_toc}
 
+* Will be replaced with the ToC, excluding the "Contents" header
 {:toc}
 
 # DRAFT API Documentation for MORF 2.0
