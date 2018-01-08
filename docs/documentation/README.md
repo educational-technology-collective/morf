@@ -4,25 +4,26 @@
 * Will be replaced with the ToC, excluding the "Contents" header
 {:toc}
 
-# DRAFT API Documentation for MORF 2.0
+# MORF 2.0 API
 
 This document describes available functions for predictive model training and testing in the MOOC Replication Framework (MORF) version 2.0. If you're new to MORF, this is the first document you should read.
 
 # Introduction 
 
-The MORF API is used to construct and evaluate *predictive models* from raw MOOC platform data. There are three main steps to using the platform:
+The MORF API is used to construct and evaluate predictive models from raw MOOC platform data. The main steps to executing a job on MORF are:
 
-1. Write code to extract features from raw platform data and build predictive models on the results of that feature extraction (examples are available in the `morf-test-examples` directory).
-2. Write a high-level "controller script" using the MORF Python API (examples are available in the `morf-test-examples` directory).
-3. Build a Docker image containing your code, with the appropriate directory structure and file names (see `input-output-contract` documentation for more details).
-4. Upload the Docker image and the controller script to public Amazon S3 buckets.
-5. Execute your controller script on MORF using the MORF command-line API (see `morf-api` documentation for more details).
+1. Write code to extract features from raw platform data and build predictive models on the results of that feature extraction.
+2. Write a high-level "controller script" using the MORF Python API.
+3. Build a Docker image containing your code and any software dependencies with the appropriate control flow.
+4. Create a configuration file containing identifiers and links to your controller script and docker image.
+5. Upload the the controller script, docker image, and configuration file to public locations (you need to provide either HTTPS or S3 URLs to these files).
+6. Submit your job to the MORF web API. You will receive notifications and results via email as your job is queued, initiated, and completed.
 
-To execute a complete example on MORF which extracts features from course clickstream data, trains a predictive model using logistic regression, and evaluates its dropout predictions, see the examples in  `morf-test-examples`.
+To execute a complete example on MORF which extracts features from course clickstream data, trains a predictive model using logistic regression, and evaluates its dropout predictions, see the examples in  the [github repository](https://github.com/jpgard/morf) and the instruction on the [getting started](https://jpgard.github.io/morf/getting-started/) page.
 
 # API Overview
 
-Because there are several different levels at which feature extraction and modeling may take place (once per iteration, once per course, or simply once for the entire collective dataset), we provide multiple APIs for the `extract` and `train` steps of model-building. These functions are documented below, but each works in fundamentally the same way: the raw MORF data is mounted into a root-level `/input/` volume of the image along with the user-provided Docker image, and the Docker image is iteratively called using the `docker run` command with a `--mode` parameter specifying whether that image should `extract`, `train`, or `test`.
+MORF provides different API functions based on the way your modeling pipeline uses data. In particular, we provide multiple APIs for the `extract` and `train` steps of model-building. These functions are documented below, but each works in fundamentally the same way: the raw MORF data is mounted into a root-level `/input/` volume of the image along with the user-provided Docker image, and the Docker image is iteratively called using the `docker run` command with a `--mode` parameter specifying whether that image should `extract`, `train`, or `test`.
 
 ## Feature Extraction
 
@@ -30,11 +31,9 @@ Three types of API functions are available for feature extraction. These functio
 
 + once per *session* (those ending in `_session()`), 
 + once per *course* (those ending in `_course()`),
-+ once overall for the entire MORF 2.0 dataset (`_all()`)
++ once for all courses collectively (`_all()`)
 
-For analyses which do not require predictive model training and testing, we provide the `_prule()` family of functions, used for extracting the confidence and conviction for production rule analyses.
-
-In addition to determining the level at which extraction occurs for the training data, the MORF API also allows users to specify the level at which holdout (test data) extraction occurs.
+Similar `extract_holdout` functions are used to specify how to extract features from holdout (test) data.
 
 | Function name            | Description                    |
 | ------------------------ | ------------------------------ |
@@ -50,11 +49,11 @@ To further clarify: the `extract_` function family determines how MORF runs your
 + If `extract_course()` is used, data for an individual course is mounted to `/input/`, and the Docker image is `run` once for each course. The Docker image is expected to write a single .csv file to `/output/` with a set of features for every user for every session of the course. The CSV should contain columns for both 'session' and 'user'. MORF will aggregate and persist the features for each course internally (all your image needs to do is write them to the `/output` directory).
 + If `extract_session()` is used, data for an individual session of a course is mounted to `/input/`, and the Docker image is `run` once for each session of each course The Docker image is expected to write a single .csv file to `/output/` with a set of features for every user in that session. MORF will aggregate and persist the features for each session internally (all your image needs to do is write them to the `/output` directory).
 
-Note that there is no `extract_holdout_course()` function because there is only one session per course.
+Note that there is no `extract_holdout_course()` function because there is only one session per course; this would be equivalent to using `extract_holdout_session()`.
 
 All feature extraction functions expect the Docker image to write individual `.csv` files to `/output` at the level of aggregation of the `extract` function used: `extract_all()` should write a a single *user x feature* .csv file to `/output/`; `extract_course()` should write one *user x feature* .csv array for each course; `extract_session()` should write one *user x feature* .csv array for each session of each course.
 
-The complete specifications for the `/input/` directory structure are in shown in `documentation/input-output/README.md`. The full set of `docker run` parameters used to call the image are demonstrated in .
+The complete specifications for the `/input/` directory structure are in shown in the input-output documentation below. The full set of `docker run` parameters used to call the image are demonstrated in the docker section below.
 
 If your workflow does not conform to the expected input/output protocol, no data will be returned and the job will be cancelled.
 
