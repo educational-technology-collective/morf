@@ -59,9 +59,7 @@ If your workflow does not conform to the expected input/output protocol, no data
 
 ## Model Training
 
-No matter how features are extracted, MORF 2.0 also provides flexible options for training models. Identical to the feature extraction options, these functions are used to specify whether the user-provided Docker image trains one model per *session* (`train_model(session)`), once per *course* (`train_model(course)`), or once overall for the entire MORF 2.0 dataset (`train_model()`).
-
-For production rule analyses, no model training is required. After extraction, production rule analyses can proceed directly to evaluation.
+Three types of API functions are also available for model training. Identical to the feature extraction options, these functions are used to specify whether the user-provided Docker image trains one model per *session* (`train_model(session)`), once per *course* (`train_model(course)`), or once overall for the entire MORF 2.0 dataset (`train_model()`). These can be used regardless of how feature extraction was conducted.
 
 | Function name            | Description                    |
 | ------------------------ | ------------------------------ |
@@ -70,7 +68,7 @@ For production rule analyses, no model training is required. After extraction, p
 | `train_session()` | Trains one model per session of the course using the Docker image.|
 
 
-All feature extraction scripts are expected to write one file at the level of aggregation of the `train` function used. The type of file is arbitrary (it can be any file type) and should match the type of file your Docker image expects as input in `test` mode.
+Your code is expected to output one file at the level of aggregation of the `train` function used (if you use `train_course()`, your code should write one file per course in `\output`). This file should contain any elements of your trained model that will be needed for prediction on new data in the `test` step. The type of file is arbitrary (it can be any file type) and should match the type of file your Docker image expects as input in `test` mode.
 
 ## Model Testing
 
