@@ -1,10 +1,10 @@
-# documentation
+# Documentation 
 
-# [DRAFT] API Documentation for MORF 2.0
+# DRAFT API Documentation for MORF 2.0
 
 This document describes available functions for predictive model training and testing in the MOOC Replication Framework (MORF) version 2.0. If you're new to MORF, this is the first document you should read.
 
-# Introduction 
+[introduction](#introduction) 
 
 The MORF API is used to construct and evaluate *predictive models* from raw MOOC platform data. There are three main steps to using the platform:
 
@@ -16,7 +16,7 @@ The MORF API is used to construct and evaluate *predictive models* from raw MOOC
 
 To execute a complete example on MORF which extracts features from course clickstream data, trains a predictive model using logistic regression, and evaluates its dropout predictions, see the examples in  `morf-test-examples`.
 
-# API Overview
+[api-overview](#api-overview)
 
 Because there are several different levels at which feature extraction and modeling may take place (once per iteration, once per course, or simply once for the entire collective dataset), we provide multiple APIs for the `extract` and `train` steps of model-building. These functions are documented below, but each works in fundamentally the same way: the raw MORF data is mounted into a root-level `/input/` volume of the image along with the user-provided Docker image, and the Docker image is iteratively called using the `docker run` command with a `--mode` parameter specifying whether that image should `extract`, `train`, or `test`.
 
@@ -71,11 +71,9 @@ All feature extraction scripts are expected to write one file at the level of ag
 
 ## Model Testing
 
-MORF provides interfaces for the evaluation of both predictive models and production rule analyses. 
-
 Model evaluation is conducted by using the extracted features and trained models from the above steps. Holdout features and trained models are mounted in a directory structure documented below and consistent with MORF's input/output contract.
 
-Note that while there are several options for feature extraction and predictive model construction, there is only one method available for predictive model evaluation. This is because no matter how models are constructed, they are evaluated on held-out runs of the same courses used for training. No matter whether models are trained at the session, course, or overall level, they will be used to predict on features from the held-out datasets extracted using the method specified above, and these performance results are aggregated and returned to you. For more information on why we used this prediction architecture, see [cite our paper here].
+Note that while there are several options for feature extraction and predictive model construction, there is only one method available for predictive model evaluation. This is because no matter how models are constructed, they are evaluated on held-out runs of the same courses used for training. No matter whether models are trained at the session, course, or overall level, they will be used to predict on features from the held-out datasets extracted using the method specified above, and these performance results are aggregated and returned to you. For more information on why we used this prediction architecture, see the MORF software paper in [publications](https://jpgard.github.io/morf/publications/).
 
 | Function name            | Description                    |
 | ------------------------ | ------------------------------ |
