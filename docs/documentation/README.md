@@ -78,10 +78,20 @@ Note that while there are several options for feature extraction and predictive 
 
 | Function name            | Description                    |
 | ------------------------ | ------------------------------ |
-| `test_all()`  | Evaluates a single model on all courses. This should be the testing function used with `extract_holdout_all()`.|
-| `test_course()`  | Evaluates a model each course individually. This should be the testing function used with `extract_holdout_session()`.|
+| `test_all()`  | Tests a single model on all courses. This should be the testing function used with `extract_holdout_all()`.|
+| `test_course()`  | Tests a model for each course individually. This should be the testing function used with `extract_holdout_session()`.|
 
 Your code is expected to write individual `.csv` files to `/output` at the level of aggregation of the `extract_holdout` function used. This file should have three columns: `userid` (the first column), `pred` (the predicted label), and `prob` (the probability of this label). The first row of the file should contain the column names. 
+
+## Model Evaluation
+
+Once you have completed the `extract`, `train`, and `test` phases of an experiment, MORF evaluates the model according to a wide variety of outcome metrics. Currently, the only type of evaluation is at the per-course level, so these metrics are provided for each course in the MORF dataset.
+
+| Function name            | Description                    |
+| ------------------------ | ------------------------------ |
+| `evaluate_course()`  | Evaluates predicted class labels and probabilities for each course. Generates detailed performance statistics for each course, which are sent to the user via email immediately after job completion on MORF.|
+
+To see a complete example of the output of MORF's model evaluation, try running the example code in the [getting started](https://jpgard.github.io/morf/getting-started/) section. If you'd like to use an additional outcome metric for your experiment that is currently not included in MORF's output, please contact us at morf-info@umich.edu.
 
 # API Detail: Feature Extraction, Directory Structure, and Input/Output Contract
 
