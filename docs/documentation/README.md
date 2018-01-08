@@ -72,16 +72,16 @@ Your code is expected to output one file at the level of aggregation of the `tra
 
 ## Model Testing
 
-Model evaluation is conducted by using the extracted features and trained models from the above steps. Holdout features and trained models are mounted in a directory structure documented below and consistent with MORF's input/output contract.
+To test your models, MORF applies the trained models to the features extracted from the holdout session of each course, using the features extracted in the `extract-holdout` step. 
 
-Note that while there are several options for feature extraction and predictive model construction, there is only one method available for predictive model evaluation. This is because no matter how models are constructed, they are evaluated on held-out runs of the same courses used for training. No matter whether models are trained at the session, course, or overall level, they will be used to predict on features from the held-out datasets extracted using the method specified above, and these performance results are aggregated and returned to you. For more information on why we used this prediction architecture, see the MORF software paper in [publications](https://jpgard.github.io/morf/publications/).
+Note that while there are several options for feature extraction and predictive model construction, there is only one method available for predictive model evaluation. This is because no matter how models are constructed, they are evaluated on held-out runs of the same courses used for training. No matter whether models are trained at the session, course, or overall level, they will be used to predict on features from the held-out datasets extracted using the method specified above, and these performance results are aggregated and returned to you. For more information on why MORF uses this prediction architecture, see the MORF software paper in [publications](https://jpgard.github.io/morf/publications/).
 
 | Function name            | Description                    |
 | ------------------------ | ------------------------------ |
-| `test_all()`  | Evaluates a model on all courses. This should be the testing function used with `extract_holdout_all()`.|
+| `test_all()`  | Evaluates a single model on all courses. This should be the testing function used with `extract_holdout_all()`.|
 | `test_course()`  | Evaluates a model each course individually. This should be the testing function used with `extract_holdout_session()`.|
 
-All testing scripts are expected to write individual `.csv` files to `/output` at the level of aggregation of the `extract` function used. This file should have two columns: `userid` (the first column) and `pred` (the second column). There should be headers with column names, but no index column. 
+Your code is expected to write individual `.csv` files to `/output` at the level of aggregation of the `extract_holdout` function used. This file should have three columns: `userid` (the first column), `pred` (the predicted label), and `prob` (the probability of this label). The first row of the file should contain the column names. 
 
 # API Detail: Feature Extraction, Directory Structure, and Input/Output Contract
 
