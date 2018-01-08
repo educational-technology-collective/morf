@@ -1,37 +1,6 @@
-## Welcome to GitHub Pages
+# The MOOC Replication Framework (MORF)
 
-You can use the [editor on GitHub](https://github.com/jpgard/morf/edit/master/README.md) to maintain and preview the content for your website in Markdown files.
+This is the official source code repository for the MOOC Replication Framework (MORF). This repository contains the public API and associated utility functions required to use MORF's Python API via a command-line web interface, or to create your own private institutional instance of MORF.
 
-Whenever you commit to this repository, GitHub Pages will run [Jekyll](https://jekyllrb.com/) to rebuild the pages in your site, from the content in your Markdown files.
+For more information on using MORF, see the official [MORF website](https://jpgard.github.io/morf/) or contact the developers at morf-info@umich.edu.
 
-### Markdown
-
-Markdown is a lightweight and easy-to-use syntax for styling your writing. It includes conventions for
-
-```markdown
-Syntax highlighted code block
-
-# Header 1
-## Header 2
-### Header 3
-
-- Bulleted
-- List
-
-1. Numbered
-2. List
-
-**Bold** and _Italic_ and `Code` text
-
-[Link](url) and ![Image](src)
-```
-
-For more details see [GitHub Flavored Markdown](https://guides.github.com/features/mastering-markdown/).
-
-### Jekyll Themes
-
-Your Pages site will use the layout and styles from the Jekyll theme you have selected in your [repository settings](https://github.com/jpgard/morf/settings). The name of this theme is saved in the Jekyll `_config.yml` configuration file.
-
-### Support or Contact
-
-Having trouble with Pages? Check out our [documentation](https://help.github.com/categories/github-pages-basics/) or [contact support](https://github.com/contact) and we’ll help you sort it out.
