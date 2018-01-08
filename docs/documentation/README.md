@@ -1,5 +1,7 @@
 # Documentation 
 
+{:toc}
+
 # DRAFT API Documentation for MORF 2.0
 
 This document describes available functions for predictive model training and testing in the MOOC Replication Framework (MORF) version 2.0. If you're new to MORF, this is the first document you should read.
