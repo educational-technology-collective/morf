@@ -93,15 +93,6 @@ Once you have completed the `extract`, `train`, and `test` phases of an experime
 
 To see a complete example of the output of MORF's model evaluation, try running the example code in the [getting started](https://jpgard.github.io/morf/getting-started/) section. If you'd like to use an additional outcome metric for your experiment that is currently not included in MORF's output, please contact us at morf-info@umich.edu.
 
-# API Detail: Feature Extraction, Directory Structure, and Input/Output Contract
-
-MORF provides flexibility over how features are extracted for predictive model evaluation in the platform. In order to do so, but ensure that the extract-train-test pipeline functions seamlessly, we utilize a specific *input/output contract* for each family of functions: 
-
-+ the *input* directory structure is consistent, always located at `/input`. Raw data for every course is organized within directories `/input/course/session/` where `course` is a course name and `session` is a unique session id. Docker images should always expect this structure whenever input is used for the API functions (i.e., for `extract`, `train`, and `test` families).
-+ the *output* structure is consistent. For feature extraction and model testing, output is generally expected to be a .csv file, one per iteration of extraction or testing. For model training, output can be any type of file, and should match the file type expected as input to your Docker image when called in `test` mode.
-
-For more detailed information on MORF's input-output contract, see `documentation/input-output/README.md`
-
 # MORF input-output contract
 
 MORF's predictive modeling API places some minimal, but strict, restrictions on the output format for each step of a predictive modeling job (`extract`, `extract-holdout`, `train`, and `test`.) This page documents these restrictions, which exist for security and ease of platform use. MORF predictive modeling jobs must conform to these restrictions exactly, or risk cancellation of jobs due to errors.
@@ -109,6 +100,12 @@ MORF's predictive modeling API places some minimal, but strict, restrictions on 
 This document is organized by `mode`. Your Docker container should expect different input formats, and write different output formats, depending on the `mode` of the job.
 
 Each section describes the INPUT, the files that will be mounted in the `/input/` directory for jobs in that mode; and the OUTPUT, the file that your script should produce in the `/output/` directory (there should only be one output file, regardless of mode).
+
+MORF utilizes a consistent *input/output contract* for each family of functions (i.e., for a family of functions with the suffix `_session`, `_course`, or `_all`): 
+
++ the *input* directory structure is consistent, always located at `/input`. Raw data for every course is organized within directories `/input/course/session/` where `course` is a course name and `session` is a unique session id. Docker images should always expect this structure whenever input is used for the API functions (i.e., for `extract`, `train`, and `test` families).
++ the *output* structure is consistent. For feature extraction and model testing, output is generally expected to be a .csv file, one per iteration of extraction or testing. For model training, output can be any type of file, and should match the file type expected as input to your Docker image when called in `test` mode.
+
 
 ## Extract and Extract-Holdout
 
@@ -172,7 +169,15 @@ af74b2124ed39c35ae4bd172d77f8925c05bee7d,0.854974830451673,1
 
 ![MORF test input output](test.png "test")
 
-# Docker Image environment
+# Using Docker with MORF
+
+Docker is the containerization service that allows MORF to be flexible and accept code run in any language. This tutorial describes some Docker basics for using the MORF platform, including creating Dockerfiles and building images from files. It also gives some additional information on how MORF runs Docker images internally and what command line arguments any Docker image needs to accept.
+
+Note that Docker is not needed for running production rule analyses on MORF.
+
+This tutorial assumes that you have Docker installed. For more information about Docker, including installation instructions, see [Docker installation instructions](https://docs.docker.com/engine/installation/) and [Getting Started with Docker](https://docs.docker.com/get-started/).
+
+## Docker Image environment
 
 The Docker image you provide will be run in a non-networked environment with `/input/` and `/output/` directories mounted in its filesystem. Because the Docker image does not have network access (for security reasons), any required libraries or software packages should be already installed in the Docker image.
 
@@ -182,13 +187,6 @@ Your Docker image will be called with a `--mode` flag, which is used to trigger 
 + `--mode=train`: Extracted data from training runs will be mounted in `/input/` directory; model training expected according to input/output contract.
 + `--mode=test`: Extracted data from testing runs will be mounted in `/input/` directory; model testing/prediction expected according to input/output contract.
 
-# Using Docker with MORF
-
-Docker is the containerization service that allows MORF to be flexible and accept code run in any language. This tutorial describes some Docker basics for using the MORF platform, including creating Dockerfiles and building images from files. It also gives some additional information on how MORF runs Docker images internally and what command line arguments any Docker image needs to accept.
-
-Note that Docker is not needed for running production rule analyses on MORF.
-
-This tutorial assumes that you have Docker installed. For more information about Docker, including installation instructions, see [Docker installation instructions](https://docs.docker.com/engine/installation/) and [Getting Started with Docker](https://docs.docker.com/get-started/).
 
 ## Creating a Project Dockerfile
 
