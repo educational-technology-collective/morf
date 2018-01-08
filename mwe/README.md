@@ -4,4 +4,4 @@ This diretory holds a complete, self-contained example of scripts which `extract
 
 ## Running the MWE
 
-TODO.
+For information on running this example, refer to the MORF [getting started](https://jpgard.github.io/morf/getting-started/) page.
