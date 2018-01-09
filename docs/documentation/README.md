@@ -236,7 +236,8 @@ ENTRYPOINT ["python3", "mwe.py"]
 
 This Dockerfile has seven distinct steps, and demonstrates a typical workflow for MORF which uses Python 3, R, and mySQL. Let's walk through each step.
 
-#### (1) pull base image
+#### (1) pull base image 
+{:.no_toc}
 ```
 FROM ubuntu:16.04
 ```
