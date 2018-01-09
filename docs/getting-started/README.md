@@ -6,7 +6,7 @@ You can install MORF using pip:
 $ pip install morf
 ```
 
-This installs all of the API functions needed to build end-to-end predictive modeling pipelines in MORF. Note that morf is only compatible with python 3.6.
+This installs all of the API functions needed to build end-to-end predictive modeling pipelines in MORF. Note that MORF is compatible with both Python 2 and 3, but for best results, we recommend using MORF with Python 3.6.
 
 A complete example of a MORF job is available in the project [repository](https://jpgard.github.io/morf/); check out the `mwe` directory [here](https://github.com/jpgard/morf/tree/master/mwe)for a complete minimum working example. 
 
