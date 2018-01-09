@@ -247,7 +247,7 @@ This command defines the base ubuntu 16.04 image to use as the first layer for b
 We recommend starting from one of Docker's base images unless the environment you need isn't available. Check the official Docker [library](https://github.com/docker-library/official-images/tree/master/library) for a list of available image tags.
 
 #### (2) install Python 
-
+{:.no_toc}
 ``` 
 RUN \
   apt-get update && \
@@ -259,6 +259,7 @@ RUN \
 This command uses the Docker keyword `RUN` to define commands that should be literally executed in the image. Note that each of these commands would normally by entered at an ubuntu command line prompt; Docker does this when building the image.
 
 #### (3) install Python libraries
+{:.no_toc}
 ``` 
 RUN pip3 install numpy pandas
 ```
@@ -268,7 +269,7 @@ This line uses `pip` to install Python libraries that are used in the feature ex
 Note that Python and `pip` were installed in the previous step, which makes the use of `pip` available in this step (just as if it were installed on any machine).
 
 #### (4) install r and dependencies
-
+{:.no_toc}
 ``` 
 RUN \
   sh -c 'echo "deb http://cran.rstudio.com/bin/linux/ubuntu xenial/" >> /etc/apt/sources.list' && \
@@ -285,7 +286,7 @@ This command executes the ubuntu commands to install R for Ubuntu, and then inst
 You may not be used to installing R packages via the command line, but this is required for building a Docker image for MORF -- you cannot install R libraries within your R scripts, for example, because the Docker image is run in a non-networked environment. Note that you can also install many independent libraries in a single line, but any dependencies need to be installed in a separate, prior call to `install.packages()` from the packages that depend on them.
 
 #### (5) install MySQL and add configurations
-
+{:.no_toc}
 ``` 
 RUN echo "mysql-server-5.7 mysql-server/root_password password root" | sudo debconf-set-selections && \
   echo "mysql-server-5.7 mysql-server/root_password_again password root" | sudo debconf-set-selections && \
@@ -297,6 +298,7 @@ This step installs mySQL, sets the root password, and sets the `secure-file-priv
 The database exports in MORF are provided as mySQL dumps, and accessing them requires mySQL. Jobs that do not use data from the mySQL dumps can skip this step.
 
 #### (6) Add scripts and start mySQL
+{:.no_toc}
 ``` 
 # add scripts
 ADD mwe.py mwe.py
@@ -313,6 +315,7 @@ To see which scripts and directories are being added. look inside the directory 
 Any modules, code, or other files you want to be available inside your Docker image during execution must be added by using `ADD` in your dockerfile; no code can be downloaded or installed during execution.
 
 #### (7) define entrypoint
+{:.no_toc}
 
 ``` 
 ENTRYPOINT ["python3", "mwe.py"]
