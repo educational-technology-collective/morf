@@ -1,9 +1,9 @@
 # Getting Started
 
-You can install MORF using pip:
+MORF is available on [PyPi](https://pypi.python.org/pypi/morf-api). You can install MORF using pip:
 
 ```
-$ pip install morf
+$ pip install morf-api
 ```
 
 This installs all of the API functions needed to build end-to-end predictive modeling pipelines in MORF. Note that MORF is compatible with both Python 2 and 3, but for best results, we recommend using MORF with Python 3.6.
