@@ -171,15 +171,13 @@ af74b2124ed39c35ae4bd172d77f8925c05bee7d,0.854974830451673,1
 
 # Using Docker with MORF
 
-Docker is the containerization service that allows MORF to be flexible and accept code run in any language. This tutorial describes some Docker basics for using the MORF platform, including creating Dockerfiles and building images from files. It also gives some additional information on how MORF runs Docker images internally and what command line arguments any Docker image needs to accept.
-
-Note that Docker is not needed for running production rule analyses on MORF.
+Docker is the containerization service that allows MORF to be flexible and accept code run in any language. This section describes some Docker basics for using the MORF platform, including creating Dockerfiles and building images from Dockerfiles. It also gives some additional information on how MORF runs Docker images internally and what command line arguments any submitted Docker image needs to accept.
 
 This tutorial assumes that you have Docker installed. For more information about Docker, including installation instructions, see [Docker installation instructions](https://docs.docker.com/engine/installation/) and [Getting Started with Docker](https://docs.docker.com/get-started/).
 
 ## Docker Image environment
 
-The Docker image you provide will be run in a non-networked environment with `/input/` and `/output/` directories mounted in its filesystem. Because the Docker image does not have network access (for security reasons), any required libraries or software packages should be already installed in the Docker image.
+The Docker image you provide will be run in a non-networked environment with `/input/` and `/output/` directories mounted in its filesystem.
 
 Your Docker image will be called with a `--mode` flag, which is used to trigger the appropriate action based on the input that will be mounted in its filesystem. These `mode`s are:
 
@@ -190,27 +188,27 @@ Your Docker image will be called with a `--mode` flag, which is used to trigger 
 
 ## Creating a Project Dockerfile
 
-A Dockerfile is a text file that contains instructions for building your Docker image. The exact contents of this file depend on (a) the software dependencies of your MORF project code, which may include (for example) scripts written in Python, Java, R, or other languages; and (b) the actual code needed to run for your MORF workflow (feature extraction, training, and testing). You can create this file using any text editor; save it with no extension.
+A Dockerfile is a text file that contains instructions for building your Docker image. The exact contents of this file depend on (a) the software dependencies of your MORF project code, which may include (for example) scripts written in Python, Java, R, or other languages; and (b) the actual code needed to run for your MORF workflow (feature extraction, training, and testing). You can create this file using any text editor; save it with no extension and name it `dockerfile`. Note that, because the Docker image does not have network access (for security reasons), any required libraries or software packages required by your code should be installed in the Docker image.
 
-Here is an example of a simple Dockerfile (this file is also located at `mwe/mwe`):
+Here is an example of a simple Dockerfile (this file is also located at `mwe/dockerfile`):
 
 ```
-# (1) Pull base image
-FROM ubuntu:14.04
+# Pull base image.
+FROM ubuntu:16.04
 
-# (2) install Python 
+# install Python 
 RUN \
   apt-get update && \
-  apt-get install -y software-properties-common python-software-properties && \
+  apt-get install -y sudo software-properties-common python-software-properties && \
   apt-get -y install python3-dev python3-pip python-virtualenv && \ 
   rm -rf /var/lib/apt/lists/* 
 
-# (3) install Python libraries
+# install Python libraries
 RUN pip3 install numpy pandas
 
-# (4) install r and dependencies
+# install r and dependencies
 RUN \
-  sh -c 'echo "deb http://cran.rstudio.com/bin/linux/ubuntu trusty/" >> /etc/apt/sources.list' && \
+  sh -c 'echo "deb http://cran.rstudio.com/bin/linux/ubuntu xenial/" >> /etc/apt/sources.list' && \
   gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-key E084DAB9 && \
   gpg -a --export E084DAB9 | apt-key add - && \
   apt-get update && \
@@ -218,39 +216,41 @@ RUN \
   R -e "install.packages('getopt', repos = c('http://cran.rstudio.com/','http://cran.us.r-project.org'), dependencies = c('Depends'))" && \
   R -e "install.packages('optparse', repos = c('http://cran.rstudio.com/','http://cran.us.r-project.org'), dependencies = c('Depends'))"
 
-# (5) install MySQL and add configurations
-RUN echo "mysql-server-5.6 mysql-server/root_password password root" | sudo debconf-set-selections && \
-  echo "mysql-server-5.6 mysql-server/root_password_again password root" | sudo debconf-set-selections && \
-  apt-get -y install mysql-server-5.6 && \
-  echo "secure-file-priv = \"\"" >> /etc/mysql/conf.d/my5.6.cnf
 
-# (6) add scripts
+# install MySQL and add configurations
+RUN echo "mysql-server-5.7 mysql-server/root_password password root" | sudo debconf-set-selections && \
+  echo "mysql-server-5.7 mysql-server/root_password_again password root" | sudo debconf-set-selections && \
+  apt-get -y install mysql-server-5.7 && \
+  echo "secure-file-priv = \"\"" >>  /etc/mysql/mysql.conf.d/mysqld.cnf
+
+# add scripts
 ADD mwe.py mwe.py
 ADD feature_extraction feature_extraction
 ADD modeling modeling
 # start mysql
 RUN service mysql start
 
-# (7) define entrypoint
+# define entrypoint
 ENTRYPOINT ["python3", "mwe.py"]
-
 ```
 
 This Dockerfile has seven distinct steps, and demonstrates a typical workflow for MORF which uses Python 3, R, and mySQL. Let's walk through each step.
 
 #### (1) pull base image
 ```
-FROM ubuntu:14.04
+FROM ubuntu:16.04
 ```
 
-This command defines the base ubuntu 14.04 image to use as the first layer for building the Docker image. We recommend starting from one of Docker's base images unless the environment you need isn't available. Check the official Docker [library](https://github.com/docker-library/official-images/tree/master/library) for a list of available image tags.
+This command defines the base ubuntu 16.04 image to use as the first layer for building the Docker image. 
+
+We recommend starting from one of Docker's base images unless the environment you need isn't available. Check the official Docker [library](https://github.com/docker-library/official-images/tree/master/library) for a list of available image tags.
 
 #### (2) install Python 
 
 ``` 
 RUN \
   apt-get update && \
-  apt-get install -y software-properties-common python-software-properties && \
+  apt-get install -y sudo software-properties-common python-software-properties && \
   apt-get -y install python3-dev python3-pip python-virtualenv && \ 
   rm -rf /var/lib/apt/lists/* 
 ```
@@ -262,13 +262,15 @@ This command uses the Docker keyword `RUN` to define commands that should be lit
 RUN pip3 install numpy pandas
 ```
 
-Now that Python and `pip` were installed in the previous step, this uses `pip` to install Python libraries.
+This line uses `pip` to install Python libraries that are used in the feature extraction and modeling code in `mwe`.
+
+Note that Python and `pip` were installed in the previous step, which makes the use of `pip` available in this step (just as if it were installed on any machine).
 
 #### (4) install r and dependencies
 
 ``` 
 RUN \
-  sh -c 'echo "deb http://cran.rstudio.com/bin/linux/ubuntu trusty/" >> /etc/apt/sources.list' && \
+  sh -c 'echo "deb http://cran.rstudio.com/bin/linux/ubuntu xenial/" >> /etc/apt/sources.list' && \
   gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-key E084DAB9 && \
   gpg -a --export E084DAB9 | apt-key add - && \
   apt-get update && \
@@ -277,21 +279,25 @@ RUN \
   R -e "install.packages('optparse', repos = c('http://cran.rstudio.com/','http://cran.us.r-project.org'), dependencies = c('Depends'))"
 ```
 
-This command executes the ubuntu commands to install R for ubuntu, and then installs some R packages. You may not be used to installing R packages via the command line, but this is required for building a Docker image for MORF -- you cannot install R libraries within your R scripts, for example, because the Docker image is run in a non-networked environment. Note that you can also install many independent libraries in a single line, but dependencies need to be installed sequentially.
+This command executes the ubuntu commands to install R for Ubuntu, and then installs some R packages used in the `mwe`. 
+
+You may not be used to installing R packages via the command line, but this is required for building a Docker image for MORF -- you cannot install R libraries within your R scripts, for example, because the Docker image is run in a non-networked environment. Note that you can also install many independent libraries in a single line, but any dependencies need to be installed in a separate, prior call to `install.packages()` from the packages that depend on them.
 
 #### (5) install MySQL and add configurations
 
 ``` 
-RUN echo "mysql-server-5.6 mysql-server/root_password password somepassword" | sudo debconf-set-selections && \
-  echo "mysql-server-5.6 mysql-server/root_password_again password somepassword" | sudo debconf-set-selections && \
-  apt-get -y install mysql-server-5.6 && \
-  echo "secure-file-priv = \"\"" >> /etc/mysql/conf.d/my5.6.cnf
+RUN echo "mysql-server-5.7 mysql-server/root_password password root" | sudo debconf-set-selections && \
+  echo "mysql-server-5.7 mysql-server/root_password_again password root" | sudo debconf-set-selections && \
+  apt-get -y install mysql-server-5.7 && \
+  echo "secure-file-priv = \"\"" >>  /etc/mysql/mysql.conf.d/mysqld.cnf
 ```
+This step installs mySQL, sets the root password, and sets the `secure-file-priv` option to allow for exporting of query results to a file (using mySQL's `INTO OUTFILE` command requires setting this option).
 
-The database exports in MORF are provided as mySQL dumps, and accessing them requires mySQL. This step installs mySQL, sets the root password, and sets the `secure-file-priv` option to allow for exporting of query results to a file (using mySQL's `INTO OUTFILE` command requires setting this option).
+The database exports in MORF are provided as mySQL dumps, and accessing them requires mySQL. Jobs that do not use data from the mySQL dumps can skip this step.
 
-#### (6) Add scripts
+#### (6) Add scripts and start mySQL
 ``` 
+# add scripts
 ADD mwe.py mwe.py
 ADD feature_extraction feature_extraction
 ADD modeling modeling
@@ -299,7 +305,11 @@ ADD modeling modeling
 RUN service mysql start
 ```
 
-This step adds scripts and directories used in the MORF workflow. You can see that these scripts and directories match those in the `mwe/` directory. These are the scripts that are used in the extract, train, and test workflow; `mwe.py` is a simple "controller" script that reads the input from the `docker run` command in MORF and uses it to control the flow of execution. This step also starts the mySQL server.
+This step adds scripts and directories from the local directory to the dockerfile itself using the [docker run](https://docs.docker.com/engine/reference/run/) command and starts mySQL within the container. 
+
+To see which scripts and directories are being added. look inside the directory containing the `dockerfile` in the `mwe` directory of the github repo. The scripts added here are used in the extract, train, and test workflow; `mwe.py` is a simple script that reads the input from the `docker run` command in MORF and uses it to control the flow of execution.
+
+Any modules, code, or other files you want to be available inside your Docker image during execution must be added by using `ADD` in your dockerfile; no code can be downloaded or installed during execution.
 
 #### (7) define entrypoint
 
@@ -307,7 +317,11 @@ This step adds scripts and directories used in the MORF workflow. You can see th
 ENTRYPOINT ["python3", "mwe.py"]
 ```
 
-This command uses Docker's `ENTRYPOINT` keyword to define an entrypoint. Whenever this image is called using `docker run`, this line tells the image to automatically execute `python3 mwe.py` instead of entering an interactive prompt. Note that this will also pass any environment variables defined using the `docker run` command, such as the `--mode` flag used to control the script. More information about `ENTRYPOINT` is in Docker's documentation [here](https://docs.docker.com/engine/reference/builder/#entrypoint).
+This command uses Docker's `ENTRYPOINT` keyword to define an entrypoint for execution. 
+
+Whenever this image is executed by MORF, this line tells the image to automatically execute `python3 mwe.py` instead of entering any other shell. Note that MORF will also pass the `--mode` flag used to control the script when calling your script, so whichever script is defined as the `ENTRYPOINT` should expect a command-line argument for `mode` which takes the values described below.
+
+More information about `ENTRYPOINT` is in Docker's documentation [here](https://docs.docker.com/engine/reference/builder/#entrypoint).
 
 ## Building a Docker Image from a Dockerfile
 
@@ -320,22 +334,22 @@ $ docker build -f dockerfile .
 When this command completes (which may take several minutes, depending on the size and complexity of the environment it is building), you need to save the image to a .tar file. Using the image ID (this will be the final line from the output of `docker build`), save this image to a .tar archive by entering:
 
 ``` 
-$ docker save d462f7d56905 > my-docker-image.tar
+$ docker save d459f7d42902 > my-docker-image.tar
 ```
 
-This will create a file `my-docker-image.tar` in the current working directory. This is the file you need to provide access to for MORF; ideally by uploading this file to Amazon S3.
+This will create a file `my-docker-image.tar` in the current working directory. This is the file you need to provide access to for MORF; ideally by uploading this file to S3 or an `https` location.
 
-## MORF Environment Variables Used with Docker Run
+## MORF Environment Variables Passed To Your Image
 
-MORF passes information to your Docker image in order to control the flow of the program. This information defines what data is mounted in the Docker image at runtime, and also tells the Docker image what task it needs to do (extract features from raw data; train a model from pre-extracted data; test a pre-trained model on pre-extracted data). This includes the following variables:
+MORF passes information to your Docker image in order to control the flow of the program. This information defines what data is mounted in the Docker image at runtime, and also tells the Docker image what task it needs to do (`extract` features from raw data; `train` a model from pre-extracted data; `test` a pre-trained model on pre-extracted data). This includes the following variables:
 
 * `mode`: This is the most important parameter passed to your Docker image. Possible values of `mode` include `extract`, `extract-holdout`, `train`, `test`. In each of these modes, data is mounted in the `/input/` directory of your Docker image at runtime, and MORf expects the appropriate data to be written to `/output/` based on the `mode` and on your Docker API script.
-* `course_id` this optional parameter provides a unique string identifying the course. In combination with `run_number`, this can be used to iterate over the course directory. You can also iterate over the directory by detecting and iterating over the directory structure within your script; we think using `/input/course_id/run_number` is easier.
-* `run_number` this optional parameter provides a unique 3-digit identifier for each session of each course (i.e., 001, 002, 011, etc.) Together with the `course_id`, this parameter provides a unique path to a subdirectory containing the complete data for one session of a course, at `/input/course_id/run_number`.
+* `course` this parameter provides a unique string identifying the course. In combination with `session`, this can be used to iterate over the course directory; data for any course and session is mounted at `/input/course/session`.
+* `session` this parameter provides a unique 3-digit identifier for each session of each course (i.e., 001, 002, 011, etc.) Together with the `course` name, this parameter provides a unique path to a subdirectory containing the complete data for one session of a course, at `/input/course/session`.
 
-You should use some kind of command-line parsing tool in your script to read these parameters; your script MUST use `mode`; the use of `course_id` and `run_number` is optional. For command-line parsong in Python, we recommend [argparse](https://docs.python.org/3/library/argparse.html); for command-line parsing in R, we recommend [optparse](https://cran.r-project.org/web/packages/optparse/index.html). You can find examples of both libraries in the `mwe/` scripts.
+You should use some kind of command-line parsing tool in your script to read these parameters; your script MUST use `mode`; the use of `course` and `session` is optional. For command-line parsing in Python, we recommend [argparse](https://docs.python.org/3/library/argparse.html); for command-line parsing in R, we recommend [optparse](https://cran.r-project.org/web/packages/optparse/index.html). You can find examples of both libraries in the `mwe` scripts.
 
-![MORF workflow](MORF_flow_simple.png "Test text")
+![MORF workflow](MORF_flow_simple.png "MORF Flow")
 
 
 ## Debugging and Running Docker Interactively
@@ -348,7 +362,7 @@ The easiest way to explore your Docker image interactively is by using `docker r
 $ docker load -i my-docker-image.tar
 ```
 
-This will produce a SHA256 code for the image. Use that SHA256 code, and you can open your .tar file using the following command:
+This will produce a SHA256 code for the image. Use that SHA256 code, and you can open your .tar file using the following command (replace `SHA256CODEHERE` with your code):
 
 ``` 
 $ docker run -it --entrypoint=/bin/bash SHA256CODEHERE
@@ -357,13 +371,9 @@ $ docker run -it --entrypoint=/bin/bash SHA256CODEHERE
 Additionally, you can mount local directories of data to the `/input/` and `/output/` directories in your image using the `--volume` flag:
 
 ``` 
-$ docker run -it --entrypoint=/bin/bash --volume=/some/path/to/local:/input --volume=/some/other/path:/output  SHA256CODEHERE
+$ docker run -it --entrypoint=/bin/bash --volume=/some/path/to/local:/input --volume=/some/other/path:/output SHA256CODEHERE
 ```
 
-This would open your Docker image with all of the contents of `/some/path/to/local` mounted at `/input` and `/some/other/path` mounted at `/output`.
-
-
-
-
+This would open your Docker image with all of the contents of `/some/path/to/local` mounted at `/input` and `/some/other/path` mounted at `/output`, allowing you to mimic the directory structure used internally by MORF when executing your job.
 
 
