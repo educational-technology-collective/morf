@@ -23,10 +23,10 @@
 A test script to extract features, train a model, and evaluate it using the MORF 2.0 architecture.
 """
 
-from morf.morf_api.extract import extract_session, extract_holdout_session
-from morf.morf_api.train import train_course
-from morf.morf_api.test import test_course
-from morf.morf_api.evaluate import evaluate_course
+from morf.workflow.extract import extract_session, extract_holdout_session
+from morf.workflow.train import train_course
+from morf.workflow.test import test_course
+from morf.workflow.evaluate import evaluate_course
 
 
 extract_session()
