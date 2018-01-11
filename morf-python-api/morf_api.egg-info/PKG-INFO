@@ -1,0 +1,34 @@
+Metadata-Version: 1.1
+Name: morf-api
+Version: 0.2.1
+Summary: The MOOC Replication Framework Python API
+Home-page: https://jpgard.github.io/morf/
+Author: The University of Michigan/The University of Pennsylvania Center for Learning Analytics
+Author-email: morf-info@umich.edu
+License: UNKNOWN
+Description: The MOOC Replication Framework (MORF) is a framework that facilitates 
+            the replication of previously published findings across multiple data sets. It facilitates 
+            the construction and evaluation of end-to-end pipelines from raw data to evaluation. 
+            MORF is designed to ensure the seamless integration of new findings as new research is 
+            conducted or new hypotheses are generated, and to support the generation of novel 
+            research in the learning sciences.
+        
+            MORF is a joint project between the etc lab at the University of Michigan School of Information, 
+            and the University of Pennsylvania Center for Learning Analytics.
+Keywords: mooc replication
+Platform: UNKNOWN
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Science/Research
+Classifier: Programming Language :: Python :: 3.6
+Classifier: Topic :: Education
+Classifier: Topic :: Education :: Computer Aided Instruction (CAI)
+Classifier: Topic :: Internet :: Log Analysis
+Classifier: Topic :: Scientific/Engineering :: Information Analysis
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 2
+Classifier: Programming Language :: Python :: 2.7
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.4
+Classifier: Programming Language :: Python :: 3.5
+Classifier: Programming Language :: Python :: 3.6
