@@ -91,7 +91,16 @@ Once you have completed the `extract`, `train`, and `test` phases of an experime
 | ------------------------ | ------------------------------ |
 | `evaluate_course()`  | Evaluates predicted class labels and probabilities for each course. Generates detailed performance statistics for each course, which are sent to the user via email immediately after job completion on MORF.|
 
-To see a complete example of the output of MORF's model evaluation, try running the example code in the [getting started](https://jpgard.github.io/morf/getting-started/) section. If you'd like to use an additional outcome metric for your experiment that is currently not included in MORF's output, please contact us at morf-info@umich.edu.
+A sample of the output of MORF's model evaluation is shown below. MORF delivers results showing the prediction performance on the held-out session of each course, with a variety of classification metrics available.
+
+```
+course,N,N_n,N_p,accuracy,auc,cohen_kappa_score,f1_score,log_loss,precision,recall,specificity
+e3eec6238a6693ee403106ac69bab9ae6c1d921a,6114,2642,3472,0.586195616617599,0.5321443615540524,0.04942557809062886,0.7320482948527856,0.6754211937217535,0.578894472361809,0.9953917050691244,0.8888888888888888
+97db7ef73ad76d94d6595f5aff9750981fcec293,13482,4862,8620,0.6614745586708204,0.5328954074450184,0.08202710494276777,0.7897549290584116,0.6514077775507692,0.6549511002444988,0.9944315545243619,0.8781725888324873
+
+```
+
+These results can also be obtained by running the example code in the [getting started](https://jpgard.github.io/morf/getting-started/) section. If you'd like to use an additional outcome metric for your experiment that is currently not included in MORF's output, please contact us at morf-info@umich.edu.
 
 # MORF input-output contract
 
