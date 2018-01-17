@@ -1,8 +1,8 @@
-Metadata-Version: 1.1
+Metadata-Version: 1.2
 Name: morf-api
-Version: 0.2.1
+Version: 0.2.2
 Summary: The MOOC Replication Framework Python API
-Home-page: https://jpgard.github.io/morf/
+Home-page: https://educational-technology-collective.github.io/morf/
 Author: The University of Michigan/The University of Pennsylvania Center for Learning Analytics
 Author-email: morf-info@umich.edu
 License: UNKNOWN
@@ -32,3 +32,4 @@ Classifier: Programming Language :: Python :: 3
 Classifier: Programming Language :: Python :: 3.4
 Classifier: Programming Language :: Python :: 3.5
 Classifier: Programming Language :: Python :: 3.6
+Requires-Python: >=3

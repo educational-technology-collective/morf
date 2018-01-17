@@ -27,7 +27,7 @@ import subprocess
 import tempfile
 import boto3
 from morf.utils import *
-from morf.utils.config import get_config_properties, combine_config_files
+from morf.utils.config import get_config_properties, combine_config_files, update_config_fields_in_section
 from morf.utils.alerts import send_success_email, send_email_alert
 from urllib.parse import urlparse
 import os
@@ -138,7 +138,7 @@ def run_job(docker_url, mode, course, user, job_id, session, level, raw_data_buc
     return None
 
 
-def run_morf_job(client_config_url, server_config_url, email_to = None):
+def run_morf_job(client_config_url, server_config_url, email_to = None, no_cache = False):
     """
     Wrapper function to run complete MORF job.
     :param client_config_url: url to client.config file; should be located on local machine.
@@ -171,11 +171,12 @@ def run_morf_job(client_config_url, server_config_url, email_to = None):
         # from client.config, fetch and download the following: docker image, controller script
         try:
             fetch_file(s3, working_dir, config["docker_url"], dest_filename = docker_image_name)
-            cache_job_file_in_s3(s3, config["user_id"], config["job_id"], config["proc_data_bucket"],
-                                 docker_image_name)
             fetch_file(s3, working_dir, config["controller_url"], dest_filename = controller_script_name)
-            cache_job_file_in_s3(s3, config["user_id"], config["job_id"], config["proc_data_bucket"],
-                                 controller_script_name)
+            if not no_cache: # cache job files in s3 unless no_cache parameter set to true
+                cache_job_file_in_s3(s3, config["user_id"], config["job_id"], config["proc_data_bucket"],
+                                     docker_image_name)
+                cache_job_file_in_s3(s3, config["user_id"], config["job_id"], config["proc_data_bucket"],
+                                     controller_script_name)
         except KeyError as e:
             cause = e.args[0]
             print("[Error]: field {} missing from client.config file.".format(cause))

@@ -19,7 +19,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-import fileinput
+
 import os
 import re
 import shutil
@@ -574,8 +574,7 @@ def fetch_file(s3, dest_dir, remote_file_url, dest_filename = None):
         dest_filename = os.path.basename(remote_file_url)
     url = urlparse(remote_file_url)
     if url.scheme == "file":
-        source = url.netloc + url.path
-        shutil.copyfile(source, os.path.join(dest_dir, dest_filename))
+        shutil.copyfile(url.path, os.path.join(dest_dir, dest_filename))
     elif url.scheme == "s3":
         bucket = url.netloc
         key = url.path[1:]  # ignore initial /
@@ -584,7 +583,7 @@ def fetch_file(s3, dest_dir, remote_file_url, dest_filename = None):
         urllib.request.urlretrieve(remote_file_url, os.path.join(dest_dir, dest_filename))
     else:
         print(
-        "[ERROR] A URL which was not s3:// or file:// or https:// was passed in for docker file location, this is not supported. {}"
+        "[ERROR] A URL which was not s3:// or file:// or https:// was passed in for a file location, this is not supported. {}"
             .format(remote_file_url))
         sys.exit(-1)
     return
