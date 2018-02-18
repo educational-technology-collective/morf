@@ -30,9 +30,9 @@ RUN echo "mysql-server-5.7 mysql-server/root_password password root" | sudo debc
   echo "secure-file-priv = \"\"" >>  /etc/mysql/mysql.conf.d/mysqld.cnf
 
 # add scripts
-ADD ./mwe.py mwe.py
-ADD ./feature_extraction feature_extraction
-ADD ./modeling modeling
+ADD mwe.py /
+ADD feature_extraction /
+ADD modeling /
 # start mysql
 RUN service mysql start
 
