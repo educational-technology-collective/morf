@@ -389,4 +389,12 @@ $ docker run -it --entrypoint=/bin/bash --volume=/some/path/to/local:/input --vo
 
 This would open your Docker image with all of the contents of `/some/path/to/local` mounted at `/input` and `/some/other/path` mounted at `/output`, allowing you to mimic the directory structure used internally by MORF when executing your job.
 
+## Running MORF Locally
+
+This section describes how to run MORF locally. Essentially, this consists of executing a MORF controller script in an environment where the MORF api is installed. This can be useful if you would like to develop or test experiments locally before deploying them on the MORF platform. Follow the steps below to execute your MORF controller script.
+
+### Prepare Data and Environment
+
+1. Obtain data. In order to run MORF locally, you will need course data to execute your scripts on. This should include the complete data exports from the MOOC platform of interest (currently MORF only supports Coursera data). For Coursera, this includes up to seven files, including the course clickstream export, SQL exports of hash mappings and anonymized and non-anonymizable course data, and dempgraphics summaries and individual responses. More information about the Coursera Spark data exports used in the current version of MORF is available [here](https://spark-public.s3.amazonaws.com/mooc/data_exports.pdf).
+2. Put data in a directory structure that matches the MORF [input-output contract](#MORF-input-output-contract).
 
