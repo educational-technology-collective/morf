@@ -389,12 +389,27 @@ $ docker run -it --entrypoint=/bin/bash --volume=/some/path/to/local:/input --vo
 
 This would open your Docker image with all of the contents of `/some/path/to/local` mounted at `/input` and `/some/other/path` mounted at `/output`, allowing you to mimic the directory structure used internally by MORF when executing your job.
 
-## Running MORF Locally
+# Running MORF Locally
 
 This section describes how to run MORF locally. Essentially, this consists of executing a MORF controller script in an environment where the MORF api is installed. This can be useful if you would like to develop or test experiments locally before deploying them on the MORF platform. Follow the steps below to execute your MORF controller script.
 
-### Prepare Data and Environment
+## Prepare Data and Environment
 
-1. Obtain data. In order to run MORF locally, you will need course data to execute your scripts on. This should include the complete data exports from the MOOC platform of interest (currently MORF only supports Coursera data). For Coursera, this includes up to seven files, including the course clickstream export, SQL exports of hash mappings and anonymized and non-anonymizable course data, and dempgraphics summaries and individual responses. More information about the Coursera Spark data exports used in the current version of MORF is available [here](https://spark-public.s3.amazonaws.com/mooc/data_exports.pdf).
-2. Put data in a directory structure that matches the MORF [input-output contract](#MORF-input-output-contract).
+The first step to executing a MORF job locally is to prepare your data and environment.
 
+1. Install the `pip install morf-api` (which will also install any required dependencies) and [Docker CE](https://docs.docker.com/install/).
+2. Obtain data. In order to run MORF locally, you will need course data to execute your scripts on. This should include the complete data exports from the MOOC platform of interest (currently MORF only supports Coursera data). For Coursera, this includes up to seven files, including the course clickstream export, SQL exports of hash mappings and anonymized and non-anonymizable course data, and dempgraphics summaries and individual responses. More information about the Coursera Spark data exports used in the current version of MORF is available [here](https://spark-public.s3.amazonaws.com/mooc/data_exports.pdf).
+3. Deposit data in a directory structure that exactly matches the MORF [input-output contract](#morf-input-output-contract). Note that this must also include the `coursera_course_dates.csv` file (if you know the start and end dates of your courses, you can create this file manually using a text editor).
+4. Build a Docker image containing your experiment (you might want to consider starting with one of the examples in the MORF github repo, such as the [minimum working example](https://github.com/educational-technology-collective/morf/tree/master/mwe)).
+5. Write a controller script using the MORF API functions. Again, the controller script from the [minimum working example](https://github.com/educational-technology-collective/morf/tree/master/mwe) would be a good starting point, if this matches your desired workflow.
+6. Create a `config.properties` file with your MORF info. Note that this may also require creating an Amazon S3 bucket for caching your job results.
+
+## Execute controller script
+
+If your environment is set up correctly as described above, you should be able to execute your MORF job by simply executing the controller script:
+
+```
+python3 controller.py
+```
+
+Monitor the logging output to monitor the status of your job.
