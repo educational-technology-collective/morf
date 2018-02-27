@@ -117,3 +117,9 @@ def fetch_data_buckets_from_config(config_file = "config.properties", data_secti
             buckets.append(bucket)
     assert len(buckets) >= 1
     return buckets
+
+
+class MorfJobConfig:
+    def __init__(self):
+        self.type = "morf" #todo: delete this
+    
