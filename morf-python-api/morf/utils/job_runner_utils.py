@@ -185,10 +185,7 @@ def run_morf_job(client_config_url, server_config_url, email_to = None, no_cache
         # change working directory and run controller script with notifications for initialization and completion
         job_config.update_status("INITIALIZED")
         send_email_alert(job_config)
-        import ipdb;ipdb.set_trace()
         subprocess.call("python3 {}".format(controller_script_name), shell = True)
-        send_success_email(job_config.aws_access_key_id,
-                           job_config.aws_secret_access_key,
-                           job_config.proc_data_bucket,
-                           job_config.job_id, job_config.user_id, job_config.email_to)
+        job_config.update_status("SUCCESS")
+        send_success_email(job_config)
         return
