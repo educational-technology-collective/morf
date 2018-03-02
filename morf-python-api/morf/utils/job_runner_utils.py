@@ -192,15 +192,25 @@ def run_morf_job(client_config_url, server_config_url, email_to = None, no_cache
             print("[Error]: field {} missing from client.config file.".format(cause))
             sys.exit(-1)
         # change working directory and run controller script with notifications for initialization and completion
-        send_email_alert(config["aws_access_key_id"],
-                         config["aws_secret_access_key"],
-                         config["job_id"],
-                         config["user_id"],
-                         status = "INITIALIZED",
+        # send_email_alert(config["aws_access_key_id"],
+        #                  config["aws_secret_access_key"],
+        #                  config["job_id"],
+        #                  config["user_id"],
+        #                  status = "INITIALIZED",
+        #                  emailaddr_to=config["email_to"])
+        send_email_alert(job_config.aws_access_key_id,
+                         job_config.aws_secret_access_key,
+                         job_config.job_id,
+                         job_config.user_id,
+                         status="INITIALIZED",
                          emailaddr_to=config["email_to"])
         subprocess.call("python3 {}".format(controller_script_name), shell = True)
-        send_success_email(config["aws_access_key_id"],
-                           config["aws_secret_access_key"],
-                           config["proc_data_bucket"],
-                           config["job_id"], config["user_id"], config["email_to"])
+        # send_success_email(config["aws_access_key_id"],
+        #                    config["aws_secret_access_key"],
+        #                    config["proc_data_bucket"],
+        #                    config["job_id"], config["user_id"], config["email_to"])
+        send_success_email(job_config.aws_access_key_id,
+                           job_config.aws_secret_access_key,
+                           job_config.proc_data_bucket,
+                           job_config.job_id, job_config.user_id, job_config.email_to)
         return
