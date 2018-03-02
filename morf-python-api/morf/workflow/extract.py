@@ -28,13 +28,14 @@ Feature extraction functions for the MORF 2.0 API. For more information about th
 from morf.utils.job_runner_utils import run_job
 from morf.utils import make_s3_key_path
 from morf.utils.api_utils import *
-from morf.utils.config import get_config_properties, fetch_data_buckets_from_config
+from morf.utils.config import get_config_properties, fetch_data_buckets_from_config, MorfJobConfig
 from morf.utils.alerts import send_email_alert
 import boto3
 from multiprocessing import Pool
 
 
 # define module-level variables from config.properties
+CONFIG_FILENAME = "config.properties"
 proc_data_bucket = get_config_properties()["proc_data_bucket"]
 docker_url = get_config_properties()["docker_url"]
 user_id = get_config_properties()["user_id"]
@@ -42,9 +43,6 @@ job_id = get_config_properties()["job_id"]
 email_to = get_config_properties()["email_to"]
 aws_access_key_id = get_config_properties()["aws_access_key_id"]
 aws_secret_access_key = get_config_properties()["aws_secret_access_key"]
-# create s3 connection object for communicating with s3
-s3 = boto3.client("s3", aws_access_key_id=aws_access_key_id,
-                  aws_secret_access_key=aws_secret_access_key)
 
 
 def extract_all():
@@ -108,12 +106,12 @@ def extract_session(labels = False, raw_data_dir = "morf-data/", label_type = "l
     :raw_data_dir: path to directory in all data buckets where course-level directories are located; this should be uniform for every raw data bucket.
     :return:
     """
-    mode="extract"
-    raw_data_buckets = fetch_data_buckets_from_config()
+    job_config = MorfJobConfig(CONFIG_FILENAME)
+    job_config.update_mode("extract")
     # clear any preexisting data for this user/job/mode
-    clear_s3_subdirectory(proc_data_bucket, user_id, job_id, mode)
+    clear_s3_subdirectory(job_config)
     ## for each bucket, call job_runner once per session with --mode=extract and --level=session
-    for raw_data_bucket in raw_data_buckets:
+    for raw_data_bucket in job_config.raw_data_buckets:
         print("[INFO] processing bucket {}".format(raw_data_bucket))
         if multithread:
             with Pool() as pool:
