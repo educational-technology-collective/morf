@@ -164,10 +164,11 @@ def run_morf_job(client_config_url, server_config_url, email_to = None, no_cache
         combine_config_files(server_config_path, local_client_config_path, outfile = config_filename)
         config = get_config_properties(config_filename)
         job_config = MorfJobConfig(config_filename)
-        if email_to: # if email_to was provided, this overrides in config file -- allows users to easily run mwe
+        if email_to: # if email_to was provided by user, this overrides in config file -- allows users to easily run mwe
             print("[INFO] email address from submission {} overriding email address in config file {}"
                   .format(email_to, config["email_to"]))
             config["email_to"] = email_to
+            job_config.email_to = email_to
             update_config_fields_in_section("client", email_to = email_to)
         cache_job_file_in_s3(s3, config["user_id"], config["job_id"], config["proc_data_bucket"])
         # from client.config, fetch and download the following: docker image, controller script
