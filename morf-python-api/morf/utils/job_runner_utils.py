@@ -174,12 +174,18 @@ def run_morf_job(client_config_url, server_config_url, email_to = None, no_cache
         cache_job_file_in_s3(s3, job_config.user_id, job_config.job_id, job_config.proc_data_bucket)
         # from client.config, fetch and download the following: docker image, controller script
         try:
-            fetch_file(s3, working_dir, config["docker_url"], dest_filename = docker_image_name)
-            fetch_file(s3, working_dir, config["controller_url"], dest_filename = controller_script_name)
+            # fetch_file(s3, working_dir, config["docker_url"], dest_filename = docker_image_name)
+            fetch_file(s3, working_dir, job_config.docker_url, dest_filename=docker_image_name)
+            # fetch_file(s3, working_dir, config["controller_url"], dest_filename = controller_script_name)
+            fetch_file(s3, working_dir, job_config.controller_url, dest_filename=controller_script_name)
             if not no_cache: # cache job files in s3 unless no_cache parameter set to true
-                cache_job_file_in_s3(s3, config["user_id"], config["job_id"], config["proc_data_bucket"],
+                # cache_job_file_in_s3(s3, config["user_id"], config["job_id"], config["proc_data_bucket"],
+                #                      docker_image_name)
+                cache_job_file_in_s3(s3, job_config.user_id, job_config.job_id, job_config.proc_data_bucket,
                                      docker_image_name)
-                cache_job_file_in_s3(s3, config["user_id"], config["job_id"], config["proc_data_bucket"],
+                # cache_job_file_in_s3(s3, config["user_id"], config["job_id"], config["proc_data_bucket"],
+                #                      controller_script_name)
+                cache_job_file_in_s3(s3, job_config.user_id, job_config.job_id, job_config.proc_data_bucket,
                                      controller_script_name)
         except KeyError as e:
             cause = e.args[0]
