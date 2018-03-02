@@ -120,6 +120,15 @@ def fetch_data_buckets_from_config(config_file = "config.properties", data_secti
 
 
 class MorfJobConfig:
-    def __init__(self):
+    def __init__(self, config_file):
         self.type = "morf" #todo: delete this
-    
+        self.course = None
+        self.session = None
+        self.mode = None
+        properties = get_config_properties(config_file)
+        # add properties to class as attributes
+        for prop in properties.items():
+            setattr(self, prop[0], prop[1])
+
+
+
