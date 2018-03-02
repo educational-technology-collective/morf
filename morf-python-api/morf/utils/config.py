@@ -23,6 +23,7 @@
 Functions for working with (reading writing, modifying) MORF configuration files.
 """
 
+import boto3
 import configparser
 import fileinput
 import os
@@ -132,6 +133,8 @@ class MorfJobConfig:
             setattr(self, prop[0], prop[1])
         # fetch raw data buckets as list
         self.raw_data_buckets = fetch_data_buckets_from_config()
+        # # create s3 connection object for communicating with s3
+        # self.s3 = boto3.client("s3", properties["aws_access_key_id"], properties["aws_secret_access_key"])
 
     def check_configurations(self):
         # todo: check that all arguments are valid/acceptable
@@ -144,3 +147,8 @@ class MorfJobConfig:
     def update_mode(self, mode):
         # todo: check whether mode is valid by comparing with allowed values
         self.mode = mode
+
+    def initialize_s3(self):
+        # create s3 connection object for communicating with s3
+        self.s3 = boto3.client("s3", aws_access_key_id=self.aws_access_key_id,
+                  aws_secret_access_key=self.aws_secret_access_key)
