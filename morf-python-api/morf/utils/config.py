@@ -116,7 +116,7 @@ def fetch_data_buckets_from_config(config_file = "config.properties", data_secti
         else:
             buckets.append(bucket)
     assert len(buckets) >= 1
-    return buckets
+    return tuple(buckets)
 
 
 class MorfJobConfig:
@@ -130,6 +130,8 @@ class MorfJobConfig:
         # add properties to class as attributes
         for prop in properties.items():
             setattr(self, prop[0], prop[1])
+        # fetch raw data buckets as list
+        self.raw_data_buckets = fetch_data_buckets_from_config()
 
     def check_configurations(self):
         # todo: check that all arguments are valid/acceptable
