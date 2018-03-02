@@ -129,6 +129,3 @@ class MorfJobConfig:
         # add properties to class as attributes
         for prop in properties.items():
             setattr(self, prop[0], prop[1])
-
-
-
