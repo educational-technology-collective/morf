@@ -129,3 +129,7 @@ class MorfJobConfig:
         # add properties to class as attributes
         for prop in properties.items():
             setattr(self, prop[0], prop[1])
+
+    def check_configurations(self):
+        # todo: check that all arguments are valid/acceptable
+        pass
