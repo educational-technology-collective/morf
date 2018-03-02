@@ -136,5 +136,9 @@ class MorfJobConfig:
         pass
 
     def update_status(self, status):
-        # todo: check whether status is valid by comparing with a list
+        # todo: check whether status is valid by comparing with allowed values
         self.status = status
+
+    def update_mode(self, mode):
+        # todo: check whether mode is valid by comparing with allowed values
+        self.mode = mode
