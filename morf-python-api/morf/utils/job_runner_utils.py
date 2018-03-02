@@ -179,12 +179,8 @@ def run_morf_job(client_config_url, server_config_url, email_to = None, no_cache
             # fetch_file(s3, working_dir, config["controller_url"], dest_filename = controller_script_name)
             fetch_file(s3, working_dir, job_config.controller_url, dest_filename=controller_script_name)
             if not no_cache: # cache job files in s3 unless no_cache parameter set to true
-                # cache_job_file_in_s3(s3, config["user_id"], config["job_id"], config["proc_data_bucket"],
-                #                      docker_image_name)
                 cache_job_file_in_s3(s3, job_config.user_id, job_config.job_id, job_config.proc_data_bucket,
                                      docker_image_name)
-                # cache_job_file_in_s3(s3, config["user_id"], config["job_id"], config["proc_data_bucket"],
-                #                      controller_script_name)
                 cache_job_file_in_s3(s3, job_config.user_id, job_config.job_id, job_config.proc_data_bucket,
                                      controller_script_name)
         except KeyError as e:
@@ -203,7 +199,8 @@ def run_morf_job(client_config_url, server_config_url, email_to = None, no_cache
                          job_config.job_id,
                          job_config.user_id,
                          status="INITIALIZED",
-                         emailaddr_to=config["email_to"])
+                         emailaddr_to=job_config.email_to)
+        import ipdb;ipdb.set_trace()
         subprocess.call("python3 {}".format(controller_script_name), shell = True)
         # send_success_email(config["aws_access_key_id"],
         #                    config["aws_secret_access_key"],
