@@ -115,8 +115,7 @@ def verify_email_address(aws_access_key_id, aws_secret_access_key, email = "morf
     return
 
 
-def send_success_email(aws_access_key_id, aws_secret_access_key, proc_data_bucket, job_id, user_id, emailaddr_to,
-                       emailaddr_from ="morf-alerts@umich.edu", status = "SUCCESS"):
+def send_success_email(job_config, emailaddr_from ="morf-alerts@umich.edu"):
     """
     Send an email alert with an attachment.
     Modified substantially from:
@@ -129,6 +128,13 @@ def send_success_email(aws_access_key_id, aws_secret_access_key, proc_data_bucke
     :param attachment_filepath:
     :return:
     """
+    aws_access_key_id = job_config.aws_access_key_id
+    aws_secret_access_key = job_config.aws_secret_access_key
+    proc_data_bucket = job_config.proc_data_bucket
+    job_id = job_config.job_id
+    user_id = job_config.user_id
+    emailaddr_to = job_config.email_to
+    status = job_config.status
     results_file_name = "morf-results.csv"
     s3 = boto3.client("s3", aws_access_key_id=aws_access_key_id,
                       aws_secret_access_key=aws_secret_access_key)
@@ -140,7 +146,7 @@ def send_success_email(aws_access_key_id, aws_secret_access_key, proc_data_bucke
         data = f.read()
     output = io.StringIO(data)
     # Build an email
-    subject_text = construct_message_subject(job_id)
+    subject_text = construct_message_subject(job_config)
     msg = MIMEMultipart()
     msg["Subject"] = subject_text
     msg["From"] = emailaddr_from
@@ -148,7 +154,7 @@ def send_success_email(aws_access_key_id, aws_secret_access_key, proc_data_bucke
     # What a recipient sees if they don't use an email reader
     msg.preamble = "Multipart message.\n"
     # the body
-    body_text = construct_message_body(job_id, status)
+    body_text = construct_message_body(job_config)
     body = MIMEText(body_text)
     msg.attach(body)
     # The attachment
@@ -189,7 +195,7 @@ def send_queueing_alert(aws_access_key_id, aws_secret_access_key, emailaddr_to, 
     subject = "MORF job queued for execution"
     message_body = """
 
-        This is an automated notification that your submissiont to MORF has been queued for execution.
+        This is an automated notification that your submission to MORF has been queued for execution.
 
         If you need support with MORF, check the MORF documentation at {} or contact the maintainers at {}.
 
