@@ -125,6 +125,7 @@ class MorfJobConfig:
         self.course = None
         self.session = None
         self.mode = None
+        self.status = "START" # todo: update this at each step of workflow
         properties = get_config_properties(config_file)
         # add properties to class as attributes
         for prop in properties.items():
