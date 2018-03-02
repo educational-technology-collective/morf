@@ -30,8 +30,10 @@ from email.mime.multipart import MIMEMultipart
 import io
 
 
-def construct_message_body(job_id, status, docs_url = "https://jpgard.github.io/morf/",
+def construct_message_body(job_config, docs_url = "https://jpgard.github.io/morf/",
                            emailaddr_info="morf-info@umich.edu"):
+    job_id = job_config.job_id
+    status = job_config.status
     message_body = """
 
         This is an automated notification that execution for your job on MORF for job_id {} has successfully completed status {}.
@@ -45,12 +47,12 @@ def construct_message_body(job_id, status, docs_url = "https://jpgard.github.io/
     return message_body
 
 
-def construct_message_subject(job_id):
-    subject = "MORF notification: job {}".format(job_id)
+def construct_message_subject(job_config):
+    subject = "MORF notification: job {}".format(job_config.job_id)
     return subject
 
 
-def ses_send_email(aws_access_key_id, aws_secret_access_key, emailaddr_to, emailaddr_from, subject, body, status):
+def ses_send_email(job_config, emailaddr_from, subject, body):
     """
     Send email via ses.
     :param aws_access_key_id:
@@ -62,6 +64,10 @@ def ses_send_email(aws_access_key_id, aws_secret_access_key, emailaddr_to, email
     :param status:
     :return:
     """
+    aws_access_key_id = job_config.aws_access_key_id
+    aws_secret_access_key = job_config.aws_secret_access_key
+    emailaddr_to = job_config.email_to
+    status = job_config.status
     client = boto3.client("ses", region_name="us-east-1", aws_access_key_id=aws_access_key_id,
                           aws_secret_access_key=aws_secret_access_key)
     alert_destination = {
@@ -80,22 +86,18 @@ def ses_send_email(aws_access_key_id, aws_secret_access_key, emailaddr_to, email
     return
 
 
-def send_email_alert(aws_access_key_id, aws_secret_access_key, job_id, user_id, status, emailaddr_to,
-                     emailaddr_from ="morf-alerts@umich.edu"):
+def send_email_alert(job_config, emailaddr_from ="morf-alerts@umich.edu"):
     """
     Send email alert with status update email_to [email_to].
     You may need email_to verify the sender address by using verify_email_address()
         and clicking the link in the verification email sent to this address.
-    :param aws_access_key_id: aws access key from config.properties (string).
-    :param aws_secret_access_key: aws secret access key from config.properties (string).
-    :param mode: mode of job; one of {extract, train, test} (string).
-    :param status: stats of job, one of {success, failure} (string).
-    :param emailaddr_to: email address email_to send notification email_to (string)
+    :param job_config: MorfJobConfig object.
+    :param emailaddr_from: email address to send alert from
     :return: None
     """
-    subject = construct_message_subject(job_id)
-    body = construct_message_body(job_id, status)
-    ses_send_email(aws_access_key_id, aws_secret_access_key, emailaddr_to, emailaddr_from, subject, body, status)
+    subject = construct_message_subject(job_config)
+    body = construct_message_body(job_config)
+    ses_send_email(job_config, emailaddr_from, subject, body)
     return
 
 
@@ -113,8 +115,7 @@ def verify_email_address(aws_access_key_id, aws_secret_access_key, email = "morf
     return
 
 
-def send_success_email(aws_access_key_id, aws_secret_access_key, proc_data_bucket, job_id, user_id, emailaddr_to,
-                       emailaddr_from ="morf-alerts@umich.edu", status = "SUCCESS"):
+def send_success_email(job_config, emailaddr_from ="morf-alerts@umich.edu"):
     """
     Send an email alert with an attachment.
     Modified substantially from:
@@ -127,6 +128,13 @@ def send_success_email(aws_access_key_id, aws_secret_access_key, proc_data_bucke
     :param attachment_filepath:
     :return:
     """
+    aws_access_key_id = job_config.aws_access_key_id
+    aws_secret_access_key = job_config.aws_secret_access_key
+    proc_data_bucket = job_config.proc_data_bucket
+    job_id = job_config.job_id
+    user_id = job_config.user_id
+    emailaddr_to = job_config.email_to
+    status = job_config.status
     results_file_name = "morf-results.csv"
     s3 = boto3.client("s3", aws_access_key_id=aws_access_key_id,
                       aws_secret_access_key=aws_secret_access_key)
@@ -138,7 +146,7 @@ def send_success_email(aws_access_key_id, aws_secret_access_key, proc_data_bucke
         data = f.read()
     output = io.StringIO(data)
     # Build an email
-    subject_text = construct_message_subject(job_id)
+    subject_text = construct_message_subject(job_config)
     msg = MIMEMultipart()
     msg["Subject"] = subject_text
     msg["From"] = emailaddr_from
@@ -146,7 +154,7 @@ def send_success_email(aws_access_key_id, aws_secret_access_key, proc_data_bucke
     # What a recipient sees if they don't use an email reader
     msg.preamble = "Multipart message.\n"
     # the body
-    body_text = construct_message_body(job_id, status)
+    body_text = construct_message_body(job_config)
     body = MIMEText(body_text)
     msg.attach(body)
     # The attachment
@@ -187,7 +195,7 @@ def send_queueing_alert(aws_access_key_id, aws_secret_access_key, emailaddr_to, 
     subject = "MORF job queued for execution"
     message_body = """
 
-        This is an automated notification that your submissiont to MORF has been queued for execution.
+        This is an automated notification that your submission to MORF has been queued for execution.
 
         If you need support with MORF, check the MORF documentation at {} or contact the maintainers at {}.
 

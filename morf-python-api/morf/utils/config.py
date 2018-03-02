@@ -134,3 +134,7 @@ class MorfJobConfig:
     def check_configurations(self):
         # todo: check that all arguments are valid/acceptable
         pass
+
+    def update_status(self, status):
+        # todo: check whether status is valid by comparing with a list
+        self.status = status
