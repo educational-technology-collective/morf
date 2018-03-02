@@ -117,3 +117,20 @@ def fetch_data_buckets_from_config(config_file = "config.properties", data_secti
             buckets.append(bucket)
     assert len(buckets) >= 1
     return buckets
+
+
+class MorfJobConfig:
+    def __init__(self, config_file):
+        self.type = "morf" #todo: delete this
+        self.course = None
+        self.session = None
+        self.mode = None
+        self.status = "START" # todo: update this at each step of workflow
+        properties = get_config_properties(config_file)
+        # add properties to class as attributes
+        for prop in properties.items():
+            setattr(self, prop[0], prop[1])
+
+    def check_configurations(self):
+        # todo: check that all arguments are valid/acceptable
+        pass
