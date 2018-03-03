@@ -36,13 +36,6 @@ from multiprocessing import Pool
 
 # define module-level variables from config.properties
 CONFIG_FILENAME = "config.properties"
-proc_data_bucket = get_config_properties()["proc_data_bucket"]
-docker_url = get_config_properties()["docker_url"]
-user_id = get_config_properties()["user_id"]
-job_id = get_config_properties()["job_id"]
-email_to = get_config_properties()["email_to"]
-aws_access_key_id = get_config_properties()["aws_access_key_id"]
-aws_secret_access_key = get_config_properties()["aws_secret_access_key"]
 
 
 def extract_all():
@@ -109,7 +102,7 @@ def extract_session(labels = False, raw_data_dir = "morf-data/", label_type = "l
     job_config = MorfJobConfig(CONFIG_FILENAME)
     job_config.update_mode("extract")
     job_config.initialize_s3()
-    # clear any preexisting data for this user/job/mode
+    # # clear any preexisting data for this user/job/mode
     clear_s3_subdirectory(job_config)
     ## for each bucket, call job_runner once per session with --mode=extract and --level=session
     for raw_data_bucket in job_config.raw_data_buckets:
@@ -128,21 +121,16 @@ def extract_session(labels = False, raw_data_dir = "morf-data/", label_type = "l
                 for run in fetch_sessions(s3, raw_data_bucket, raw_data_dir, course, fetch_holdout_session_only=False):
                     run_job(docker_url, mode, course, user_id, job_id, run, "session", raw_data_bucket)
     if not labels: # normal feature extraction job; collects features across all buckets and upload to proc_data_bucket
-        result_file = collect_session_results(s3, raw_data_buckets, proc_data_bucket, mode, user_id, job_id)
-        upload_key = "{}/{}/extract/{}".format(user_id, job_id, result_file)
-        upload_file_to_s3(result_file, bucket = proc_data_bucket, key = upload_key)
+        result_file = collect_session_results(job_config)
+        upload_key = "{}/{}/extract/{}".format(job_config.user_id, job_config.job_id, result_file)
+        upload_file_to_s3(result_file, bucket = job_config.proc_data_bucket, key = upload_key)
     if labels: # label extraction job; copy file into raw course data dir instead of proc_data_bucket, creating separate label files for each bucket
-        for raw_data_bucket in raw_data_buckets:
-            result_file = collect_session_results(s3, [raw_data_bucket], proc_data_bucket, mode, user_id, job_id)
+        for raw_data_bucket in job_config.raw_data_buckets:
+            result_file = collect_session_results(job_config, raw_data_buckets = [raw_data_bucket])
             upload_key = raw_data_dir + "{}.csv".format(label_type)
             upload_file_to_s3(result_file, bucket = raw_data_bucket, key = upload_key)
     os.remove(result_file)
-    send_email_alert(aws_access_key_id,
-                     aws_secret_access_key,
-                     job_id,
-                     user_id,
-                     status=mode,
-                     emailaddr_to=email_to)
+    send_email_alert(job_config)
     return
 
 
