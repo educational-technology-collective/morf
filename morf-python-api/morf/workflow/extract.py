@@ -108,6 +108,7 @@ def extract_session(labels = False, raw_data_dir = "morf-data/", label_type = "l
     """
     job_config = MorfJobConfig(CONFIG_FILENAME)
     job_config.update_mode("extract")
+    job_config.initialize_s3()
     # clear any preexisting data for this user/job/mode
     clear_s3_subdirectory(job_config)
     ## for each bucket, call job_runner once per session with --mode=extract and --level=session
@@ -115,11 +116,11 @@ def extract_session(labels = False, raw_data_dir = "morf-data/", label_type = "l
         print("[INFO] processing bucket {}".format(raw_data_bucket))
         if multithread:
             with Pool() as pool:
-                for course in fetch_courses(s3, raw_data_bucket, raw_data_dir):
-                    for run in fetch_sessions(s3, raw_data_bucket, raw_data_dir, course, 
+                for course in fetch_courses(job_config, raw_data_bucket, raw_data_dir):
+                    for run in fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course,
                                               fetch_holdout_session_only=False):
-                        pool.apply_async(run_job, [docker_url, mode, course, user_id, job_id, run, "session", 
-                                                   raw_data_bucket])
+                        pool.apply_async(run_job, [job_config.docker_url, job_config.mode, course, job_config.user_id,
+                                                   job_config.job_id, run, "session", raw_data_bucket])
                 pool.close()
                 pool.join()
         else: # do job in serial; this is useful for debugging
