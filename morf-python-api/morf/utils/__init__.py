@@ -102,14 +102,15 @@ def set_all_file_permissions(dir):
     return
 
 
-def fetch_courses(s3, data_bucket, data_dir ="morf-data/"):
+def fetch_courses(job_config, data_bucket, data_dir ="morf-data/"):
     """
     Fetch list of course names in data_bucket/data_dir.
-    :param s3: boto3.client object with appropriate access credentials.
+    :param job_config: MorfJobConfig object.
     :param data_bucket: name of bucket containing data; s3 should have read/copy access to this bucket.
     :param data_dir: path to directory in data_bucket that contains course-level directories of raw data.
     :return: courses; list of course names as strings.
     """
+    s3 = job_config.s3
     if not data_dir.endswith("/"):
         data_dir = "{0}/".format(data_dir)
     bucket_objects = s3.list_objects(Bucket=data_bucket, Prefix=data_dir, Delimiter="/")
@@ -117,16 +118,17 @@ def fetch_courses(s3, data_bucket, data_dir ="morf-data/"):
     return courses
 
 
-def fetch_sessions(s3, data_bucket, data_dir, course, fetch_holdout_session_only = False):
+def fetch_sessions(job_config, data_bucket, data_dir, course, fetch_holdout_session_only = False):
     """
     Fetch course sessions in data_bucket/data_dir.
-    :param s3: boto3.client object with appropriate access credentials.
+    :param job_config: MorfJobConfig object.
     :param data_bucket: name of bucket containing data; s3 should have read/copy access to this bucket.
     :param data_dir: path to directory in data_bucket that contains course-level directories of raw data.
     :param course: string; name of course (should match course-level directory name in s3 directory tree).
     :param fetch_holdout_session_only: logical; used to determine whether to fetch holdout (final) session or a list of all training sessions (all other sessions besides holdout).
     :return: list of session numbers as strings.
     """
+    s3 = job_config.s3
     if not data_dir.endswith("/"):
         data_dir = data_dir + "/"
     course_bucket_objects = s3.list_objects(Bucket=data_bucket, Prefix="".join([data_dir, course, "/"]), Delimiter="/")
@@ -664,18 +666,19 @@ def move_results_to_destination(archive_file, bucket, user_id, job_id, mode, cou
     return
 
 
-def fetch_result_file(s3, bucket, user_id, job_id, mode, dir, course = None, session = None):
+def fetch_result_file(job_config, dir, course = None, session = None):
     """
     Download and untar result file for user_id, job_id, mode, and (optional) course and session from bucket.
-    :param s3:
-    :param bucket: bucket containing data
-    :param user_id: 
-    :param job_id: 
-    :param mode: 
-    :param course:
-    :param session:
-    :return: 
+    :param job_config: MorfJobConfig object.
+    :param course: course shorname.
+    :param session: session number.
+    :return:  None.
     """
+    s3 = job_config.s3
+    bucket = job_config.proc_data_bucket
+    user_id = job_config.user_id
+    job_id = job_config.job_id
+    mode = job_config.mode
     archive_file = generate_archive_filename(user_id, job_id, mode, course, session)
     key = make_s3_key_path(user_id=user_id, job_id=job_id, mode=mode, course=course, session=session,
                            filename=archive_file)
