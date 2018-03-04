@@ -151,5 +151,6 @@ class MorfJobConfig:
 
     def initialize_s3(self):
         # create s3 connection object for communicating with s3
-        self.s3 = boto3.client("s3", aws_access_key_id=self.aws_access_key_id,
+        s3obj = boto3.client("s3", aws_access_key_id=self.aws_access_key_id,
                   aws_secret_access_key=self.aws_secret_access_key)
+        return s3obj
