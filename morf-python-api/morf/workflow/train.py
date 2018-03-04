@@ -32,16 +32,16 @@ import boto3
 from multiprocessing import Pool
 
 # define module-level variables from config.properties
-proc_data_bucket = get_config_properties()["proc_data_bucket"]
-docker_url = get_config_properties()["docker_url"]
-user_id = get_config_properties()["user_id"]
-job_id = get_config_properties()["job_id"]
-email_to = get_config_properties()["email_to"]
-aws_access_key_id = get_config_properties()["aws_access_key_id"]
-aws_secret_access_key = get_config_properties()["aws_secret_access_key"]
-# create s3 connection object for communicating with s3
-s3 = boto3.client('s3', aws_access_key_id=aws_access_key_id,
-                  aws_secret_access_key=aws_secret_access_key)
+# proc_data_bucket = get_config_properties()["proc_data_bucket"]
+# docker_url = get_config_properties()["docker_url"]
+# user_id = get_config_properties()["user_id"]
+# job_id = get_config_properties()["job_id"]
+# email_to = get_config_properties()["email_to"]
+# aws_access_key_id = get_config_properties()["aws_access_key_id"]
+# aws_secret_access_key = get_config_properties()["aws_secret_access_key"]
+# # create s3 connection object for communicating with s3
+# s3 = boto3.client('s3', aws_access_key_id=aws_access_key_id,
+#                   aws_secret_access_key=aws_secret_access_key)
 
 mode = "train"
 
@@ -73,6 +73,7 @@ def train_course(label_type, raw_data_dir = "morf-data/"):
     :raw_data_dir: path to directory in all data buckets where course-level directories are located; this should be uniform for every raw data bucket.
     :return: None
     """
+    level = "course"
     check_label_type(label_type)
     raw_data_buckets = fetch_data_buckets_from_config()
     # clear any preexisting data for this user/job/mode
@@ -82,7 +83,7 @@ def train_course(label_type, raw_data_dir = "morf-data/"):
         print("[INFO] processing bucket {}".format(raw_data_bucket))
         with Pool() as pool:
             for course in fetch_complete_courses(s3, raw_data_bucket, raw_data_dir, n_train=1):
-                pool.apply_async(run_job, [docker_url, mode, course, user_id, job_id, None, "course", raw_data_bucket, label_type])
+                pool.apply_async(run_job, [docker_url, mode, course, user_id, job_id, None, level, raw_data_bucket, label_type])
             pool.close()
             pool.join()
     send_email_alert(aws_access_key_id,
