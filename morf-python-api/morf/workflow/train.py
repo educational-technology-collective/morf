@@ -85,7 +85,7 @@ def train_course(label_type, raw_data_dir = "morf-data/"):
     clear_s3_subdirectory(job_config)
 
     # for each bucket, call job_runner once per course with --mode=train and --level=course
-    for raw_data_bucket in rjob_config.raw_data_buckets:
+    for raw_data_bucket in job_config.raw_data_buckets:
         print("[INFO] processing bucket {}".format(raw_data_bucket))
         with Pool() as pool:
             for course in fetch_complete_courses(job_config, raw_data_bucket, raw_data_dir, n_train=1):
