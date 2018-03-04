@@ -69,7 +69,7 @@ def train_all(label_type):
     return
 
 
-def train_course(label_type, raw_data_dir = "morf-data/"):
+def train_course(label_type, raw_data_dir = "morf-data/", multithread = True):
     """
     Trains one model per course using the Docker image.
     :param label_type:  label type provided by user.
@@ -87,11 +87,15 @@ def train_course(label_type, raw_data_dir = "morf-data/"):
     # for each bucket, call job_runner once per course with --mode=train and --level=course
     for raw_data_bucket in job_config.raw_data_buckets:
         print("[INFO] processing bucket {}".format(raw_data_bucket))
-        with Pool() as pool:
+        if multithread:
+            with Pool() as pool:
+                for course in fetch_complete_courses(job_config, raw_data_bucket, raw_data_dir, n_train=1):
+                    pool.apply_async(run_job, [job_config, course, None, level, raw_data_bucket, label_type])
+                pool.close()
+                pool.join()
+        else: # do job in serial; useful for debugging
             for course in fetch_complete_courses(job_config, raw_data_bucket, raw_data_dir, n_train=1):
-                pool.apply_async(run_job, [job_config, course, None, level, raw_data_bucket, label_type])
-            pool.close()
-            pool.join()
+                run_job(job_config, course, None, level, raw_data_bucket, label_type)
     send_email_alert(job_config)
     return
 
