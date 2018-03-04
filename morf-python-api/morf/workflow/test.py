@@ -71,8 +71,7 @@ def test_course(raw_data_dir = "morf-data/"):
     """
     level = "course"
     job_config = MorfJobConfig(CONFIG_FILENAME)
-    job_config.update_mode("train")
-    job_config.initialize_s3()
+    job_config.update_mode(mode)
     check_label_type(label_type)
     # clear any preexisting data for this user/job/mode
     clear_s3_subdirectory(job_config)
@@ -84,17 +83,10 @@ def test_course(raw_data_dir = "morf-data/"):
                 pool.apply_async(run_job, [job_config, course, None, level, raw_data_bucket, label_type])
             pool.close()
             pool.join()
-    result_file = collect_course_results(s3, raw_data_buckets, proc_data_bucket, mode, user_id, job_id)
-    upload_key = make_s3_key_path(user_id, job_id, mode, course= None,
-                                  filename= generate_archive_filename(user_id=user_id, job_id=job_id, mode=mode,
-                                                                      extension="csv"))
-    upload_file_to_s3(result_file, bucket=proc_data_bucket, key=upload_key)
+    result_file = collect_course_results(job_config)
+    upload_key = make_s3_key_path(job_config, filename= generate_archive_filename(job_config, extension="csv"))
+    upload_file_to_s3(result_file, bucket=job_config.proc_data_bucket, key=upload_key)
     os.remove(result_file)
-    send_email_alert(aws_access_key_id,
-                     aws_secret_access_key,
-                     job_id,
-                     user_id,
-                     status=mode,
-                     emailaddr_to=email_to)
+    send_email_alert(job_config)
     return
 
