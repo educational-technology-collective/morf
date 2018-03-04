@@ -359,9 +359,9 @@ def initialize_train_test_data(job_config, raw_data_bucket, level, label_type, c
         for bucket in raw_data_bucket:
             for course in fetch_courses(s3, bucket, raw_data_dir):
                 if mode == "train":
-                    sessions = fetch_sessions(s3, bucket, raw_data_dir, course)
+                    sessions = fetch_sessions(job_config, bucket, raw_data_dir, course)
                 elif mode == "test":
-                    sessions = fetch_sessions(s3, bucket, raw_data_dir, course, fetch_holdout_session_only=True)
+                    sessions = fetch_sessions(job_config, bucket, raw_data_dir, course, fetch_holdout_session_only=True)
                 for session in sessions:
                     download_train_test_data(s3, aws_access_key_id, aws_secret_access_key, bucket, raw_data_dir,
                                              proc_data_bucket, course, session, input_dir, proc_data_dir, mode,
