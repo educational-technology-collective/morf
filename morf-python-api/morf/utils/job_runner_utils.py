@@ -106,15 +106,12 @@ def run_image(docker_url, user_id, job_id, mode, raw_data_bucket, course=None, s
     return
 
 
-def run_job(docker_url, mode, course, user, job_id, session, level, raw_data_bucket=None,
+def run_job(job_config, course, session, level, raw_data_bucket=None,
             label_type=None, raw_data_buckets=None):
     """
     Call job runner with correct parameters.
-    :param docker_url: path to docker executable (string).
-    :param mode: mode of job (string).
+    :param job_config: MorfJobConfig object.
     :param course: course id (string); set as None if level == all.
-    :param user: user name (string).
-    :param job_id: user-specified job id (string).
     :param session: session number (string); set as none if level != session.
     :param level: one of {session, course, all}
     :param raw_data_bucket: name of bucket containing raw data.
@@ -122,6 +119,13 @@ def run_job(docker_url, mode, course, user, job_id, session, level, raw_data_buc
     :param raw_data_buckets: list of buckets (for use with level == all)
     :return: result of call to subprocess.call().
     """
+    print("COURSE {} SESSION {} run_job()".format(course, session))
+    docker_url = job_config.docker_url
+    user = job_config.user_id
+    job_id = job_config.job_id
+    mode = job_config.mode
+    if not raw_data_buckets:
+        raw_data_buckets = job_config.raw_data_buckets
     # todo: just set default values as none; no need for control flow below
     # todo: specify bucket here and make a required argument (currently run_image just defaults to using morf-michigan)
     # todo: different calls to run_image for each level are probably not necessary; all defaults are set to 'none'
@@ -133,6 +137,7 @@ def run_job(docker_url, mode, course, user, job_id, session, level, raw_data_buc
     elif level == "course":
         run_image(docker_url, user, job_id, mode, raw_data_bucket, course=course, level=level, label_type=label_type)
     elif level == "session":
+        print("[TEST] running run_job at level SESSION")
         run_image(docker_url, user, job_id, mode, raw_data_bucket, course=course, session=session, level=level,
                   label_type=label_type)
     return None
