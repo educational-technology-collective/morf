@@ -329,7 +329,6 @@ def initialize_raw_course_data(s3, aws_access_key_id, aws_secret_access_key, raw
     return
 
 
-# todo: update docstring
 def initialize_train_test_data(job_config, raw_data_bucket, level, label_type, course = None, session = None, input_dir ='./input',
                                raw_data_dir = 'morf-data/'):
     """
@@ -372,13 +371,9 @@ def initialize_train_test_data(job_config, raw_data_bucket, level, label_type, c
         elif mode == "test":
             sessions = fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course, fetch_holdout_session_only=True)
         for session in sessions:
-            download_train_test_data(s3, aws_access_key_id, aws_secret_access_key, raw_data_bucket, raw_data_dir,
-                                     proc_data_bucket, course, session, input_dir, proc_data_dir, mode, label_type,
-                                     user_id, job_id)
+            download_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, session, input_dir, label_type)
     if level == "session": # download data for this session only
-        download_train_test_data(s3, aws_access_key_id, aws_secret_access_key, raw_data_bucket, raw_data_dir,
-                                 proc_data_bucket, course, session, input_dir, proc_data_dir, mode, label_type,
-                                 user_id, job_id)
+        download_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, session, input_dir, label_type)
     return
 
 
