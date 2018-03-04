@@ -430,7 +430,7 @@ def clear_s3_subdirectory(job_config, course = None, session = None):
     :param session:
     :return:
     """
-    s3_prefix = "/".join([x for x in [job_config.user_id, job_config.job_id, job_config.mode, job_config.course, job_config.session] if x is not None]) + "/"
+    s3_prefix = "/".join([x for x in [job_config.user_id, job_config.job_id, job_config.mode, course, session] if x is not None]) + "/"
     print("[INFO] clearing previous job data at s3://{}".format(s3_prefix))
     delete_s3_keys(job_config.proc_data_bucket, prefix = s3_prefix)
     return
