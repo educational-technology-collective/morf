@@ -45,6 +45,9 @@ from multiprocessing import Pool
 
 mode = "train"
 
+# define module-level variables for config.properties
+CONFIG_FILENAME = "config.properties"
+
 
 def train_all(label_type):
     """
@@ -74,10 +77,13 @@ def train_course(label_type, raw_data_dir = "morf-data/"):
     :return: None
     """
     level = "course"
+    job_config = MorfJobConfig(CONFIG_FILENAME)
+    job_config.update_mode("train")
+    job_config.initialize_s3()
     check_label_type(label_type)
-    raw_data_buckets = fetch_data_buckets_from_config()
-    # clear any preexisting data for this user/job/mode
-    clear_s3_subdirectory(proc_data_bucket, user_id, job_id, mode)
+    # # clear any preexisting data for this user/job/mode
+    clear_s3_subdirectory(job_config)
+
     # for each bucket, call job_runner once per course with --mode=train and --level=course
     for raw_data_bucket in raw_data_buckets:
         print("[INFO] processing bucket {}".format(raw_data_bucket))
