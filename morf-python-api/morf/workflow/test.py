@@ -70,7 +70,10 @@ def test_course(raw_data_dir = "morf-data/"):
     :return:
     """
     level = "course"
-    raw_data_buckets = fetch_data_buckets_from_config()
+    job_config = MorfJobConfig(CONFIG_FILENAME)
+    job_config.update_mode("train")
+    job_config.initialize_s3()
+    check_label_type(label_type)
     # clear any preexisting data for this user/job/mode
     clear_s3_subdirectory(proc_data_bucket, user_id, job_id, mode)
     ## for each bucket, call job_runner once per course with --mode=test and --level=course
