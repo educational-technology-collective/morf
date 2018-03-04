@@ -575,7 +575,7 @@ def generate_archive_filename(user_id, job_id, mode, course=None, session=None, 
     return archive_file
 
 
-def make_output_archive_file(output_dir, mode, user_id, job_id, course=None, session = None):
+def make_output_archive_file(output_dir, job_config, course=None, session = None):
     """
     Archive output_dir into archive file, and return name of archive file.
     :param output_dir: directory to compress into archive_file.
@@ -586,7 +586,7 @@ def make_output_archive_file(output_dir, mode, user_id, job_id, course=None, ses
     :param session: session number of course (string) (optional, only needed when mode == extract).
     :return: name of archive file (string).
     """
-    archive_file = generate_archive_filename(user_id, job_id, mode, course, session)
+    archive_file = generate_archive_filename(job_config.user_id, job_config.job_id, job_config.mode, course, session)
     # archive results; only save directory structure relative to output_dir (NOT absolute directory structure)
     print("[INFO] archiving results to {} as {}".format(output_dir, archive_file))
     # todo: use python tarfile here
