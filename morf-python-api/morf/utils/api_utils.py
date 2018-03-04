@@ -92,7 +92,7 @@ def collect_course_results(job_config, raw_data_dir = "morf-data/"):
     """
     s3 = job_config.initialize_s3()
     raw_data_buckets = job_config.raw_data_buckets
-    proc_data_bucket = job_config.proc_data_buckets
+    proc_data_bucket = job_config.proc_data_bucket
     mode = job_config.mode
     user_id = job_config.user_id
     job_id = job_config.job_id
