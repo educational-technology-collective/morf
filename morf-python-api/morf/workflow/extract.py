@@ -34,7 +34,7 @@ import boto3
 from multiprocessing import Pool
 
 
-# define module-level variables from config.properties
+# define module-level variables for config.properties
 CONFIG_FILENAME = "config.properties"
 
 
