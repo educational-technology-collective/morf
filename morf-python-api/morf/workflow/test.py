@@ -69,6 +69,7 @@ def test_course(raw_data_dir = "morf-data/"):
     tests one model per course using the Docker image.
     :return:
     """
+    level = "course"
     raw_data_buckets = fetch_data_buckets_from_config()
     # clear any preexisting data for this user/job/mode
     clear_s3_subdirectory(proc_data_bucket, user_id, job_id, mode)
@@ -77,7 +78,7 @@ def test_course(raw_data_dir = "morf-data/"):
         print("[INFO] processing bucket {}".format(raw_data_bucket))
         with Pool() as pool:
             for course in fetch_complete_courses(s3, raw_data_bucket, raw_data_dir, n_train=1):
-                pool.apply_async(run_job, [docker_url, mode, course, user_id, job_id, None, "course", raw_data_bucket])
+                pool.apply_async(run_job, [docker_url, mode, course, user_id, job_id, None, level, raw_data_bucket])
             pool.close()
             pool.join()
     result_file = collect_course_results(s3, raw_data_buckets, proc_data_bucket, mode, user_id, job_id)
