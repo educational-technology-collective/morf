@@ -254,7 +254,7 @@ def download_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, 
     session_input_dir = os.path.join(input_dir, course, session)
     os.makedirs(session_input_dir)
     # download features file
-    feature_csv = generate_archive_filename(user_id=user_id, job_id=job_id, mode=fetch_mode, extension="csv")
+    feature_csv = generate_archive_filename(job_config, mode=fetch_mode, extension="csv")
     key = "{}/{}/{}/{}".format(user_id, job_id, fetch_mode, feature_csv)
     download_from_s3(proc_data_bucket, key, s3, session_input_dir)
     # read features file and filter to only include specific course/session
@@ -518,7 +518,7 @@ def download_models(job_config, course, dest_dir, level, session = None):
 
     if level == "all":
         # just one model file
-        mod_archive_file = generate_archive_filename(user_id, job_id, "train")
+        mod_archive_file = generate_archive_filename(job_config, mode = "train")
         key = make_s3_key_path(job_config, filename = mod_archive_file)
         download_model_from_s3(bucket, key, s3, dest_dir)
     if level in ["course","session"]: # model files might be in either course- or session-level directories
@@ -558,7 +558,7 @@ def fetch_file(s3, dest_dir, remote_file_url, dest_filename = None):
     return
 
 
-def generate_archive_filename(user_id, job_id, mode, course=None, session=None, extension ="tgz"):
+def generate_archive_filename(job_config, course=None, session=None, extension ="tgz", mode = None):
     """
     Generate filenames using a consistent and uniquely identifiable format based on user_id, job_id, mode, course, session.
     :param user_id: user id for job (string).
@@ -569,7 +569,9 @@ def generate_archive_filename(user_id, job_id, mode, course=None, session=None, 
     :param extension: extension of file to generate name for (the part after the '.'; i.e. 'tgz', 'csv', etc.)
     :return: name of file (string).
     """
-    job_attributes = [user_id, job_id, mode, course, session]
+    if not mode:
+        mode = job_config.mode
+    job_attributes = [job_config.user_id, job_config.job_id, mode, course, session]
     active_attributes = [x for x in job_attributes if x is not None]
     archive_file = '-'.join(active_attributes) + "." + extension
     return archive_file
@@ -586,7 +588,7 @@ def make_output_archive_file(output_dir, job_config, course=None, session = None
     :param session: session number of course (string) (optional, only needed when mode == extract).
     :return: name of archive file (string).
     """
-    archive_file = generate_archive_filename(job_config.user_id, job_config.job_id, job_config.mode, course, session)
+    archive_file = generate_archive_filename(job_config, course, session)
     # archive results; only save directory structure relative to output_dir (NOT absolute directory structure)
     print("[INFO] archiving results to {} as {}".format(output_dir, archive_file))
     # todo: use python tarfile here
@@ -642,7 +644,7 @@ def fetch_result_file(job_config, dir, course = None, session = None):
     user_id = job_config.user_id
     job_id = job_config.job_id
     mode = job_config.mode
-    archive_file = generate_archive_filename(user_id, job_id, mode, course, session)
+    archive_file = generate_archive_filename(job_config, course, session)
     key = make_s3_key_path(job_config, course=course, session=session,
                            filename=archive_file)
     dest = os.path.join(dir, archive_file)
