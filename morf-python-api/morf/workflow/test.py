@@ -75,13 +75,13 @@ def test_course(raw_data_dir = "morf-data/"):
     job_config.initialize_s3()
     check_label_type(label_type)
     # clear any preexisting data for this user/job/mode
-    clear_s3_subdirectory(proc_data_bucket, user_id, job_id, mode)
+    clear_s3_subdirectory(job_config)
     ## for each bucket, call job_runner once per course with --mode=test and --level=course
-    for raw_data_bucket in raw_data_buckets:
+    for raw_data_bucket in job_config.raw_data_buckets:
         print("[INFO] processing bucket {}".format(raw_data_bucket))
         with Pool() as pool:
-            for course in fetch_complete_courses(s3, raw_data_bucket, raw_data_dir, n_train=1):
-                pool.apply_async(run_job, [docker_url, mode, course, user_id, job_id, None, level, raw_data_bucket])
+            for course in fetch_complete_courses(job_config, raw_data_bucket, raw_data_dir, n_train=1):
+                pool.apply_async(run_job, [job_config, course, None, level, raw_data_bucket, label_type])
             pool.close()
             pool.join()
     result_file = collect_course_results(s3, raw_data_buckets, proc_data_bucket, mode, user_id, job_id)
