@@ -227,26 +227,26 @@ def initialize_labels(s3, aws_access_key_id, aws_secret_access_key, bucket, cour
     return
 
 
-#todo: complete this docstring
-def download_train_test_data(s3, aws_access_key_id, aws_secret_access_key, raw_data_bucket, raw_data_dir,
-                             proc_data_bucket, course, session, input_dir, proc_data_dir, mode, label_type,
-                             user_id, job_id):
+
+def download_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, session, input_dir, label_type):
     """
     Download pre-extracted train or test data (specified by mode) for course/session into input_dir. Used for MORF API (for Xing, use download_train_test_data_xing()).
-    :param s3: boto3.client object for s3 connection.
-    :param aws_access_key_id: aws_access_key_id.
-    :param aws_secret_access_key: aws_secret_access_key.
-    :param raw_data_bucket:
-    :param raw_data_dir:
-    :param proc_data_bucket: proc_data_bucket with extracted data.
+    :param job_config: MorfJobConfig object.
+    :param raw_data_bucket: bucket containing raw data.
+    :param raw_data_dir: directory in raw_data_bucket containing course-level data.
     :param course: course to fetch data for.
     :param session: session to fetch data for.
     :param input_dir: /input directory to load data into. This should be same directory mounted to Docker image.
-    :param proc_data_dir: directory in proc_data_bucket containing course-level data directories.
-    :param mode: mode of job; should be in [train, test].
     :param label_type: valid label type to reatin for 'label' column of MORF-provided labels.
     :return: None
     """
+    s3 = job_config.s3
+    aws_access_key_id = job_config.aws_access_key_id
+    aws_secret_access_key = job_config.aws_secret_access_key
+    proc_data_bucket = job_config.proc_data_bucket
+    mode = job_config.mode
+    user_id = job_config.user_id
+    job_id = job_config.job_id
     if mode == "train":
         fetch_mode = "extract"
     if mode == "test":
@@ -368,9 +368,9 @@ def initialize_train_test_data(job_config, raw_data_bucket, level, label_type, c
                                              label_type, user_id, job_id)
     if level == "course": # download data for every session of course
         if mode == "train":
-            sessions = fetch_sessions(s3, raw_data_bucket, raw_data_dir, course)
+            sessions = fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course)
         elif mode == "test":
-            sessions = fetch_sessions(s3, raw_data_bucket, raw_data_dir, course, fetch_holdout_session_only=True)
+            sessions = fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course, fetch_holdout_session_only=True)
         for session in sessions:
             download_train_test_data(s3, aws_access_key_id, aws_secret_access_key, raw_data_bucket, raw_data_dir,
                                      proc_data_bucket, course, session, input_dir, proc_data_dir, mode, label_type,
