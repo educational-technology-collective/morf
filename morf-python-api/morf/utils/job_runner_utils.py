@@ -72,10 +72,7 @@ def run_image(job_config, raw_data_bucket, course=None, session=None, level=None
                 initialize_train_test_data(job_config, raw_data_bucket=raw_data_bucket, level=level, label_type=label_type,
                                            course=course, session=session, input_dir=input_dir)
         if mode == "test":  # fetch models and untar
-            download_models(bucket=get_config_properties()["proc_data_bucket"], user_id=user_id, s3=s3,
-                            aws_access_key_id=get_config_properties()["aws_access_key_id"],
-                            aws_secret_access_key=get_config_properties()["aws_secret_access_key"], job_id=job_id,
-                            course=course, session=session, dest_dir=input_dir, level=level)
+            download_models(job_config,course=course, session=session, dest_dir=input_dir, level=level)
         # load the docker image and get its key
         local_docker_file_location = "{}/docker_image".format(working_dir)
         cmd = "{} load -i {};".format(get_config_properties()["docker_exec"], local_docker_file_location)
@@ -99,8 +96,7 @@ def run_image(job_config, raw_data_bucket, course=None, session=None, level=None
         # archive and write output
         archive_file = make_output_archive_file(output_dir, mode=mode, user_id=user_id, job_id=job_id,
                                                 course=course, session=session)
-        move_results_to_destination(archive_file, bucket=get_config_properties()["proc_data_bucket"], user_id=user_id,
-                                    job_id=job_id, mode=mode, course=course, session=session)
+        move_results_to_destination(archive_file, job_config)
     return
 
 
@@ -163,16 +159,14 @@ def run_morf_job(client_config_url, server_config_url, email_to = None, no_cache
                   .format(email_to, job_config.email_to))
             job_config.email_to = email_to
             update_config_fields_in_section("client", email_to = email_to)
-        cache_job_file_in_s3(s3, job_config.user_id, job_config.job_id, job_config.proc_data_bucket)
+        cache_job_file_in_s3(job_config, filename = config_filename)
         # from client.config, fetch and download the following: docker image, controller script
         try:
             fetch_file(s3, working_dir, job_config.docker_url, dest_filename=docker_image_name)
             fetch_file(s3, working_dir, job_config.controller_url, dest_filename=controller_script_name)
             if not no_cache: # cache job files in s3 unless no_cache parameter set to true
-                cache_job_file_in_s3(s3, job_config.user_id, job_config.job_id, job_config.proc_data_bucket,
-                                     docker_image_name)
-                cache_job_file_in_s3(s3, job_config.user_id, job_config.job_id, job_config.proc_data_bucket,
-                                     controller_script_name)
+                cache_job_file_in_s3(job_config, filename = docker_image_name)
+                cache_job_file_in_s3(job_config, filename = controller_script_name)
         except KeyError as e:
             cause = e.args[0]
             print("[Error]: field {} missing from client.config file.".format(cause))
