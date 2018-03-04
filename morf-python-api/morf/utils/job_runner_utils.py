@@ -51,7 +51,7 @@ def run_image(job_config, raw_data_bucket, course=None, session=None, level=None
     user_id = job_config.user_id
     job_id = job_config.job_id
     mode = job_config.mode
-    s3 = job_config.s3
+    s3 = job_config.initialize_s3()
     # create local directory for processing on this instance
     with tempfile.TemporaryDirectory(dir=get_config_properties()["local_working_directory"]) as working_dir:
         # download_docker_image(s3, working_dir, docker_url)
@@ -104,8 +104,7 @@ def run_image(job_config, raw_data_bucket, course=None, session=None, level=None
     return
 
 
-def run_job(job_config, course, session, level, raw_data_bucket=None,
-            label_type=None, raw_data_buckets=None):
+def run_job(job_config, course, session, level, raw_data_bucket=None, label_type=None, raw_data_buckets=None):
     """
     Call job runner with correct parameters.
     :param job_config: MorfJobConfig object.
@@ -117,7 +116,6 @@ def run_job(job_config, course, session, level, raw_data_bucket=None,
     :param raw_data_buckets: list of buckets (for use with level == all)
     :return: result of call to subprocess.call().
     """
-    print("COURSE {} SESSION {} run_job()".format(course, session))
     if not raw_data_buckets:
         raw_data_buckets = job_config.raw_data_buckets
     # todo: just set default values as none; no need for control flow below
@@ -131,7 +129,6 @@ def run_job(job_config, course, session, level, raw_data_bucket=None,
     elif level == "course":
         run_image(job_config, raw_data_bucket, course=course, level=level, label_type=label_type)
     elif level == "session":
-        print("[TEST] running run_job at level SESSION")
         run_image(job_config, raw_data_bucket, course=course, session=session, level=level, label_type=label_type)
     return None
 
