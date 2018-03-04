@@ -141,15 +141,16 @@ def fetch_sessions(job_config, data_bucket, data_dir, course, fetch_holdout_sess
         return sessions
 
 
-def fetch_complete_courses(s3, data_bucket, data_dir ="morf-data/", n_train=1):
+def fetch_complete_courses(job_config, data_bucket, data_dir ="morf-data/", n_train=1):
     """
     Fetch names of courses in data_bucket/data_dir which have at least n_train training sessions and one holdout session.
-    :param s3: boto3.client object with appropriate access credentials.
+    :param job_config: MorfJobConfig object
     :param data_bucket: name of bucket containing data; s3 should have read/copy access to this bucket.
     :param data_dir: path to directory in data_bucket that contains course-level directories of raw data.
     :param n_train: minimum number of training sessions a course needs to have in order to be returned.
     :return: list of course names.
     """
+    s3 = job_config.s3
     complete_courses = []
     for course in fetch_courses(s3, data_bucket, data_dir):
         training_sessions = fetch_sessions(s3, data_bucket, data_dir, course, fetch_holdout_session_only=False)
