@@ -31,20 +31,7 @@ from morf.utils.config import get_config_properties, fetch_data_buckets_from_con
 import boto3
 from multiprocessing import Pool
 
-# define module-level variables from config.properties
-# proc_data_bucket = get_config_properties()["proc_data_bucket"]
-# docker_url = get_config_properties()["docker_url"]
-# user_id = get_config_properties()["user_id"]
-# job_id = get_config_properties()["job_id"]
-# email_to = get_config_properties()["email_to"]
-# aws_access_key_id = get_config_properties()["aws_access_key_id"]
-# aws_secret_access_key = get_config_properties()["aws_secret_access_key"]
-# # create s3 connection object for communicating with s3
-# s3 = boto3.client('s3', aws_access_key_id=aws_access_key_id,
-#                   aws_secret_access_key=aws_secret_access_key)
-
 mode = "train"
-
 # define module-level variables for config.properties
 CONFIG_FILENAME = "config.properties"
 
@@ -83,7 +70,6 @@ def train_course(label_type, raw_data_dir = "morf-data/", multithread = True):
     check_label_type(label_type)
     # # clear any preexisting data for this user/job/mode
     clear_s3_subdirectory(job_config)
-
     # for each bucket, call job_runner once per course with --mode=train and --level=course
     for raw_data_bucket in job_config.raw_data_buckets:
         print("[INFO] processing bucket {}".format(raw_data_bucket))
