@@ -94,8 +94,7 @@ def run_image(job_config, raw_data_bucket, course=None, session=None, level=None
         print("[INFO] running: " + cmd)
         subprocess.call(cmd, shell=True)
         # archive and write output
-        archive_file = make_output_archive_file(output_dir, mode=mode, user_id=user_id, job_id=job_id,
-                                                course=course, session=session)
+        archive_file = make_output_archive_file(output_dir, job_config, course = course, session = session)
         move_results_to_destination(archive_file, job_config)
     return
 
