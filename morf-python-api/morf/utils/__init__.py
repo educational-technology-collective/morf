@@ -110,7 +110,7 @@ def fetch_courses(job_config, data_bucket, data_dir ="morf-data/"):
     :param data_dir: path to directory in data_bucket that contains course-level directories of raw data.
     :return: courses; list of course names as strings.
     """
-    s3 = job_config.s3
+    s3 = job_config.initialize_s3()
     if not data_dir.endswith("/"):
         data_dir = "{0}/".format(data_dir)
     bucket_objects = s3.list_objects(Bucket=data_bucket, Prefix=data_dir, Delimiter="/")
@@ -128,7 +128,7 @@ def fetch_sessions(job_config, data_bucket, data_dir, course, fetch_holdout_sess
     :param fetch_holdout_session_only: logical; used to determine whether to fetch holdout (final) session or a list of all training sessions (all other sessions besides holdout).
     :return: list of session numbers as strings.
     """
-    s3 = job_config.s3
+    s3 = job_config.initialize_s3()
     if not data_dir.endswith("/"):
         data_dir = data_dir + "/"
     course_bucket_objects = s3.list_objects(Bucket=data_bucket, Prefix="".join([data_dir, course, "/"]), Delimiter="/")
@@ -240,7 +240,7 @@ def download_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, 
     :param label_type: valid label type to reatin for 'label' column of MORF-provided labels.
     :return: None
     """
-    s3 = job_config.s3
+    s3 = job_config.initialize_s3()
     aws_access_key_id = job_config.aws_access_key_id
     aws_secret_access_key = job_config.aws_secret_access_key
     proc_data_bucket = job_config.proc_data_bucket
@@ -342,7 +342,7 @@ def initialize_train_test_data(job_config, raw_data_bucket, level, label_type, c
     :param data_dir: path to directory in raw_data_bucket containing course-level directories.
     :return: None
     """
-    s3 = job_config.s3
+    s3 = job_config.initialize_s3()
     aws_access_key_id = job_config.aws_access_key_id
     aws_secret_access_key = job_config.aws_secret_access_key
     proc_data_bucket = job_config.proc_data_bucket
@@ -669,7 +669,7 @@ def fetch_result_file(job_config, dir, course = None, session = None):
     :param session: session number.
     :return:  None.
     """
-    s3 = job_config.s3
+    s3 = job_config.initialize_s3()
     bucket = job_config.proc_data_bucket
     user_id = job_config.user_id
     job_id = job_config.job_id
