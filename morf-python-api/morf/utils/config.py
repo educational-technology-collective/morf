@@ -121,12 +121,13 @@ def fetch_data_buckets_from_config(config_file = "config.properties", data_secti
 
 
 class MorfJobConfig:
+    """
+    Job-level configurations; these should remain consistent across entire workflow of a job.
+    """
     def __init__(self, config_file):
         self.type = "morf" #todo: delete this
-        self.course = None
-        self.session = None
         self.mode = None
-        self.status = "START" # todo: update this at each step of workflow
+        self.status = "START"
         properties = get_config_properties(config_file)
         # add properties to class as attributes
         for prop in properties.items():
