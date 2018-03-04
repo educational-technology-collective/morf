@@ -36,6 +36,7 @@ from multiprocessing import Pool
 
 # define module-level variables for config.properties
 CONFIG_FILENAME = "config.properties"
+mode = "extract"
 
 
 def extract_all():
@@ -101,8 +102,7 @@ def extract_session(labels = False, raw_data_dir = "morf-data/", label_type = "l
     """
     level = "session"
     job_config = MorfJobConfig(CONFIG_FILENAME)
-    job_config.update_mode("extract")
-    job_config.initialize_s3()
+    job_config.update_mode(mode)
     # # clear any preexisting data for this user/job/mode
     clear_s3_subdirectory(job_config)
     ## for each bucket, call job_runner once per session with --mode=extract and --level=session
