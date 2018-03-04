@@ -33,8 +33,7 @@ from urllib.parse import urlparse
 import os
 
 
-def run_image(docker_url, user_id, job_id, mode, raw_data_bucket, course=None, session=None, level=None,
-              label_type=None):
+def run_image(job_config, raw_data_bucket, course=None, session=None, level=None, label_type=None):
     """
     Run a docker image with the specified parameters.
     :param docker_url: URL for a built and compressed (.tar) docker image
@@ -48,8 +47,11 @@ def run_image(docker_url, user_id, job_id, mode, raw_data_bucket, course=None, s
     :param label_type: type of outcome label to use (required for model training and testing) (string).
     :return:
     """
-    s3 = boto3.client("s3", aws_access_key_id=get_config_properties()["aws_access_key_id"],
-                      aws_secret_access_key=get_config_properties()["aws_secret_access_key"])
+    docker_url = job_config.docker_url
+    user_id = job_config.user_id
+    job_id = job_config.job_id
+    mode = job_config.mode
+    s3 = job_config.s3
     # create local directory for processing on this instance
     with tempfile.TemporaryDirectory(dir=get_config_properties()["local_working_directory"]) as working_dir:
         # download_docker_image(s3, working_dir, docker_url)
