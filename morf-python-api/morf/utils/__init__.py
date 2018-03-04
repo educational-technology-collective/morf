@@ -227,10 +227,9 @@ def initialize_labels(s3, aws_access_key_id, aws_secret_access_key, bucket, cour
     return
 
 
-
 def download_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, session, input_dir, label_type):
     """
-    Download pre-extracted train or test data (specified by mode) for course/session into input_dir. Used for MORF API (for Xing, use download_train_test_data_xing()).
+    Download pre-extracted train or test data (specified by mode) for course/session into input_dir.
     :param job_config: MorfJobConfig object.
     :param raw_data_bucket: bucket containing raw data.
     :param raw_data_dir: directory in raw_data_bucket containing course-level data.
@@ -482,32 +481,6 @@ def compile_test_results(s3, courses, bucket, user_id, job_id, temp_dir = "./tem
     return None
 
 
-def download_train_test_data_xing(s3, course_dir, bucket, user_id, job_id, course):
-    """
-    Download and untar previously-extracted data for user_id/job_id/course. Used for Xing replication only.
-    :param s3: boto3.client object with appropriate access credentials.
-    :param course_dir: destination to download data to.
-    :param bucket: s3 bucket containing train-test data archive file.
-    :param user_id: user_id for job (string).
-    :param job_id: job_id for job (string).
-    :param course: course slug for job (string).
-    :return: None.
-    """
-    train_file = "{}-{}-{}-{}.tgz".format(user_id, job_id, "train-test-data", course) #TODO: should use generate_archive_filename
-    key = make_s3_key_path(user_id, job_id, 'extract', course, train_file)
-    train_fp = os.path.join(course_dir, train_file)
-    print("[INFO] downloading compressed data file from bucket {} key {}".format(bucket, key))
-    try:
-        s3.download_file(bucket, key, train_fp)
-        tar = tarfile.open(train_fp)
-        tar.extractall(course_dir)
-        tar.close()
-    except:
-        sys.exit(
-            "[WARNING] error downloading file from s3; likely train/test data for this course does not exist. Skipping.")
-    return None
-
-
 def download_model_from_s3(bucket, key, s3, dest_dir):
     """
     Download and untar a model file from S3; or print a warning message if it doesn't exist.
@@ -526,24 +499,27 @@ def download_model_from_s3(bucket, key, s3, dest_dir):
     return
 
 
-def download_models(bucket, user_id, s3, aws_access_key_id, aws_secret_access_key, job_id, course, dest_dir, level,
-                    session = None):
+def download_models(job_config, course, dest_dir, level, session = None):
     """
     Download and untar archived file of pre-trained models for specified user_id/job_id/course.
-    :param bucket: bucket containing models.
-    :param user_id: user_id for job (string).
-    :param s3: boto3.client object with appropriate access credentials.
-    :param job_id: job_id for job (string).
+    :param job_config: MorfJobConfig object.
     :param course: course: course slug for job (string).
     :param dest_dir: location to download models to; this should be /input directory mounted to Docker image.
     :param level: Level for job.
     :param session: Session id for session-level jobs.
     :return: None
     """
+    bucket = job_config.proc_data_bucket
+    user_id = job_config.user_id
+    s3 = job_config.initialize_s3()
+    aws_access_key_id = job_config.aws_access_key_id
+    aws_secret_access_key = job_config.aws_secret_access_key
+    job_id = job_config.job_id
+
     if level == "all":
         # just one model file
         mod_archive_file = generate_archive_filename(user_id, job_id, "train")
-        key = make_s3_key_path(user_id, job_id, "train", mod_archive_file)
+        key = make_s3_key_path(job_config, filename = mod_archive_file)
         download_model_from_s3(bucket, key, s3, dest_dir)
     if level in ["course","session"]: # model files might be in either course- or session-level directories
         train_files = [obj.key
@@ -555,10 +531,9 @@ def download_models(bucket, user_id, s3, aws_access_key_id, aws_secret_access_ke
                        and course in obj.key.split("/")[-1]]
         for key in train_files:
             download_model_from_s3(bucket, key, s3, dest_dir)
-    else: # level == None; this is for legacy jobs (especially Xing) and should eventually be deprecated altogether.
-        mod_archive_file = generate_archive_filename(user_id, job_id, "train", course)
-        key = make_s3_key_path(user_id, job_id, "train", course, mod_archive_file)
-        download_model_from_s3(bucket, key, s3, dest_dir)
+    else:
+        print("[ERROR] the procedure for executing this job is unsupported in this version of MORF.")
+        raise
     return
 
 
@@ -620,37 +595,30 @@ def make_output_archive_file(output_dir, mode, user_id, job_id, course=None, ses
     return archive_file
 
 
-def make_s3_key_path(user_id, job_id, mode = None, course = None, filename = None, session = None):
+def make_s3_key_path(job_config, course = None, filename = None, session = None):
     """
     Create a key path following MORF's subdirectory organization and any non-null parameters provided.
-    :param user_id: user id (string).
-    :param job_id: job id (string).
-    :param mode: mode (string).
+    :param job_config: MorfJobConfig object.
     :param course: course slug (string).
     :param filename: file name (string; base filename only - no path).
     :param session: course session (string).
     :return: key path (string) for use in s3.
     """
-    job_attributes = [user_id, job_id, mode, course, session, filename]
+    job_attributes = [job_config.user_id, job_config.job_id, job_config.mode, course, session, filename]
     active_attributes = [x for x in job_attributes if x is not None]
     key = "/".join(active_attributes)
     return key
 
 
-def move_results_to_destination(archive_file, bucket, user_id, job_id, mode, course = None, session = None):
+def move_results_to_destination(archive_file, job_config):
     """
     Moves tar of output file to destination, either local file path or s3 url.
     :param archive_file: name of archive output file to move (string).
-    :param bucket: bucket to move results to.
-    :param user_id: user_id for job (string).
-    :param job_id: job_id for job (string).
-    :param mode: mode for job (string); one of: {extract, test, train}.
-    :param course: name of course for job (string).
-    :param session: session number of course (string).
+    :param job_config: MorfJobConfig object.
     :return: None.
     """
-    key = make_s3_key_path(user_id = user_id, job_id=job_id, mode=mode, course=course, session=session,
-                           filename=archive_file)
+    bucket = job_config.proc_data_bucket
+    key = make_s3_key_path(job_config, filename=archive_file)
     print("[INFO] uploading results to bucket {} key {}".format(bucket, key))
     session = boto3.Session()
     s3_client = session.client("s3")
@@ -675,7 +643,7 @@ def fetch_result_file(job_config, dir, course = None, session = None):
     job_id = job_config.job_id
     mode = job_config.mode
     archive_file = generate_archive_filename(user_id, job_id, mode, course, session)
-    key = make_s3_key_path(user_id=user_id, job_id=job_id, mode=mode, course=course, session=session,
+    key = make_s3_key_path(job_config, course=course, session=session,
                            filename=archive_file)
     dest = os.path.join(dir, archive_file)
     print("[INFO] fetching s3://{}/{}".format(bucket, key))
@@ -711,17 +679,17 @@ def remove_readonly(func, path, _):
     func(path)
 
 
-def cache_job_file_in_s3(s3, user_id, job_id, bucket, filename ="config.properties"):
+def cache_job_file_in_s3(job_config, bucket = None, filename ="config.properties"):
     """
-    Cache job files in s3 bucket, allowing for full reproducibility.
-    :param s3:
-    :param user_id:
-    :param job_id:
-    :param bucket:
-    :param filename:
-    :return:
+    Cache job files in s3 bucket.
+    :param job_config: MorfJobConfig object.
+    :param bucket: S3 bucket name (string); if not provided then job_config.proc_data_bucket is used.
+    :param filename: name of file to upload as (string).
+    :return: None
     """
-    key = make_s3_key_path(user_id, job_id, filename = filename)
+    if not bucket:
+        bucket = job_config.proc_data_bucket
+    key = make_s3_key_path(job_config, filename = filename)
     upload_file_to_s3(filename, bucket, key)
     return
 
