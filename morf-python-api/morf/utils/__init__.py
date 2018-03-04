@@ -561,12 +561,11 @@ def fetch_file(s3, dest_dir, remote_file_url, dest_filename = None):
 def generate_archive_filename(job_config, course=None, session=None, extension ="tgz", mode = None):
     """
     Generate filenames using a consistent and uniquely identifiable format based on user_id, job_id, mode, course, session.
-    :param user_id: user id for job (string).
-    :param job_id: job id for job (string).
-    :param mode: mode for job (string).
+    :param job_config: MorfJobConfig object.
     :param course: course id (string).
     :param session: session number (string).
     :param extension: extension of file to generate name for (the part after the '.'; i.e. 'tgz', 'csv', etc.)
+    :param mode: mode for job; only needed if overriding current mode of job_config (string).
     :return: name of file (string).
     """
     if not mode:
@@ -612,7 +611,7 @@ def make_s3_key_path(job_config, course = None, filename = None, session = None)
     return key
 
 
-def move_results_to_destination(archive_file, job_config):
+def move_results_to_destination(archive_file, job_config, course = None, session = None):
     """
     Moves tar of output file to destination, either local file path or s3 url.
     :param archive_file: name of archive output file to move (string).
@@ -620,7 +619,7 @@ def move_results_to_destination(archive_file, job_config):
     :return: None.
     """
     bucket = job_config.proc_data_bucket
-    key = make_s3_key_path(job_config, filename=archive_file)
+    key = make_s3_key_path(job_config, filename=archive_file, course = course, session = session)
     print("[INFO] uploading results to bucket {} key {}".format(bucket, key))
     session = boto3.Session()
     s3_client = session.client("s3")
