@@ -69,11 +69,7 @@ def run_image(job_config, raw_data_bucket, course=None, session=None, level=None
                 download_train_test_data_xing(s3, input_dir, bucket=get_config_properties()["proc_data_bucket"],
                                               user_id=user_id, job_id=job_id, course=course)
             else:
-                initialize_train_test_data(s3=s3, aws_access_key_id=get_config_properties()["aws_access_key_id"],
-                                           aws_secret_access_key=get_config_properties()["aws_secret_access_key"],
-                                           raw_data_bucket=raw_data_bucket,
-                                           proc_data_bucket=get_config_properties()["proc_data_bucket"], mode=mode,
-                                           level=level, user_id=user_id, job_id=job_id, label_type=label_type,
+                initialize_train_test_data(job_config, raw_data_bucket=raw_data_bucket, level=level, label_type=label_type,
                                            course=course, session=session, input_dir=input_dir)
         if mode == "test":  # fetch models and untar
             download_models(bucket=get_config_properties()["proc_data_bucket"], user_id=user_id, s3=s3,
