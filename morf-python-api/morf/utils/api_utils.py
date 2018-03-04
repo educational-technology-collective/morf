@@ -52,8 +52,6 @@ def collect_session_results(job_config, holdout = False, raw_data_dir = "morf-da
     :param holdout: flag; fetch holdout run only (boolean; default False).
     :return: path to csv.
     """
-    s3 = job_config.s3
-    proc_data_bucket = job_config.proc_data_bucket
     mode = job_config.mode
     user_id = job_config.user_id
     job_id = job_config.job_id
