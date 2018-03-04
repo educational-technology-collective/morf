@@ -139,7 +139,7 @@ def send_success_email(job_config, emailaddr_from ="morf-alerts@umich.edu"):
     s3 = boto3.client("s3", aws_access_key_id=aws_access_key_id,
                       aws_secret_access_key=aws_secret_access_key)
     # fetch model evaluation results
-    attachment_basename = generate_archive_filename(user_id=user_id, job_id=job_id, mode="evaluate", extension="csv")
+    attachment_basename = generate_archive_filename(job_config, mode="evaluate", extension="csv")
     key = make_s3_key_path(user_id, job_id, mode = "test", filename=attachment_basename)
     attachment_filepath = download_from_s3(proc_data_bucket, key, s3)
     with open(attachment_filepath) as f:
