@@ -80,7 +80,7 @@ def collect_session_results(job_config, holdout = False, raw_data_dir = "morf-da
     return csv_fp
 
 
-def collect_course_results(s3, raw_data_buckets, proc_data_bucket, mode, user_id, job_id, raw_data_dir = "morf-data/"):
+def collect_course_results(job_config, raw_data_dir = "morf-data/"):
     """
     Iterate through course-level directories in bucket, download individual files from [mode], add column for course and session, and concatenate into single 'master' csv.
     :param s3: boto3.client object with appropriate access credentials.
@@ -91,6 +91,12 @@ def collect_course_results(s3, raw_data_buckets, proc_data_bucket, mode, user_id
     :param holdout: flag; fetch holdout run only (boolean; default False).
     :return: path to csv.
     """
+    s3 = job_config.initialize_s3()
+    raw_data_buckets = job_config.raw_data_buckets
+    proc_data_bucket = job_config.proc_data_buckets
+    mode = job_config.mode
+    user_id = job_config.user_id
+    job_id = job_config.job_id
     feat_df_list = list()
     for raw_data_bucket in raw_data_buckets:
         for course in fetch_courses(s3, raw_data_bucket, raw_data_dir):
