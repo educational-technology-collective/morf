@@ -57,7 +57,6 @@ def collect_session_results(job_config, holdout = False, raw_data_dir = "morf-da
     job_id = job_config.job_id
     if not raw_data_buckets: # can utilize this parameter to override job_config buckets; used for label extraction
         raw_data_buckets = job_config.raw_data_buckets
-    # todo: possibly parallelize this using pool.map_async
     feat_df_list = list()
     for raw_data_bucket in raw_data_buckets:
         for course in fetch_courses(job_config, raw_data_bucket, raw_data_dir):
@@ -75,7 +74,7 @@ def collect_session_results(job_config, holdout = False, raw_data_dir = "morf-da
                         print("[WARNING] no results found for course {} run {} mode {}".format(course, run, mode))
                         continue
     master_feat_df = pd.concat(feat_df_list)
-    csv_fp = generate_archive_filename(user_id=user_id, job_id=job_id, mode=mode, extension='csv')
+    csv_fp = generate_archive_filename(job_config, extension='csv')
     master_feat_df.to_csv(csv_fp, index = False, header = True)
     return csv_fp
 
@@ -112,7 +111,7 @@ def collect_course_results(job_config, raw_data_dir = "morf-data/"):
                     print("[WARNING] no results found for course {} mode {}".format(course, mode))
                     continue
     master_feat_df = pd.concat(feat_df_list)
-    csv_fp = generate_archive_filename(user_id=user_id, job_id=job_id, mode=mode, extension='csv')
+    csv_fp = generate_archive_filename(job_config, extension='csv')
     master_feat_df.to_csv(csv_fp, index=False, header=True)
     return csv_fp
 
