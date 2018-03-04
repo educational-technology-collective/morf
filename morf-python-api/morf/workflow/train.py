@@ -85,19 +85,14 @@ def train_course(label_type, raw_data_dir = "morf-data/"):
     clear_s3_subdirectory(job_config)
 
     # for each bucket, call job_runner once per course with --mode=train and --level=course
-    for raw_data_bucket in raw_data_buckets:
+    for raw_data_bucket in rjob_config.raw_data_buckets:
         print("[INFO] processing bucket {}".format(raw_data_bucket))
         with Pool() as pool:
-            for course in fetch_complete_courses(s3, raw_data_bucket, raw_data_dir, n_train=1):
-                pool.apply_async(run_job, [docker_url, mode, course, user_id, job_id, None, level, raw_data_bucket, label_type])
+            for course in fetch_complete_courses(job_config, raw_data_bucket, raw_data_dir, n_train=1):
+                pool.apply_async(run_job, [job_config, course, None, level, raw_data_bucket, label_type])
             pool.close()
             pool.join()
-    send_email_alert(aws_access_key_id,
-                     aws_secret_access_key,
-                     job_id,
-                     user_id,
-                     status=mode,
-                     emailaddr_to=email_to)
+    send_email_alert(job_config)
     return
 
 
