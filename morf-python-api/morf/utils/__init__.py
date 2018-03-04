@@ -330,26 +330,26 @@ def initialize_raw_course_data(s3, aws_access_key_id, aws_secret_access_key, raw
 
 
 # todo: update docstring
-def initialize_train_test_data(s3, aws_access_key_id, aws_secret_access_key, raw_data_bucket, proc_data_bucket, mode,
-                               level, user_id, job_id, label_type, course = None, session = None, input_dir ='./input',
+def initialize_train_test_data(job_config, raw_data_bucket, level, label_type, course = None, session = None, input_dir ='./input',
                                raw_data_dir = 'morf-data/'):
     """
     Mounts data in /input/course/session directories for MORF API train/test jobs.
-    :param s3: boto3.client object for s3 connection.
-    :param aws_access_key_id: AWS access key.
-    :param aws_secret_access_key: AWS secret access key.
+    :param job_config: MorfJobConfig object.
     :param raw_data_bucket: S3 bucket containing raw data (used to find all sessions of course).
-    :param proc_data_bucket: S3 bucket containing extracted features (this is where data is fetched from).
-    :param mode: mode of job; should be in [train, test].
     :param level: level of job; should be in [all, course, session].
-    :param user_id: user id job job.
-    :param job_id: job id of job.
     :param course: course (if level in [course, session]).
     :param session: session number (if level == session).
     :param input_dir: path to temporary /input directory to be mounted in Docker image.
     :param data_dir: path to directory in raw_data_bucket containing course-level directories.
     :return: None
     """
+    s3 = job_config.s3
+    aws_access_key_id = job_config.aws_access_key_id
+    aws_secret_access_key = job_config.aws_secret_access_key
+    proc_data_bucket = job_config.proc_data_bucket
+    mode = job_config.mode
+    user_id = job_config.user_id
+    job_id = job_config.job_id
     if mode == "train":
         proc_data_dir = "{}/{}/{}".format(user_id, job_id, "extract")
     elif mode == "test":
