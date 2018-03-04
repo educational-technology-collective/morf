@@ -150,11 +150,10 @@ def fetch_complete_courses(job_config, data_bucket, data_dir ="morf-data/", n_tr
     :param n_train: minimum number of training sessions a course needs to have in order to be returned.
     :return: list of course names.
     """
-    s3 = job_config.s3
     complete_courses = []
-    for course in fetch_courses(s3, data_bucket, data_dir):
-        training_sessions = fetch_sessions(s3, data_bucket, data_dir, course, fetch_holdout_session_only=False)
-        testing_session = fetch_sessions(s3, data_bucket, data_dir, course, fetch_holdout_session_only=True)
+    for course in fetch_courses(job_config, data_bucket, data_dir):
+        training_sessions = fetch_sessions(job_config, data_bucket, data_dir, course, fetch_holdout_session_only=False)
+        testing_session = fetch_sessions(job_config, data_bucket, data_dir, course, fetch_holdout_session_only=True)
         if (len(testing_session) == 1) and (len(training_sessions) >= n_train):
             complete_courses.append(course)
     return complete_courses
