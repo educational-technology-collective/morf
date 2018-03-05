@@ -596,16 +596,19 @@ def make_output_archive_file(output_dir, job_config, course=None, session = None
     return archive_file
 
 
-def make_s3_key_path(job_config, course = None, filename = None, session = None):
+def make_s3_key_path(job_config, course = None, filename = None, session = None, mode = None):
     """
     Create a key path following MORF's subdirectory organization and any non-null parameters provided.
     :param job_config: MorfJobConfig object.
     :param course: course slug (string).
     :param filename: file name (string; base filename only - no path).
     :param session: course session (string).
+    :param mode: optional mode to override job_config.mode attribute (string).
     :return: key path (string) for use in s3.
     """
-    job_attributes = [job_config.user_id, job_config.job_id, job_config.mode, course, session, filename]
+    if not mode:
+        mode = job_config.mode
+    job_attributes = [job_config.user_id, job_config.job_id, mode, course, session, filename]
     active_attributes = [x for x in job_attributes if x is not None]
     key = "/".join(active_attributes)
     return key
