@@ -98,11 +98,11 @@ def collect_course_results(job_config, raw_data_dir = "morf-data/"):
     job_id = job_config.job_id
     feat_df_list = list()
     for raw_data_bucket in raw_data_buckets:
-        for course in fetch_courses(s3, raw_data_bucket, raw_data_dir):
+        for course in fetch_courses(job_config, raw_data_bucket, raw_data_dir):
             with tempfile.TemporaryDirectory(dir=os.getcwd()) as working_dir:
                 print("[INFO] fetching extraction results for course {}".format(course))
                 try:
-                    fetch_result_file(s3, proc_data_bucket, user_id=user_id, job_id=job_id, mode=mode, course=course, dir=working_dir)
+                    fetch_result_file(job_config, mode=mode, dir=working_dir, course=course)
                     csv = fetch_result_csv_fp(working_dir)
                     feat_df = pd.read_csv(csv, dtype=object)
                     feat_df['course'] = course
