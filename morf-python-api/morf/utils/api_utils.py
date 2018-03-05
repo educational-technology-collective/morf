@@ -102,7 +102,7 @@ def collect_course_results(job_config, raw_data_dir = "morf-data/"):
             with tempfile.TemporaryDirectory(dir=os.getcwd()) as working_dir:
                 print("[INFO] fetching extraction results for course {}".format(course))
                 try:
-                    fetch_result_file(job_config, mode=mode, dir=working_dir, course=course)
+                    fetch_result_file(job_config, dir=working_dir, course=course)
                     csv = fetch_result_csv_fp(working_dir)
                     feat_df = pd.read_csv(csv, dtype=object)
                     feat_df['course'] = course
