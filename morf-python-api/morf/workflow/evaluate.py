@@ -27,20 +27,16 @@ Evaluation utility functions for the MORF 2.0 API. For more information about th
 from morf.utils import *
 from morf.utils.api_utils import *
 from morf.utils.security import hash_df_column
-from morf.utils.config import get_config_properties, fetch_data_buckets_from_config
+from morf.utils.config import get_config_properties, fetch_data_buckets_from_config, MorfJobConfig
 from morf.utils.alerts import send_email_alert
 import tempfile
 import pandas as pd
 import sklearn.metrics
 
-proc_data_bucket = get_config_properties()["proc_data_bucket"]
-docker_url = get_config_properties()["docker_url"]
-user_id = get_config_properties()["user_id"]
-job_id = get_config_properties()["job_id"]
-hash_secret = get_config_properties()["hash_secret"]
-# create s3 connection object for communicating with s3
-s3 = boto3.client("s3", aws_access_key_id=get_config_properties()["aws_access_key_id"],
-                  aws_secret_access_key=get_config_properties()["aws_secret_access_key"])
+mode = "evaluate"
+# define module-level variables for config.properties
+CONFIG_FILENAME = "config.properties"
+
 
 def check_dataframe_complete(df, columns):
     """
@@ -101,7 +97,7 @@ def evaluate_all():
 
 
 def evaluate_course(label_type, label_col = "label_type", raw_data_dir = "morf-data/",
-                    proc_data_bucket = proc_data_bucket, course_col = "course", pred_cols = ["prob", "pred"],
+                    course_col = "course", pred_cols = ["prob", "pred"],
                     user_col = "userID", labels_file = "labels-test.csv"):
     """
     Fetch metrics by course.
@@ -116,12 +112,16 @@ def evaluate_course(label_type, label_col = "label_type", raw_data_dir = "morf-d
     :param labels_file: name of csv file containing labels.
     :return: None.
     """
+    job_config = MorfJobConfig(CONFIG_FILENAME)
+    job_config.update_mode(mode)
     check_label_type(label_type)
-    raw_data_buckets = fetch_data_buckets_from_config()
+    raw_data_buckets = job_config.raw_data_buckets
+    proc_data_bucket = job_config.proc_data_bucket
+    s3 = job_config.initialize_s3()
     course_data = []
     for raw_data_bucket in raw_data_buckets:
-        pred_file = generate_archive_filename(user_id=user_id, job_id=job_id, mode="test", extension="csv")
-        pred_key = "{}/{}/{}/{}".format(user_id, job_id, "test", pred_file)
+        pred_file = generate_archive_filename(job_config, mode="test", extension="csv")
+        pred_key = "{}/{}/{}/{}".format(job_config.user_id, job_config.job_id, "test", pred_file)
         label_key = raw_data_dir + labels_file
         # download course prediction and label files, fetch classification metrics at course level
         with tempfile.TemporaryDirectory(dir=os.getcwd()) as working_dir:
@@ -132,14 +132,14 @@ def evaluate_course(label_type, label_col = "label_type", raw_data_dir = "morf-d
             lab_df = lab_df[lab_df[label_col] == label_type].copy()
             pred_lab_df = pd.merge(lab_df, pred_df, how = "left", on = [user_col, course_col])
             check_dataframe_complete(pred_lab_df, columns = pred_cols)
-            for course in fetch_complete_courses(s3, raw_data_bucket, raw_data_dir, n_train=1):
+            for course in fetch_complete_courses(job_config, data_bucket = raw_data_bucket, data_dir = raw_data_dir, n_train=1):
                 course_metrics_df = fetch_binary_classification_metrics(pred_lab_df, course)
                 course_data.append(course_metrics_df)
     master_metrics_df = pd.concat(course_data).reset_index().rename(columns={"index": course_col})
-    csv_fp = generate_archive_filename(user_id=user_id, job_id=job_id, mode="evaluate", extension="csv")
-    master_metrics_df[course_col] = hash_df_column(master_metrics_df[course_col], user_id, hash_secret)
+    csv_fp = generate_archive_filename(job_config, extension="csv")
+    master_metrics_df[course_col] = hash_df_column(master_metrics_df[course_col], job_config.user_id, job_config.hash_secret)
     master_metrics_df.to_csv(csv_fp, index = False, header = True)
-    upload_key = make_s3_key_path(user_id, job_id, mode="test", filename=csv_fp)
+    upload_key = make_s3_key_path(job_config, mode = "test", filename=csv_fp)
     upload_file_to_s3(csv_fp, bucket=proc_data_bucket, key=upload_key)
     os.remove(csv_fp)
     return
