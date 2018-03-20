@@ -127,7 +127,7 @@ def extract_session(labels=False, raw_data_dir="morf-data/", label_type="labels-
         result_file = collect_session_results(job_config)
         upload_key = "{}/{}/extract/{}".format(job_config.user_id, job_config.job_id, result_file)
         upload_file_to_s3(result_file, bucket=job_config.proc_data_bucket, key=upload_key)
-    if labels:  # label extraction job; copy file into raw course data dir instead of proc_data_bucket, creating separate label files for each bucket
+    else:  # label extraction job; copy file into raw course data dir instead of proc_data_bucket, creating separate label files for each bucket
         for raw_data_bucket in job_config.raw_data_buckets:
             result_file = collect_session_results(job_config, raw_data_buckets=[raw_data_bucket])
             upload_key = raw_data_dir + "{}.csv".format(label_type)
@@ -208,16 +208,17 @@ def extract_holdout_session(labels=False, raw_data_dir="morf-data/", label_type=
     clear_s3_subdirectory(job_config)
     for raw_data_bucket in job_config.raw_data_buckets:
         print("[INFO] processing bucket {}".format(raw_data_bucket))
+        courses = fetch_courses(job_config, raw_data_bucket, raw_data_dir)
         if multithread:
             with Pool() as pool:
-                for course in fetch_courses(job_config, raw_data_bucket, raw_data_dir):
+                for course in courses:
                     holdout_run = fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course,
                                                  fetch_holdout_session_only=True)[0]  # only use holdout run; unlisted
                     pool.apply_async(run_job, [job_config, course, holdout_run, level, raw_data_bucket])
                 pool.close()
                 pool.join()
         else:  # do job in serial; this is useful for debugging
-            for course in fetch_courses(job_config, raw_data_bucket, raw_data_dir):
+            for course in courses:
                 holdout_run = fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course,
                                              fetch_holdout_session_only=True)[0]  # only use holdout run; unlisted
                 run_job(job_config, course, holdout_run, level, raw_data_bucket)
@@ -225,7 +226,7 @@ def extract_holdout_session(labels=False, raw_data_dir="morf-data/", label_type=
         result_file = collect_session_results(job_config, holdout=True)
         upload_key = "{}/{}/{}/{}".format(job_config.user_id, job_config.job_id, job_config.mode, result_file)
         upload_file_to_s3(result_file, bucket=job_config.proc_data_bucket, key=upload_key)
-    if labels:  # label extraction job; copy file into raw course data dir instead of proc_data_bucket, creating separate label files for each bucket
+    else:  # label extraction job; copy file into raw course data dir instead of proc_data_bucket, creating separate label files for each bucket
         for raw_data_bucket in job_config.raw_data_buckets:
             result_file = collect_session_results(job_config, raw_data_buckets=[raw_data_bucket])
             upload_key = raw_data_dir + "{}.csv".format(label_type)
