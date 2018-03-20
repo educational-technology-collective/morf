@@ -145,6 +145,10 @@ class MorfJobConfig:
         # todo: check whether status is valid by comparing with allowed values
         self.status = status
 
+    def update_email_to(self, email_to):
+        # todo: check if email is valid
+        self.email_to = email_to
+
     def update_mode(self, mode):
         # todo: check whether mode is valid by comparing with allowed values
         self.mode = mode
