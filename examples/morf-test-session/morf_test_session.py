@@ -41,22 +41,22 @@ from multiprocessing import Pool
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='execute feature extraction, training, or testing.')
-    parser.add_argument('-c', '--course_id', required=True, help='an s3 pointer to a course')
-    parser.add_argument('-r', '--run_number', required=False, help='3-digit course run number')
+    parser.add_argument('--course', required=True, help='an s3 pointer to a course')
+    parser.add_argument('--session', required=False, help='3-digit course run number')
     parser.add_argument('-m', '--mode', required=True, help='mode to run image in; {extract, train, test}')
     args = parser.parse_args()
     if args.mode == 'extract':
         # this block expects individual session-level data mounted by extract_session() and outputs one CSV file per session in /output
         # set up the mysql database
-        extract_coursera_sql_data(args.course_id, args.run_number)
-        extract_features(course_name = args.course_id, run_number = args.run_number)
+        extract_coursera_sql_data(args.course, args.session)
+        extract_features(course_name = args.course, run_number = args.session)
     if args.mode == 'train':
         # this block expects session-level data mounted by train_session() and outputs one model file per session in /output
-        cmd = "Rscript /modeling/train_model_morf_test_session.R --course {} --session {}".format(args.course_id, args.run_number)
+        cmd = "Rscript /modeling/train_model_morf_test_session.R --course {} --session {}".format(args.course, args.session)
         subprocess.call(cmd, shell=True)
     if args.mode == 'test':
         # this block expects session-level data and models mounted by test_course() and outputs one csv of predictions per course in /output, using only data from most recent iteration of course.
-        cmd = "Rscript /modeling/test_model_morf_test_session.R --course {}".format(args.course_id)
+        cmd = "Rscript /modeling/test_model_morf_test_session.R --course {}".format(args.course)
         subprocess.call(cmd, shell=True)
 
 
