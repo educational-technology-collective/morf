@@ -79,7 +79,11 @@ def run_image(job_config, raw_data_bucket, course=None, session=None, level=None
         print("[INFO] running: " + cmd)
         output = subprocess.run(cmd, stdout=subprocess.PIPE, shell = True)
         print(output.stdout.decode("utf-8"))
-        image_uuid = output.stdout.decode("utf-8").split("sha256:")[-1].strip()
+        load_output = output.stdout.decode("utf-8")
+        if "sha256:" in load_output:
+            image_uuid = output.stdout.decode("utf-8").split("sha256:")[-1].strip()
+        else: #image is tagged
+            image_uuid = load_output.split()[-1].strip()
         # execute the image
         if mode == "extract-holdout":  # call docker image with mode == extract
             cmd = "{} run --network=\"none\" --rm=true --volume={}:/input --volume={}:/output {} --course {} --session {} --mode {};".format(
@@ -137,7 +141,7 @@ def run_morf_job(client_config_url, server_config_url, email_to = None, no_cache
     """
     controller_script_name = "controller.py"
     docker_image_name = "docker_image"
-    config_filename = "config.properties"
+    combined_config_filename = "config.properties"
     server_config_path = urlparse(server_config_url).path
     # read server.config and get those properties
     server_config = get_config_properties(server_config_path)
@@ -151,14 +155,16 @@ def run_morf_job(client_config_url, server_config_url, email_to = None, no_cache
                           aws_secret_access_key=server_config["aws_secret_access_key"])
         fetch_file(s3, working_dir, client_config_url)
         local_client_config_path = os.path.join(os.getcwd(), "client.config")
-        combine_config_files(server_config_path, local_client_config_path, outfile = config_filename)
-        job_config = MorfJobConfig(config_filename)
+        combine_config_files(server_config_path,
+                             local_client_config_path,
+                             outfile = combined_config_filename)
+        job_config = MorfJobConfig(combined_config_filename)
         if email_to: # if email_to was provided by user, this overrides in config file -- allows users to easily run mwe
             print("[INFO] email address from submission {} overriding email address in config file {}"
                   .format(email_to, job_config.email_to))
-            job_config.email_to = email_to
+            job_config.update_email_to(email_to)
             update_config_fields_in_section("client", email_to = email_to)
-        cache_job_file_in_s3(job_config, filename = config_filename)
+        cache_job_file_in_s3(job_config, filename = combined_config_filename)
         # from client.config, fetch and download the following: docker image, controller script
         try:
             fetch_file(s3, working_dir, job_config.docker_url, dest_filename=docker_image_name)
