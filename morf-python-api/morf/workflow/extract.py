@@ -24,7 +24,6 @@
 Feature extraction functions for the MORF 2.0 API. For more information about the API, see the documentation.
 """
 
-
 from morf.utils.job_runner_utils import run_job
 from morf.utils import make_s3_key_path
 from morf.utils.api_utils import *
@@ -32,7 +31,6 @@ from morf.utils.config import get_config_properties, fetch_data_buckets_from_con
 from morf.utils.alerts import send_email_alert
 import boto3
 from multiprocessing import Pool
-
 
 # define module-level variables for config.properties
 CONFIG_FILENAME = "config.properties"
@@ -49,9 +47,10 @@ def extract_all():
     # clear any preexisting data for this user/job/mode
     clear_s3_subdirectory(proc_data_bucket, user_id, job_id, mode)
     # only call job_runner once with --mode-extract and --level=all; this will load ALL data up and run the docker image
-    run_job(docker_url, mode, course = None, user=user_id, job_id=job_id, session=None, level="all", raw_data_buckets=raw_data_buckets)
+    run_job(docker_url, mode, course=None, user=user_id, job_id=job_id, session=None, level="all",
+            raw_data_buckets=raw_data_buckets)
     result_file = collect_all_results(s3, raw_data_buckets, proc_data_bucket, mode, user_id, job_id)
-    upload_key = make_s3_key_path(user_id, job_id, mode, course=None, filename= result_file)
+    upload_key = make_s3_key_path(user_id, job_id, mode, course=None, filename=result_file)
     upload_file_to_s3(result_file, bucket=proc_data_bucket, key=upload_key)
     os.remove(result_file)
     send_email_alert(aws_access_key_id,
@@ -63,7 +62,7 @@ def extract_all():
     return
 
 
-def extract_course(raw_data_dir = "morf-data/"):
+def extract_course(raw_data_dir="morf-data/"):
     """
     Extract features using the Docker image, building individual feature sets for each course.
     :return:
@@ -93,11 +92,13 @@ def extract_course(raw_data_dir = "morf-data/"):
     return
 
 
-def extract_session(labels = False, raw_data_dir = "morf-data/", label_type = "labels-train", multithread = True):
+def extract_session(labels=False, raw_data_dir="morf-data/", label_type="labels-train", multithread=True):
     """
     Extract features using the Docker image, building individual feature sets for each "session" or iteration of the course.
     :labels: flag for whether this is a job to generate output labels; if so, the collected result file is copied back into the raw data folder in s3 (as labels-train.csv).
     :raw_data_dir: path to directory in all data buckets where course-level directories are located; this should be uniform for every raw data bucket.
+    :label_type: type of outcome label to use (string).
+    :multithread: whether to run job in parallel (multithread = false can be useful for debugging).
     :return:
     """
     level = "session"
@@ -108,28 +109,29 @@ def extract_session(labels = False, raw_data_dir = "morf-data/", label_type = "l
     ## for each bucket, call job_runner once per session with --mode=extract and --level=session
     for raw_data_bucket in job_config.raw_data_buckets:
         print("[INFO] processing bucket {}".format(raw_data_bucket))
+        courses = fetch_courses(job_config, raw_data_bucket, raw_data_dir)
         if multithread:
             with Pool() as pool:
-                for course in fetch_courses(job_config, raw_data_bucket, raw_data_dir):
-                    for run in fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course,
-                                              fetch_holdout_session_only=False):
-                        pool.apply_async(run_job, [job_config, course, run, level, raw_data_bucket])
+                for course in courses:
+                    for session in fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course,
+                                                  fetch_holdout_session_only=False):
+                        pool.apply_async(run_job, [job_config, course, session, level, raw_data_bucket])
                 pool.close()
                 pool.join()
-        else: # do job in serial; this is useful for debugging
-            for course in fetch_courses(job_config, raw_data_bucket, raw_data_dir):
-                for run in fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course,
-                                          fetch_holdout_session_only=False):
-                    run_job(job_config, course, run, level, raw_data_bucket)
-    if not labels: # normal feature extraction job; collects features across all buckets and upload to proc_data_bucket
+        else:  # do job in serial; this is useful for debugging
+            for course in courses:
+                for session in fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course,
+                                              fetch_holdout_session_only=False):
+                    run_job(job_config, course, session, level, raw_data_bucket)
+    if not labels:  # normal feature extraction job; collects features across all buckets and upload to proc_data_bucket
         result_file = collect_session_results(job_config)
         upload_key = "{}/{}/extract/{}".format(job_config.user_id, job_config.job_id, result_file)
-        upload_file_to_s3(result_file, bucket = job_config.proc_data_bucket, key = upload_key)
-    if labels: # label extraction job; copy file into raw course data dir instead of proc_data_bucket, creating separate label files for each bucket
+        upload_file_to_s3(result_file, bucket=job_config.proc_data_bucket, key=upload_key)
+    if labels:  # label extraction job; copy file into raw course data dir instead of proc_data_bucket, creating separate label files for each bucket
         for raw_data_bucket in job_config.raw_data_buckets:
-            result_file = collect_session_results(job_config, raw_data_buckets = [raw_data_bucket])
+            result_file = collect_session_results(job_config, raw_data_buckets=[raw_data_bucket])
             upload_key = raw_data_dir + "{}.csv".format(label_type)
-            upload_file_to_s3(result_file, bucket = raw_data_bucket, key = upload_key)
+            upload_file_to_s3(result_file, bucket=raw_data_bucket, key=upload_key)
     os.remove(result_file)
     send_email_alert(job_config)
     return
@@ -145,10 +147,10 @@ def extract_holdout_all():
     # clear any preexisting data for this user/job/mode
     clear_s3_subdirectory(proc_data_bucket, user_id, job_id, mode)
     # only call job_runner once with --mode-extract and --level=all; this will load ALL data up and run the docker image
-    run_job(docker_url, mode, course=None, user=user_id, job_id=job_id, session=None, level="all", 
+    run_job(docker_url, mode, course=None, user=user_id, job_id=job_id, session=None, level="all",
             raw_data_buckets=raw_data_buckets)
     result_file = collect_all_results(s3, raw_data_buckets, proc_data_bucket, mode, user_id, job_id)
-    upload_key = make_s3_key_path(user_id, job_id, mode, course=None, filename= result_file)
+    upload_key = make_s3_key_path(user_id, job_id, mode, course=None, filename=result_file)
     upload_file_to_s3(result_file, bucket=proc_data_bucket, key=upload_key)
     os.remove(result_file)
     send_email_alert(aws_access_key_id,
@@ -160,7 +162,7 @@ def extract_holdout_all():
     return
 
 
-def extract_holdout_course(raw_data_dir = "morf-data/"):
+def extract_holdout_course(raw_data_dir="morf-data/"):
     """
     Extract features using the Docker image across each course of holdout data.
     :return:
@@ -178,7 +180,7 @@ def extract_holdout_course(raw_data_dir = "morf-data/"):
             pool.close()
             pool.join()
     result_file = collect_course_results(s3, raw_data_buckets, proc_data_bucket, mode, user_id, job_id)
-    upload_key = make_s3_key_path(user_id, job_id, mode, course= None, filename= result_file)
+    upload_key = make_s3_key_path(user_id, job_id, mode, course=None, filename=result_file)
     upload_file_to_s3(result_file, bucket=proc_data_bucket, key=upload_key)
     os.remove(result_file)
     send_email_alert(aws_access_key_id,
@@ -190,13 +192,13 @@ def extract_holdout_course(raw_data_dir = "morf-data/"):
     return
 
 
-def extract_holdout_session(labels = False, raw_data_dir = "morf-data/", label_type = "labels-train", multithread = True):
+def extract_holdout_session(labels=False, raw_data_dir="morf-data/", label_type="labels-train", multithread=True):
     """
     Extract features using the Docker image across each session of holdout data.
     :labels: flag for whether this is a job to generate output labels; if so, the collected result file is copied back into the raw data folder in s3 (as labels-test.csv).
     :return: None
     """
-    mode="extract-holdout"
+    mode = "extract-holdout"
     level = "session"
     job_config = MorfJobConfig(CONFIG_FILENAME)
     job_config.update_mode(mode)
@@ -210,28 +212,24 @@ def extract_holdout_session(labels = False, raw_data_dir = "morf-data/", label_t
             with Pool() as pool:
                 for course in fetch_courses(job_config, raw_data_bucket, raw_data_dir):
                     holdout_run = fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course,
-                                                 fetch_holdout_session_only=True)[0] # only use holdout run; unlisted
+                                                 fetch_holdout_session_only=True)[0]  # only use holdout run; unlisted
                     pool.apply_async(run_job, [job_config, course, holdout_run, level, raw_data_bucket])
                 pool.close()
                 pool.join()
-        else: # do job in serial; this is useful for debugging
+        else:  # do job in serial; this is useful for debugging
             for course in fetch_courses(job_config, raw_data_bucket, raw_data_dir):
                 holdout_run = fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course,
                                              fetch_holdout_session_only=True)[0]  # only use holdout run; unlisted
                 run_job(job_config, course, holdout_run, level, raw_data_bucket)
-    if not labels: # normal feature extraction job; collects features across all buckets and upload to proc_data_bucket
-        result_file = collect_session_results(job_config, holdout = True)
+    if not labels:  # normal feature extraction job; collects features across all buckets and upload to proc_data_bucket
+        result_file = collect_session_results(job_config, holdout=True)
         upload_key = "{}/{}/{}/{}".format(job_config.user_id, job_config.job_id, job_config.mode, result_file)
-        upload_file_to_s3(result_file, bucket = job_config.proc_data_bucket, key = upload_key)
-    if labels: # label extraction job; copy file into raw course data dir instead of proc_data_bucket, creating separate label files for each bucket
+        upload_file_to_s3(result_file, bucket=job_config.proc_data_bucket, key=upload_key)
+    if labels:  # label extraction job; copy file into raw course data dir instead of proc_data_bucket, creating separate label files for each bucket
         for raw_data_bucket in job_config.raw_data_buckets:
             result_file = collect_session_results(job_config, raw_data_buckets=[raw_data_bucket])
             upload_key = raw_data_dir + "{}.csv".format(label_type)
-            upload_file_to_s3(result_file, bucket = raw_data_bucket, key = upload_key)
+            upload_file_to_s3(result_file, bucket=raw_data_bucket, key=upload_key)
     os.remove(result_file)
     send_email_alert(job_config)
     return
-
-
-
-
