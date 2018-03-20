@@ -538,6 +538,15 @@ def download_models(job_config, course, dest_dir, level, session = None):
 
 
 def fetch_file(s3, dest_dir, remote_file_url, dest_filename = None):
+    """
+
+    :param s3: boto3.client object for s3 connection.
+    :param dest_dir: directory to download file to (string).
+    :param remote_file_url: url of remote file; must be either file://, s3, or http format (string).
+    :param dest_filename: base name of file to use (otherwise defaults to current file name) (string).
+    :return:
+    """
+
     print("[INFO] retrieving file {} to {}".format(remote_file_url, dest_dir))
     if not dest_filename:
         dest_filename = os.path.basename(remote_file_url)
