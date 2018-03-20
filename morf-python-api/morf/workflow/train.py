@@ -42,71 +42,78 @@ def train_all(label_type):
     :param label_type:  label type provided by user.
     :return: None
     """
+    level = "all"
+    job_config = MorfJobConfig(CONFIG_FILENAME)
+    job_config.update_mode("train")
     check_label_type(label_type)
-    raw_data_buckets = fetch_data_buckets_from_config()
     # clear any preexisting data for this user/job/mode
-    clear_s3_subdirectory(proc_data_bucket, user_id, job_id, mode)
-    run_job(docker_url, mode, None, user_id, job_id, None, "all", raw_data_buckets=raw_data_buckets, label_type=label_type)
-    send_email_alert(aws_access_key_id,
-                     aws_secret_access_key,
-                     job_id,
-                     user_id,
-                     status=mode,
-                     emailaddr_to=email_to)
+    clear_s3_subdirectory(job_config)
+    run_job(job_config, course=None, session=None, level=level, label_type=label_type)
+    send_email_alert(job_config)
     return
 
 
-def train_course(label_type, raw_data_dir = "morf-data/", multithread = True):
+def train_course(label_type, raw_data_dir="morf-data/", multithread=True):
     """
     Trains one model per course using the Docker image.
     :param label_type:  label type provided by user.
     :raw_data_dir: path to directory in all data buckets where course-level directories are located; this should be uniform for every raw data bucket.
+    :multithread: whether to run job in parallel (multithread = false can be useful for debugging).
     :return: None
     """
     level = "course"
     job_config = MorfJobConfig(CONFIG_FILENAME)
-    job_config.update_mode("train")
+    job_config.update_mode(mode)
     check_label_type(label_type)
-    # # clear any preexisting data for this user/job/mode
+    # clear any preexisting data for this user/job/mode
     clear_s3_subdirectory(job_config)
     # for each bucket, call job_runner once per course with --mode=train and --level=course
     for raw_data_bucket in job_config.raw_data_buckets:
         print("[INFO] processing bucket {}".format(raw_data_bucket))
+        courses = fetch_complete_courses(job_config, raw_data_bucket, raw_data_dir)
         if multithread:
             with Pool() as pool:
-                for course in fetch_complete_courses(job_config, raw_data_bucket, raw_data_dir, n_train=1):
+                for course in courses:
                     pool.apply_async(run_job, [job_config, course, None, level, raw_data_bucket, label_type])
                 pool.close()
                 pool.join()
-        else: # do job in serial; useful for debugging
-            for course in fetch_complete_courses(job_config, raw_data_bucket, raw_data_dir, n_train=1):
+        else:  # single-threaded
+            for course in courses:
                 run_job(job_config, course, None, level, raw_data_bucket, label_type)
     send_email_alert(job_config)
     return
 
 
-def train_session(label_type, raw_data_dir = "morf-data/"):
+def train_session(label_type, raw_data_dir="morf-data/", multithread=True):
     """
     Train one model per session of the course using the Docker image.
     :param label_type:  label type provided by user.
+    :raw_data_dir: path to directory in all data buckets where course-level directories are located; this should be uniform for every raw data bucket.
+    :multithread: whether to run job in parallel (multithread = false can be useful for debugging).
     :return: None
     """
+    level = "session"
+    job_config = MorfJobConfig(CONFIG_FILENAME)
+    job_config.update_mode(mode)
     check_label_type(label_type)
-    raw_data_buckets = fetch_data_buckets_from_config()
     # clear any preexisting data for this user/job/mode
-    clear_s3_subdirectory(proc_data_bucket, user_id, job_id, mode)
+    clear_s3_subdirectory(job_config)
     # for each bucket, call job_runner once per session with --mode=train and --level=session
-    for raw_data_bucket in raw_data_buckets:
-        with Pool() as pool:
-            for course in fetch_complete_courses(s3, raw_data_bucket, raw_data_dir, n_train=1):
-                for run in fetch_sessions(s3, raw_data_bucket, raw_data_dir, course, fetch_holdout_session_only=False):
-                    pool.apply_async(run_job, [docker_url, mode, course, user_id, job_id, run, "session", raw_data_bucket, label_type])
+    for raw_data_bucket in job_config.raw_data_buckets:
+        print("[INFO] processing bucket {}".format(raw_data_bucket))
+        courses = fetch_complete_courses(job_config, raw_data_bucket, raw_data_dir)
+        if multithread:
+            with Pool() as pool:
+                for course in courses:
+                    for session in fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course,
+                                                  fetch_holdout_session_only=False):
+                        pool.apply_async(run_job, [job_config, course, session, level, raw_data_bucket, label_type])
             pool.close()
             pool.join()
-    send_email_alert(aws_access_key_id,
-                     aws_secret_access_key,
-                     job_id,
-                     user_id,
-                     status=mode,
-                     emailaddr_to=email_to)
+        else:  # single-threaded
+            for course in courses:
+                for session in fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course,
+                                              fetch_holdout_session_only=False):
+                    run_job(job_config, course, session, level, raw_data_bucket, label_type)
+    send_email_alert(job_config)
     return
