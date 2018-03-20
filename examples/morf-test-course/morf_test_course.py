@@ -40,8 +40,8 @@ from feature_extraction import fetch_courses_and_sessions, aggregate_output_csvs
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='execute feature extraction, training, or testing.')
     parser.add_argument('-m', '--mode', required=True, help='mode to run image in; {extract, train, test}')
-    parser.add_argument('--course_id', required=True)
-    parser.add_argument('--run_number', required=False)
+    parser.add_argument('--course', required=True)
+    parser.add_argument('--session', required=False)
     args = parser.parse_args()
     if args.mode == 'extract':
         # this block expects individual session data mounted by extract_session() and outputs one CSV file in /output
@@ -49,15 +49,15 @@ if __name__ == '__main__':
         for c,s in fetch_courses_and_sessions():
         # set up the mysql database
             extract_coursera_sql_data(c, s)
-            extract_features(course_name = c, run_number = s)
+            extract_features(course_name = c, session = s)
         aggregate_output_csvs()
     if args.mode == 'train':
         # this block expects all data mounted by train_course() and outputs one model in /output
-        cmd = "Rscript /modeling/train_model_course.R --course {}".format(args.course_id)
+        cmd = "Rscript /modeling/train_model_course.R --course {}".format(args.course)
         subprocess.call(cmd, shell=True)
     if args.mode == 'test':
         # this block expects course-level data and models mounted by test_course() and outputs one csv of predictions for all courses in /output
-        cmd = "Rscript /modeling/test_model_course.R --course {}".format(args.course_id)
+        cmd = "Rscript /modeling/test_model_course.R --course {}".format(args.course)
         subprocess.call(cmd, shell=True)
 
 
