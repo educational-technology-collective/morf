@@ -53,22 +53,27 @@ def run_image(job_config, raw_data_bucket, course=None, session=None, level=None
     mode = job_config.mode
     s3 = job_config.initialize_s3()
     # create local directory for processing on this instance
+    print("[TEST] REACHED BLOCK ABOVE TEMPFILE CREATION")
     with tempfile.TemporaryDirectory(dir=get_config_properties()["local_working_directory"]) as working_dir:
         # download_docker_image(s3, working_dir, docker_url)
+        print("[TEST] REACHED BLOCK ABOVE FETCH_FILE")
         fetch_file(s3, working_dir, docker_url, dest_filename="docker_image")
+        print("[TEST] REACHED BLOCK AFTER FETCH_FILE")
         input_dir, output_dir = initialize_input_output_dirs(working_dir)
         # fetch any data or models needed
+        print("[TEST] REACHED BLOCK ABOVE MODE CHECKS")
         if "extract" in mode:  # download raw data
-            initialize_raw_course_data(s3=s3, aws_access_key_id=get_config_properties()["aws_access_key_id"],
-                                       aws_secret_access_key=get_config_properties()["aws_secret_access_key"],
-                                       raw_data_bucket=raw_data_bucket, mode=mode, course=course, session=session,
-                                       level=level, input_dir=input_dir)
+            initialize_raw_course_data(job_config,
+                                       raw_data_bucket=raw_data_bucket, mode=mode, course=course,
+                                       session=session, level=level, input_dir=input_dir)
         # fetch training/testing data and untar file for xing
+        print("MODE: {}".format(mode))
         if mode in ["train", "test"]:
             if "xing" in job_id:
                 download_train_test_data_xing(s3, input_dir, bucket=get_config_properties()["proc_data_bucket"],
                                               user_id=user_id, job_id=job_id, course=course)
             else:
+                print("[TEST] REACHED INITIALIZE_TRAIN_TEST_DATA() IN JOB_RUNNER_UTILS")
                 initialize_train_test_data(job_config, raw_data_bucket=raw_data_bucket, level=level, label_type=label_type,
                                            course=course, session=session, input_dir=input_dir)
         if mode == "test":  # fetch models and untar
@@ -181,5 +186,6 @@ def run_morf_job(client_config_url, server_config_url, email_to = None, no_cache
         send_email_alert(job_config)
         subprocess.call("python3 {}".format(controller_script_name), shell = True)
         job_config.update_status("SUCCESS")
+        # TODO: uncomment below after debugging complete
         send_success_email(job_config)
         return
