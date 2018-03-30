@@ -103,11 +103,15 @@ def train_session(label_type, raw_data_dir="morf-data/", multithread=True):
         print("[INFO] processing bucket {}".format(raw_data_bucket))
         courses = fetch_complete_courses(job_config, raw_data_bucket, raw_data_dir)
         if multithread:
-            with Pool() as pool:
+            with Pool(1) as pool:
                 for course in courses:
                     for session in fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course,
                                                   fetch_holdout_session_only=False):
-                        pool.apply_async(run_job, [job_config, course, session, level, raw_data_bucket, label_type])
+                        # todo: this only works when using the poolres and .get()
+                        # calls below...why? Potentially implement this for all
+                        # of the workflow functions
+                        poolres = pool.apply_async(run_job, [job_config, course, session, level, raw_data_bucket, label_type])
+                        print(poolres.get())
             pool.close()
             pool.join()
         else:  # single-threaded
