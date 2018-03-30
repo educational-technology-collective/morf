@@ -34,7 +34,6 @@ from multiprocessing import Pool
 
 # define module-level variables for config.properties
 CONFIG_FILENAME = "config.properties"
-mode = "extract"
 
 
 def extract_all():
@@ -62,33 +61,34 @@ def extract_all():
     return
 
 
-def extract_course(raw_data_dir="morf-data/"):
+def extract_course(raw_data_dir="morf-data/", multithread = True):
     """
     Extract features using the Docker image, building individual feature sets for each course.
     :return:
     """
     mode = "extract"
-    raw_data_buckets = fetch_data_buckets_from_config()
+    job_config = MorfJobConfig(CONFIG_FILENAME)
+    job_config.update_mode(mode)
     # clear any preexisting data for this user/job/mode
-    clear_s3_subdirectory(proc_data_bucket, user_id, job_id, mode)
+    clear_s3_subdirectory(job_config)
     # call job_runner once percourse with --mode=extract and --level=course
-    for raw_data_bucket in raw_data_buckets:
+    for raw_data_bucket in job_config.raw_data_buckets:
         print("[INFO] processing bucket {}".format(raw_data_bucket))
-        with Pool() as pool:
-            for course in fetch_courses(s3, raw_data_bucket, raw_data_dir):
-                pool.apply_async(run_job, [docker_url, mode, course, user_id, job_id, None, "course", raw_data_bucket])
-            pool.close()
-            pool.join()
-    result_file = collect_course_results(s3, raw_data_buckets, proc_data_bucket, mode, user_id, job_id)
-    upload_key = make_s3_key_path(user_id, job_id, mode, course=None, filename=result_file)
+        courses = fetch_courses(job_config, raw_data_bucket, raw_data_dir)
+        if multithread:
+            with Pool() as pool:
+                for course in courses:
+                    pool.apply_async(run_job, [job_config, course, None, "course", raw_data_bucket])
+                pool.close()
+                pool.join()
+        else: # do job in serial; this is useful for debugging
+            for course in courses:
+                run_job(job_config, course, None, "course", raw_data_bucket)
+    result_file = collect_course_results(job_config)
+    upload_key = make_s3_key_path(job_config, filename=result_file)
     upload_file_to_s3(result_file, bucket=proc_data_bucket, key=upload_key)
     os.remove(result_file)
-    send_email_alert(aws_access_key_id,
-                     aws_secret_access_key,
-                     job_id,
-                     user_id,
-                     status=mode,
-                     emailaddr_to=email_to)
+    send_email_alert(job_config)
     return
 
 
@@ -102,6 +102,7 @@ def extract_session(labels=False, raw_data_dir="morf-data/", label_type="labels-
     :return:
     """
     level = "session"
+    mode = "extract"
     job_config = MorfJobConfig(CONFIG_FILENAME)
     job_config.update_mode(mode)
     # # clear any preexisting data for this user/job/mode
