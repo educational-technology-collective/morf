@@ -29,8 +29,8 @@ from morf.workflow.test import test_course
 from morf.workflow.evaluate import evaluate_course
 
 
-extract_session(multithread = False)
-# extract_holdout_session()
-# train_session(label_type = 'dropout')
-# test_course()
-# evaluate_course(label_type = 'dropout')
+extract_session()
+extract_holdout_session()
+train_session(label_type = 'dropout')
+test_course(label_type = 'dropout')
+evaluate_course(label_type = 'dropout')
