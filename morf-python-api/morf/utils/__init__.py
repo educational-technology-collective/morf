@@ -270,7 +270,7 @@ def download_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, 
     return
 
 
-def initialize_raw_course_data(s3, aws_access_key_id, aws_secret_access_key, raw_data_bucket, level, mode,
+def initialize_raw_course_data(job_config, raw_data_bucket, level, mode,
                                data_dir ="morf-data", course = None, session = None, input_dir ="./input",
                                course_date_file_name ="coursera_course_dates.csv"):
     """
@@ -288,6 +288,9 @@ def initialize_raw_course_data(s3, aws_access_key_id, aws_secret_access_key, raw
     :param course_date_file_name: name of csv file located at bucket/data_dir containing course start and end dates.
     :return: None
     """
+    s3 = job_config.initialize_s3()
+    aws_access_key_id = job_config.aws_access_key_id
+    aws_secret_access_key = job_config.aws_secret_access_key
     if level != "all": # course_date_file_url is unique across the entire job
 
         course_date_file_url = "s3://{}/{}/{}".format(raw_data_bucket, data_dir, course_date_file_name)
@@ -546,24 +549,26 @@ def fetch_file(s3, dest_dir, remote_file_url, dest_filename = None):
     :param dest_filename: base name of file to use (otherwise defaults to current file name) (string).
     :return:
     """
-
     print("[INFO] retrieving file {} to {}".format(remote_file_url, dest_dir))
-    if not dest_filename:
-        dest_filename = os.path.basename(remote_file_url)
-    url = urlparse(remote_file_url)
-    if url.scheme == "file":
-        shutil.copyfile(url.path, os.path.join(dest_dir, dest_filename))
-    elif url.scheme == "s3":
-        bucket = url.netloc
-        key = url.path[1:]  # ignore initial /
-        download_from_s3(bucket, key, s3, dest_dir, dest_filename = dest_filename)
-    elif url.scheme == "https":
-        urllib.request.urlretrieve(remote_file_url, os.path.join(dest_dir, dest_filename))
-    else:
-        print(
-        "[ERROR] A URL which was not s3:// or file:// or https:// was passed in for a file location, this is not supported. {}"
-            .format(remote_file_url))
-        sys.exit(-1)
+    try:
+        if not dest_filename:
+            dest_filename = os.path.basename(remote_file_url)
+        url = urlparse(remote_file_url)
+        if url.scheme == "file":
+            shutil.copyfile(url.path, os.path.join(dest_dir, dest_filename))
+        elif url.scheme == "s3":
+            bucket = url.netloc
+            key = url.path[1:]  # ignore initial /
+            download_from_s3(bucket, key, s3, dest_dir, dest_filename = dest_filename)
+        elif url.scheme == "https":
+            urllib.request.urlretrieve(remote_file_url, os.path.join(dest_dir, dest_filename))
+        else:
+            print(
+            "[ERROR] A URL which was not s3:// or file:// or https:// was passed in for a file location, this is not supported. {}"
+                .format(remote_file_url))
+            sys.exit(-1)
+    except Exception as e:
+        print("[ERROR] {} when attempting to fetch and copy file at {}".format(e, remote_file_url))
     return
 
 
