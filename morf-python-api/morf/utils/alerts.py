@@ -121,11 +121,8 @@ def send_success_email(job_config, emailaddr_from ="morf-alerts@umich.edu"):
     Modified substantially from:
     http://blog.vero4ka.info/blog/2016/10/26/how-to-send-an-email-with-attachment-via-amazon-ses-in-python/
     https://gist.github.com/yosemitebandit/2883593
-    :param aws_access_key_id:
-    :param aws_secret_access_key:
-    :param emailaddr_to:
-    :param emailaddr_from:
-    :param attachment_filepath:
+    :param job_config: MorfJobConfig object.
+    :param emailaddr_from: address to send email from (string).
     :return:
     """
     aws_access_key_id = job_config.aws_access_key_id
