@@ -48,20 +48,17 @@ def run_image(job_config, raw_data_bucket, course=None, session=None, level=None
     :return:
     """
     docker_url = job_config.docker_url
-    user_id = job_config.user_id
-    job_id = job_config.job_id
     mode = job_config.mode
     s3 = job_config.initialize_s3()
+    docker_exec = job_config.docker_exec
     # create local directory for processing on this instance
-    print("[TEST] REACHED BLOCK ABOVE TEMPFILE CREATION")
-    with tempfile.TemporaryDirectory(dir=get_config_properties()["local_working_directory"]) as working_dir:
-        # download_docker_image(s3, working_dir, docker_url)
-        print("[TEST] REACHED BLOCK ABOVE FETCH_FILE")
-        fetch_file(s3, working_dir, docker_url, dest_filename="docker_image")
-        print("[TEST] REACHED BLOCK AFTER FETCH_FILE")
+    with tempfile.TemporaryDirectory(dir=job_config.local_working_directory) as working_dir:
+        try:
+            fetch_file(s3, working_dir, docker_url, dest_filename="docker_image")
+        except Exception as e:
+            print("[ERROR] Error downloading file {} to {}".format(docker_url, working_dir))
         input_dir, output_dir = initialize_input_output_dirs(working_dir)
         # fetch any data or models needed
-        print("[TEST] REACHED BLOCK ABOVE MODE CHECKS")
         if "extract" in mode:  # download raw data
             initialize_raw_course_data(job_config,
                                        raw_data_bucket=raw_data_bucket, mode=mode, course=course,
@@ -69,18 +66,14 @@ def run_image(job_config, raw_data_bucket, course=None, session=None, level=None
         # fetch training/testing data and untar file for xing
         print("MODE: {}".format(mode))
         if mode in ["train", "test"]:
-            if "xing" in job_id:
-                download_train_test_data_xing(s3, input_dir, bucket=get_config_properties()["proc_data_bucket"],
-                                              user_id=user_id, job_id=job_id, course=course)
-            else:
-                print("[TEST] REACHED INITIALIZE_TRAIN_TEST_DATA() IN JOB_RUNNER_UTILS")
-                initialize_train_test_data(job_config, raw_data_bucket=raw_data_bucket, level=level, label_type=label_type,
-                                           course=course, session=session, input_dir=input_dir)
+            initialize_train_test_data(job_config, raw_data_bucket=raw_data_bucket, level=level,
+                                       label_type=label_type, course=course, session=session,
+                                       input_dir=input_dir)
         if mode == "test":  # fetch models and untar
-            download_models(job_config,course=course, session=session, dest_dir=input_dir, level=level)
+            download_models(job_config, course=course, session=session, dest_dir=input_dir, level=level)
         # load the docker image and get its key
         local_docker_file_location = "{}/docker_image".format(working_dir)
-        cmd = "{} load -i {};".format(get_config_properties()["docker_exec"], local_docker_file_location)
+        cmd = "{} load -i {};".format(job_config.docker_exec, local_docker_file_location)
         print("[INFO] running: " + cmd)
         output = subprocess.run(cmd, stdout=subprocess.PIPE, shell = True)
         print(output.stdout.decode("utf-8"))
@@ -92,14 +85,14 @@ def run_image(job_config, raw_data_bucket, course=None, session=None, level=None
         # execute the image
         if mode == "extract-holdout":  # call docker image with mode == extract
             cmd = "{} run --network=\"none\" --rm=true --volume={}:/input --volume={}:/output {} --course {} --session {} --mode {};".format(
-                get_config_properties()["docker_exec"], input_dir, output_dir, image_uuid, course, session, "extract")
+                docker_exec, input_dir, output_dir, image_uuid, course, session, "extract")
         else:  # proceed as normal
             cmd = "{} run --network=\"none\" --rm=true --volume={}:/input --volume={}:/output {} --course {} --session {} --mode {};".format(
-                get_config_properties()["docker_exec"], input_dir, output_dir, image_uuid, course, session, mode)
+                docker_exec, input_dir, output_dir, image_uuid, course, session, mode)
         print("[INFO] running: " + cmd)
         subprocess.call(cmd, shell=True)
         # cleanup
-        cmd = "{} rmi --force {}".format(get_config_properties()["docker_exec"], image_uuid)
+        cmd = "{} rmi --force {}".format(docker_exec, image_uuid)
         print("[INFO] running: " + cmd)
         subprocess.call(cmd, shell=True)
         # archive and write output
@@ -140,8 +133,8 @@ def run_job(job_config, course, session, level, raw_data_bucket=None, label_type
 def run_morf_job(client_config_url, server_config_url, email_to = None, no_cache = False):
     """
     Wrapper function to run complete MORF job.
-    :param client_config_url: url to client.config file; should be located on local machine.
-    :param server_config_url: url (local or s3) to server.config file.
+    :param client_config_url: url to client.config file.
+    :param server_config_url: url to server.config file.
     :return:
     """
     controller_script_name = "controller.py"
@@ -186,6 +179,5 @@ def run_morf_job(client_config_url, server_config_url, email_to = None, no_cache
         send_email_alert(job_config)
         subprocess.call("python3 {}".format(controller_script_name), shell = True)
         job_config.update_status("SUCCESS")
-        # TODO: uncomment below after debugging complete
         send_success_email(job_config)
         return
