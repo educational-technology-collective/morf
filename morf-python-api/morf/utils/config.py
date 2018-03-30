@@ -30,7 +30,7 @@ import os
 from morf.utils import get_bucket_from_url, get_key_from_url
 
 
-def get_config_properties(config_file ="config.properties"):
+def get_config_properties(config_file="config.properties"):
     """
     Returns the list of properties as a dict of key/value pairs in the file config.properties.
     :return: A flat (no sections) Python dictionary of properties.
@@ -47,7 +47,7 @@ def get_config_properties(config_file ="config.properties"):
     return properties
 
 
-def combine_config_files(*args, outfile = "config.properties"):
+def combine_config_files(*args, outfile="config.properties"):
     """
     Combine multiple config files into single config file located at outfile.
     :param args: names of config files to combine.
@@ -60,7 +60,7 @@ def combine_config_files(*args, outfile = "config.properties"):
     return
 
 
-def update_config_fields_in_section(section, config_file = "config.properties", **kwargs):
+def update_config_fields_in_section(section, config_file="config.properties", **kwargs):
     """
     Overwrite (or create, if not exists) fields in section of config_file with values provided according to kwargs.
     :param section: section header within config file which contains the field to be modified.
@@ -78,14 +78,16 @@ def update_config_fields_in_section(section, config_file = "config.properties", 
         for item in cf.items(section):
             try:
                 cf_new[section][item[0]] = item[1]
-            except KeyError: # section doesn't exist yet
+            except KeyError:  # section doesn't exist yet
                 cf_new[section] = {}
                 cf_new[section][item[0]] = item[1]
     for key, value in kwargs.items():
         try:
             cf_new[section][key] = value
         except KeyError:
-            print("[ERROR] error updating config file: {}; possibly attempted to update a section that does not exist".format(e))
+            print(
+            "[ERROR] error updating config file: {}; possibly attempted to update a section that does not exist".format(
+                e))
     try:
         os.remove(config_file)
         with open(config_file, "w") as cfwrite:
@@ -95,7 +97,8 @@ def update_config_fields_in_section(section, config_file = "config.properties", 
     return
 
 
-def fetch_data_buckets_from_config(config_file = "config.properties", data_section = 'data', required_bucket_dir_name = 'morf-data/'):
+def fetch_data_buckets_from_config(config_file="config.properties", data_section="data",
+                                   required_bucket_dir_name='morf-data/'):
     """
     Fetch the buckets from data_section of config_file; warn if key does not exactle match directory_name.
     :param config_file: path to config file.
@@ -111,7 +114,8 @@ def fetch_data_buckets_from_config(config_file = "config.properties", data_secti
         bucket = get_bucket_from_url(item_url)
         dir = get_key_from_url(item_url)
         if dir != required_bucket_dir_name:
-            msg = "[ERROR]: specified path {} does not match required directory name {}; change name of directories to be consistent or specify the correct directory to check for.".format(item_url, required_bucket_dir_name)
+            msg = "[ERROR]: specified path {} does not match required directory name {}; change name of directories to be consistent or specify the correct directory to check for.".format(
+                item_url, required_bucket_dir_name)
             print(msg)
             raise
         else:
@@ -124,8 +128,9 @@ class MorfJobConfig:
     """
     Job-level configurations; these should remain consistent across entire workflow of a job.
     """
+
     def __init__(self, config_file):
-        self.type = "morf" #todo: delete this
+        self.type = "morf"  # todo: delete this
         self.mode = None
         self.status = "START"
         properties = get_config_properties(config_file)
@@ -135,7 +140,6 @@ class MorfJobConfig:
         # fetch raw data buckets as list
         self.raw_data_buckets = fetch_data_buckets_from_config()
         # # create s3 connection object for communicating with s3
-        # self.s3 = boto3.client("s3", properties["aws_access_key_id"], properties["aws_secret_access_key"])
 
     def check_configurations(self):
         # todo: check that all arguments are valid/acceptable
@@ -155,6 +159,7 @@ class MorfJobConfig:
 
     def initialize_s3(self):
         # create s3 connection object for communicating with s3
-        s3obj = boto3.client("s3", aws_access_key_id=self.aws_access_key_id,
-                  aws_secret_access_key=self.aws_secret_access_key)
+        s3obj = boto3.client("s3",
+                             aws_access_key_id=self.aws_access_key_id,
+                             aws_secret_access_key=self.aws_secret_access_key)
         return s3obj
