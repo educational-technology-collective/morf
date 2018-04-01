@@ -81,7 +81,8 @@ def test_course(label_type, raw_data_dir="morf-data/", multithread=True):
         if multithread:
             with Pool() as pool:
                 for course in courses:
-                    pool.apply_async(run_job, [job_config, course, None, level, raw_data_bucket, label_type])
+                    poolres = pool.apply_async(run_job, [job_config, course, None, level, raw_data_bucket, label_type])
+                    print(poolres.get())
                 pool.close()
                 pool.join()
         else:
