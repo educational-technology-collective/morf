@@ -42,22 +42,18 @@ def extract_all():
     :return:
     """
     mode = "extract"
-    raw_data_buckets = fetch_data_buckets_from_config()
+    level = "all"
+    job_config = MorfJobConfig(CONFIG_FILENAME)
+    job_config.update_mode(mode)
     # clear any preexisting data for this user/job/mode
-    clear_s3_subdirectory(proc_data_bucket, user_id, job_id, mode)
+    clear_s3_subdirectory(job_config)
     # only call job_runner once with --mode-extract and --level=all; this will load ALL data up and run the docker image
-    run_job(docker_url, mode, course=None, user=user_id, job_id=job_id, session=None, level="all",
-            raw_data_buckets=raw_data_buckets)
-    result_file = collect_all_results(s3, raw_data_buckets, proc_data_bucket, mode, user_id, job_id)
-    upload_key = make_s3_key_path(user_id, job_id, mode, course=None, filename=result_file)
-    upload_file_to_s3(result_file, bucket=proc_data_bucket, key=upload_key)
+    run_job(job_config, None, None, level, raw_data_buckets=job_config.raw_data_buckets)
+    result_file = collect_all_results(job_config)
+    upload_key = make_s3_key_path(job_config, filename=result_file)
+    upload_file_to_s3(result_file, bucket=job_config.proc_data_bucket, key=upload_key)
     os.remove(result_file)
-    send_email_alert(aws_access_key_id,
-                     aws_secret_access_key,
-                     job_id,
-                     user_id,
-                     status=mode,
-                     emailaddr_to=email_to)
+    send_email_alert(job_config)
     return
 
 
