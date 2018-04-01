@@ -116,7 +116,7 @@ def collect_course_results(job_config, raw_data_dir = "morf-data/"):
     return csv_fp
 
 
-def collect_all_results(s3, proc_data_bucket, mode, user_id, job_id, raw_data_dir = "morf-data/"):
+def collect_all_results(job_config, raw_data_dir = "morf-data/"):
     """
     Pull results for all-level job and return path to csv.
     Similar wrapper to replicated workflow for collect_course_results and collect_session_results, but no iteration over courses/sessions required.
@@ -129,9 +129,9 @@ def collect_all_results(s3, proc_data_bucket, mode, user_id, job_id, raw_data_di
     :return:
     """
     working_dir = os.getcwd()
-    fetch_result_file(s3, proc_data_bucket, user_id=user_id, job_id=job_id, mode=mode, dir=working_dir)
+    fetch_result_file(job_config, dir=working_dir)
     csv = fetch_result_csv_fp(working_dir)
-    csv_fp = generate_archive_filename(user_id=user_id, job_id=job_id, mode=mode, extension="csv")
+    csv_fp = generate_archive_filename(job_config, extension="csv")
     shutil.move(csv, csv_fp)
     return csv_fp
 
