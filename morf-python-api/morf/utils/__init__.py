@@ -300,26 +300,26 @@ def initialize_raw_course_data(job_config, raw_data_bucket, level, mode,
             course_date_file_url = "s3://{}/{}/{}".format(bucket, data_dir, course_date_file_name)
             for course in fetch_courses(s3, bucket, data_dir):
                 if mode == "extract":
-                    sessions = fetch_sessions(s3, bucket, data_dir, course)
+                    sessions = fetch_sessions(job_config, bucket, data_dir, course)
                     for session in sessions:
                         download_raw_course_data(s3, aws_access_key_id, aws_secret_access_key, bucket=bucket,
                                                  course=course, session=session, input_dir=input_dir,
                                                  course_date_file_url=course_date_file_url, data_dir=data_dir)
                 if mode == "extract-holdout":
-                    holdout_session = fetch_sessions(s3, bucket, data_dir, course, fetch_holdout_session_only=True)[0]
+                    holdout_session = fetch_sessions(job_config, bucket, data_dir, course, fetch_holdout_session_only=True)[0]
                     download_raw_course_data(s3, aws_access_key_id, aws_secret_access_key, bucket=bucket,
                                              course=course, session=holdout_session, input_dir=input_dir,
                                              course_date_file_url=course_date_file_url, data_dir=data_dir)
     elif level == "course":
         # download all data for every session of course
         if mode == "extract":
-            sessions = fetch_sessions(s3, raw_data_bucket, data_dir, course)
+            sessions = fetch_sessions(job_config, raw_data_bucket, data_dir, course)
             for session in sessions:
                 download_raw_course_data(s3, aws_access_key_id, aws_secret_access_key, bucket=raw_data_bucket,
                                          course=course, session=session, input_dir=input_dir,
                                          course_date_file_url=course_date_file_url, data_dir=data_dir)
         if mode == "extract-holdout":
-            holdout_session = fetch_sessions(s3, raw_data_bucket, data_dir, course, fetch_holdout_session_only=True)[0]
+            holdout_session = fetch_sessions(job_config, raw_data_bucket, data_dir, course, fetch_holdout_session_only=True)[0]
             download_raw_course_data(s3, aws_access_key_id, aws_secret_access_key, bucket=raw_data_bucket,
                                      course=course, session=holdout_session, input_dir=input_dir,
                                      course_date_file_url=course_date_file_url, data_dir=data_dir)
@@ -331,8 +331,7 @@ def initialize_raw_course_data(job_config, raw_data_bucket, level, mode,
     return
 
 
-def initialize_train_test_data(job_config, raw_data_bucket, level, label_type, course = None, session = None, input_dir ='./input',
-                               raw_data_dir = 'morf-data/'):
+def initialize_train_test_data(job_config, raw_data_bucket, level, label_type, course = None, session = None, input_dir ='./input', raw_data_dir = 'morf-data/'):
     """
     Mounts data in /input/course/session directories for MORF API train/test jobs.
     :param job_config: MorfJobConfig object.
@@ -364,9 +363,7 @@ def initialize_train_test_data(job_config, raw_data_bucket, level, label_type, c
                 elif mode == "test":
                     sessions = fetch_sessions(job_config, bucket, raw_data_dir, course, fetch_holdout_session_only=True)
                 for session in sessions:
-                    download_train_test_data(s3, aws_access_key_id, aws_secret_access_key, bucket, raw_data_dir,
-                                             proc_data_bucket, course, session, input_dir, proc_data_dir, mode,
-                                             label_type, user_id, job_id)
+                    download_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, session, input_dir, label_type)
     if level == "course": # download data for every session of course
         if mode == "train":
             sessions = fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course)
