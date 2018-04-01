@@ -40,8 +40,8 @@ from feature_extraction import fetch_courses_and_sessions, aggregate_output_csvs
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='execute feature extraction, training, or testing.')
     parser.add_argument('-m', '--mode', required=True, help='mode to run image in; {extract, train, test}')
-    parser.add_argument('--course_id', required=False)
-    parser.add_argument('--run_number', required=False)
+    parser.add_argument('--course', required=False)
+    parser.add_argument('--session', required=False)
     args = parser.parse_args()
     if args.mode == 'extract':
         # this block expects individual all data mounted by extract_all() and outputs one CSV file in /output
