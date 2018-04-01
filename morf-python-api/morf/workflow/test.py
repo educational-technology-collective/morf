@@ -37,7 +37,7 @@ mode = "test"
 CONFIG_FILENAME = "config.properties"
 
 
-def test_all():
+def test_all(label_type):
     """
     test a single overall model using the entire dataset using the Docker image.
     :return:
@@ -47,14 +47,12 @@ def test_all():
     job_config.update_mode(mode)
     check_label_type(label_type)
     # clear any preexisting data for this user/job/mode
-    clear_s3_subdirectory(proc_data_bucket, user_id, job_id, mode)
-    run_job(docker_url, mode, None, user_id, job_id, None, "all", None, raw_data_buckets=raw_data_buckets)
+    clear_s3_subdirectory(job_config)
+    run_job(job_config, None, None, level, raw_data_buckets=job_config.raw_data_buckets)
     # fetch archived result file and push csv result back to s3, mimicking session- and course-level workflow
-    result_file = collect_all_results(s3, proc_data_bucket, mode, user_id, job_id)
-    upload_key = make_s3_key_path(user_id, job_id, mode, course=None,
-                                  filename=generate_archive_filename(user_id=user_id, job_id=job_id, mode=mode,
-                                                                     extension="csv"))
-    upload_file_to_s3(result_file, bucket=proc_data_bucket, key=upload_key)
+    result_file = collect_all_results(job_config)
+    upload_key = make_s3_key_path(job_config, filename=generate_archive_filename(job_config, extension="csv"))
+    upload_file_to_s3(result_file, bucket=job_config.proc_data_bucket, key=upload_key)
     os.remove(result_file)
     send_email_alert(job_config)
     return
