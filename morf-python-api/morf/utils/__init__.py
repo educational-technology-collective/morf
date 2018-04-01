@@ -298,7 +298,7 @@ def initialize_raw_course_data(job_config, raw_data_bucket, level, mode,
         # download all data; every session of every course
         for bucket in raw_data_bucket:
             course_date_file_url = "s3://{}/{}/{}".format(bucket, data_dir, course_date_file_name)
-            for course in fetch_courses(s3, bucket, data_dir):
+            for course in fetch_courses(job_config, bucket):
                 if mode == "extract":
                     sessions = fetch_sessions(job_config, bucket, data_dir, course)
                     for session in sessions:
@@ -343,27 +343,17 @@ def initialize_train_test_data(job_config, raw_data_bucket, level, label_type, c
     :param data_dir: path to directory in raw_data_bucket containing course-level directories.
     :return: None
     """
-    s3 = job_config.initialize_s3()
-    aws_access_key_id = job_config.aws_access_key_id
-    aws_secret_access_key = job_config.aws_secret_access_key
-    proc_data_bucket = job_config.proc_data_bucket
     mode = job_config.mode
-    user_id = job_config.user_id
-    job_id = job_config.job_id
-    if mode == "train":
-        proc_data_dir = "{}/{}/{}".format(user_id, job_id, "extract")
-    elif mode == "test":
-        proc_data_dir = "{}/{}/{}".format(user_id, job_id, "extract-holdout")
     if level == "all": # download data for every course and session
         # download all data; every session of every course
         for bucket in raw_data_bucket:
-            for course in fetch_courses(s3, bucket, raw_data_dir):
+            for course in fetch_courses(job_config, bucket):
                 if mode == "train":
                     sessions = fetch_sessions(job_config, bucket, raw_data_dir, course)
                 elif mode == "test":
                     sessions = fetch_sessions(job_config, bucket, raw_data_dir, course, fetch_holdout_session_only=True)
                 for session in sessions:
-                    download_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, session, input_dir, label_type)
+                    download_train_test_data(job_config, bucket, raw_data_dir, course, session, input_dir, label_type)
     if level == "course": # download data for every session of course
         if mode == "train":
             sessions = fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course)
@@ -646,7 +636,7 @@ def move_results_to_destination(archive_file, job_config, course = None, session
 
 def fetch_result_file(job_config, dir, course = None, session = None):
     """
-    Download and untar result file for user_id, job_id, mode, and (optional) course and session from bucket.
+    Download and untar result file for user_id, job_id, mode, and (optional) course and session from job_config.proc_data_bucket.
     :param job_config: MorfJobConfig object.
     :param course: course shorname.
     :param session: session number.
@@ -654,9 +644,6 @@ def fetch_result_file(job_config, dir, course = None, session = None):
     """
     s3 = job_config.initialize_s3()
     bucket = job_config.proc_data_bucket
-    user_id = job_config.user_id
-    job_id = job_config.job_id
-    mode = job_config.mode
     archive_file = generate_archive_filename(job_config, course, session)
     key = make_s3_key_path(job_config, course=course, session=session,
                            filename=archive_file)
