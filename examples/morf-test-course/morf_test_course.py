@@ -46,10 +46,10 @@ if __name__ == '__main__':
     if args.mode == 'extract':
         # this block expects individual session data mounted by extract_session() and outputs one CSV file in /output
         # get list of courses and sessions from course-level directories in /input
-        for c,s in fetch_courses_and_sessions():
-        # set up the mysql database
+        for c, s in fetch_courses_and_sessions():
+            # set up the mysql database
             extract_coursera_sql_data(c, s)
-            extract_features(course_name = c, session = s)
+            extract_features(course_name=c, run_number=s)
         aggregate_output_csvs()
     if args.mode == 'train':
         # this block expects all data mounted by train_course() and outputs one model in /output
@@ -59,10 +59,3 @@ if __name__ == '__main__':
         # this block expects course-level data and models mounted by test_course() and outputs one csv of predictions for all courses in /output
         cmd = "Rscript /modeling/test_model_course.R --course {}".format(args.course)
         subprocess.call(cmd, shell=True)
-
-
-
-
-
-
-
