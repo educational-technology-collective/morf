@@ -64,7 +64,6 @@ def run_image(job_config, raw_data_bucket, course=None, session=None, level=None
                                        raw_data_bucket=raw_data_bucket, mode=mode, course=course,
                                        session=session, level=level, input_dir=input_dir)
         # fetch training/testing data and untar file for xing
-        print("MODE: {}".format(mode))
         if mode in ["train", "test"]:
             initialize_train_test_data(job_config, raw_data_bucket=raw_data_bucket, level=level,
                                        label_type=label_type, course=course, session=session,
@@ -179,5 +178,6 @@ def run_morf_job(client_config_url, server_config_url, email_to = None, no_cache
         send_email_alert(job_config)
         subprocess.call("python3 {}".format(controller_script_name), shell = True)
         job_config.update_status("SUCCESS")
+
         send_success_email(job_config)
         return
