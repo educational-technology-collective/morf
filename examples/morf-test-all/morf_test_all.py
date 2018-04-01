@@ -57,7 +57,7 @@ if __name__ == '__main__':
         subprocess.call(cmd, shell=True)
     if args.mode == 'test':
         # this block expects course-level data and models mounted by test_course() and outputs one csv of predictions for all courses in /output
-        cmd = "Rscript /modeling/test_model_all.R".format(args.course_id)
+        cmd = "Rscript /modeling/test_model_all.R".format(args.course)
         subprocess.call(cmd, shell=True)
 
 
