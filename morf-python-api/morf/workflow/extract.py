@@ -67,6 +67,7 @@ def extract_course(raw_data_dir="morf-data/", multithread = True):
     :return:
     """
     mode = "extract"
+    level = "course"
     job_config = MorfJobConfig(CONFIG_FILENAME)
     job_config.update_mode(mode)
     # clear any preexisting data for this user/job/mode
@@ -78,15 +79,16 @@ def extract_course(raw_data_dir="morf-data/", multithread = True):
         if multithread:
             with Pool() as pool:
                 for course in courses:
-                    pool.apply_async(run_job, [job_config, course, None, "course", raw_data_bucket])
+                    poolres = pool.apply_async(run_job, [job_config, course, None, level, raw_data_bucket])
+                    print(poolres.get())
                 pool.close()
                 pool.join()
         else: # do job in serial; this is useful for debugging
             for course in courses:
-                run_job(job_config, course, None, "course", raw_data_bucket)
+                run_job(job_config, course, None, level, raw_data_bucket)
     result_file = collect_course_results(job_config)
     upload_key = make_s3_key_path(job_config, filename=result_file)
-    upload_file_to_s3(result_file, bucket=proc_data_bucket, key=upload_key)
+    upload_file_to_s3(result_file, bucket=job_config.proc_data_bucket, key=upload_key)
     os.remove(result_file)
     send_email_alert(job_config)
     return
@@ -163,33 +165,40 @@ def extract_holdout_all():
     return
 
 
-def extract_holdout_course(raw_data_dir="morf-data/"):
+def extract_holdout_course(raw_data_dir="morf-data/", multithread = True):
     """
     Extract features using the Docker image across each course of holdout data.
     :return:
     """
     mode = "extract-holdout"
-    raw_data_buckets = fetch_data_buckets_from_config()
+    level = "course"
+    job_config = MorfJobConfig(CONFIG_FILENAME)
+    job_config.update_mode(mode)
+    job_config.initialize_s3()
     # clear any preexisting data for this user/job/mode
-    clear_s3_subdirectory(proc_data_bucket, user_id, job_id, mode)
+    clear_s3_subdirectory(job_config)
     # call job_runner once percourse with --mode=extract and --level=course
-    for raw_data_bucket in raw_data_buckets:
+    for raw_data_bucket in job_config.raw_data_buckets:
         print("[INFO] processing bucket {}".format(raw_data_bucket))
-        with Pool() as pool:
-            for course in fetch_courses(s3, raw_data_bucket, raw_data_dir):
-                pool.apply_async(run_job, [docker_url, mode, course, user_id, job_id, None, "course", raw_data_bucket])
-            pool.close()
-            pool.join()
-    result_file = collect_course_results(s3, raw_data_buckets, proc_data_bucket, mode, user_id, job_id)
-    upload_key = make_s3_key_path(user_id, job_id, mode, course=None, filename=result_file)
-    upload_file_to_s3(result_file, bucket=proc_data_bucket, key=upload_key)
+        courses = fetch_courses(job_config, raw_data_bucket, raw_data_dir)
+        if multithread:
+            with Pool() as pool:
+                for course in courses:
+                    holdout_session = fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course,
+                                                 fetch_holdout_session_only=True)[0]  # only use holdout run; unlisted
+                    pool.apply_async(run_job, [job_config, course, holdout_session, level, raw_data_bucket])
+                pool.close()
+                pool.join()
+        else: # do job in serial; this is useful for debugging
+            for course in courses:
+                holdout_session = fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course,
+                                                 fetch_holdout_session_only=True)[0]  # only use holdout run; unlisted
+                run_job(job_config, course, holdout_session, level, raw_data_bucket)
+    result_file = collect_course_results(job_config)
+    upload_key = make_s3_key_path(job_config, filename=result_file)
+    upload_file_to_s3(result_file, bucket=job_config.proc_data_bucket, key=upload_key)
     os.remove(result_file)
-    send_email_alert(aws_access_key_id,
-                     aws_secret_access_key,
-                     job_id,
-                     user_id,
-                     status=mode,
-                     emailaddr_to=email_to)
+    send_email_alert(job_config)
     return
 
 
