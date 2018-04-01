@@ -1,4 +1,5 @@
 config.properties
 *.tar
 *.md
+*.pyc
 

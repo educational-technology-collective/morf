@@ -121,11 +121,8 @@ def send_success_email(job_config, emailaddr_from ="morf-alerts@umich.edu"):
     Modified substantially from:
     http://blog.vero4ka.info/blog/2016/10/26/how-to-send-an-email-with-attachment-via-amazon-ses-in-python/
     https://gist.github.com/yosemitebandit/2883593
-    :param aws_access_key_id:
-    :param aws_secret_access_key:
-    :param emailaddr_to:
-    :param emailaddr_from:
-    :param attachment_filepath:
+    :param job_config: MorfJobConfig object.
+    :param emailaddr_from: address to send email from (string).
     :return:
     """
     aws_access_key_id = job_config.aws_access_key_id
@@ -135,12 +132,13 @@ def send_success_email(job_config, emailaddr_from ="morf-alerts@umich.edu"):
     user_id = job_config.user_id
     emailaddr_to = job_config.email_to
     status = job_config.status
+    job_config.update_mode("test") # need to set mode so that correct key path is used to fetch results
     results_file_name = "morf-results.csv"
     s3 = boto3.client("s3", aws_access_key_id=aws_access_key_id,
                       aws_secret_access_key=aws_secret_access_key)
     # fetch model evaluation results
-    attachment_basename = generate_archive_filename(user_id=user_id, job_id=job_id, mode="evaluate", extension="csv")
-    key = make_s3_key_path(user_id, job_id, mode = "test", filename=attachment_basename)
+    attachment_basename = generate_archive_filename(job_config, mode="evaluate", extension="csv")
+    key = make_s3_key_path(job_config, filename=attachment_basename)
     attachment_filepath = download_from_s3(proc_data_bucket, key, s3)
     with open(attachment_filepath) as f:
         data = f.read()

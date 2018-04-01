@@ -33,8 +33,7 @@ from urllib.parse import urlparse
 import os
 
 
-def run_image(docker_url, user_id, job_id, mode, raw_data_bucket, course=None, session=None, level=None,
-              label_type=None):
+def run_image(job_config, raw_data_bucket, course=None, session=None, level=None, label_type=None):
     """
     Run a docker image with the specified parameters.
     :param docker_url: URL for a built and compressed (.tar) docker image
@@ -48,73 +47,64 @@ def run_image(docker_url, user_id, job_id, mode, raw_data_bucket, course=None, s
     :param label_type: type of outcome label to use (required for model training and testing) (string).
     :return:
     """
-    s3 = boto3.client("s3", aws_access_key_id=get_config_properties()["aws_access_key_id"],
-                      aws_secret_access_key=get_config_properties()["aws_secret_access_key"])
+    docker_url = job_config.docker_url
+    mode = job_config.mode
+    s3 = job_config.initialize_s3()
+    docker_exec = job_config.docker_exec
     # create local directory for processing on this instance
-    with tempfile.TemporaryDirectory(dir=get_config_properties()["local_working_directory"]) as working_dir:
-        # download_docker_image(s3, working_dir, docker_url)
-        fetch_file(s3, working_dir, docker_url, dest_filename="docker_image")
+    with tempfile.TemporaryDirectory(dir=job_config.local_working_directory) as working_dir:
+        try:
+            fetch_file(s3, working_dir, docker_url, dest_filename="docker_image")
+        except Exception as e:
+            print("[ERROR] Error downloading file {} to {}".format(docker_url, working_dir))
         input_dir, output_dir = initialize_input_output_dirs(working_dir)
         # fetch any data or models needed
         if "extract" in mode:  # download raw data
-            initialize_raw_course_data(s3=s3, aws_access_key_id=get_config_properties()["aws_access_key_id"],
-                                       aws_secret_access_key=get_config_properties()["aws_secret_access_key"],
-                                       raw_data_bucket=raw_data_bucket, mode=mode, course=course, session=session,
-                                       level=level, input_dir=input_dir)
+            initialize_raw_course_data(job_config,
+                                       raw_data_bucket=raw_data_bucket, mode=mode, course=course,
+                                       session=session, level=level, input_dir=input_dir)
         # fetch training/testing data and untar file for xing
         if mode in ["train", "test"]:
-            if "xing" in job_id:
-                download_train_test_data_xing(s3, input_dir, bucket=get_config_properties()["proc_data_bucket"],
-                                              user_id=user_id, job_id=job_id, course=course)
-            else:
-                initialize_train_test_data(s3=s3, aws_access_key_id=get_config_properties()["aws_access_key_id"],
-                                           aws_secret_access_key=get_config_properties()["aws_secret_access_key"],
-                                           raw_data_bucket=raw_data_bucket,
-                                           proc_data_bucket=get_config_properties()["proc_data_bucket"], mode=mode,
-                                           level=level, user_id=user_id, job_id=job_id, label_type=label_type,
-                                           course=course, session=session, input_dir=input_dir)
+            initialize_train_test_data(job_config, raw_data_bucket=raw_data_bucket, level=level,
+                                       label_type=label_type, course=course, session=session,
+                                       input_dir=input_dir)
         if mode == "test":  # fetch models and untar
-            download_models(bucket=get_config_properties()["proc_data_bucket"], user_id=user_id, s3=s3,
-                            aws_access_key_id=get_config_properties()["aws_access_key_id"],
-                            aws_secret_access_key=get_config_properties()["aws_secret_access_key"], job_id=job_id,
-                            course=course, session=session, dest_dir=input_dir, level=level)
+            download_models(job_config, course=course, session=session, dest_dir=input_dir, level=level)
         # load the docker image and get its key
         local_docker_file_location = "{}/docker_image".format(working_dir)
-        cmd = "{} load -i {};".format(get_config_properties()["docker_exec"], local_docker_file_location)
+        cmd = "{} load -i {};".format(job_config.docker_exec, local_docker_file_location)
         print("[INFO] running: " + cmd)
         output = subprocess.run(cmd, stdout=subprocess.PIPE, shell = True)
         print(output.stdout.decode("utf-8"))
-        image_uuid = output.stdout.decode("utf-8").split("sha256:")[-1].strip()
+        load_output = output.stdout.decode("utf-8")
+        if "sha256:" in load_output:
+            image_uuid = output.stdout.decode("utf-8").split("sha256:")[-1].strip()
+        else: #image is tagged
+            image_uuid = load_output.split()[-1].strip()
         # execute the image
         if mode == "extract-holdout":  # call docker image with mode == extract
             cmd = "{} run --network=\"none\" --rm=true --volume={}:/input --volume={}:/output {} --course {} --session {} --mode {};".format(
-                get_config_properties()["docker_exec"], input_dir, output_dir, image_uuid, course, session, "extract")
+                docker_exec, input_dir, output_dir, image_uuid, course, session, "extract")
         else:  # proceed as normal
             cmd = "{} run --network=\"none\" --rm=true --volume={}:/input --volume={}:/output {} --course {} --session {} --mode {};".format(
-                get_config_properties()["docker_exec"], input_dir, output_dir, image_uuid, course, session, mode)
+                docker_exec, input_dir, output_dir, image_uuid, course, session, mode)
         print("[INFO] running: " + cmd)
         subprocess.call(cmd, shell=True)
         # cleanup
-        cmd = "{} rmi --force {}".format(get_config_properties()["docker_exec"], image_uuid)
+        cmd = "{} rmi --force {}".format(docker_exec, image_uuid)
         print("[INFO] running: " + cmd)
         subprocess.call(cmd, shell=True)
         # archive and write output
-        archive_file = make_output_archive_file(output_dir, mode=mode, user_id=user_id, job_id=job_id,
-                                                course=course, session=session)
-        move_results_to_destination(archive_file, bucket=get_config_properties()["proc_data_bucket"], user_id=user_id,
-                                    job_id=job_id, mode=mode, course=course, session=session)
+        archive_file = make_output_archive_file(output_dir, job_config, course = course, session = session)
+        move_results_to_destination(archive_file, job_config, course = course, session = session)
     return
 
 
-def run_job(docker_url, mode, course, user, job_id, session, level, raw_data_bucket=None,
-            label_type=None, raw_data_buckets=None):
+def run_job(job_config, course, session, level, raw_data_bucket=None, label_type=None, raw_data_buckets=None):
     """
     Call job runner with correct parameters.
-    :param docker_url: path to docker executable (string).
-    :param mode: mode of job (string).
+    :param job_config: MorfJobConfig object.
     :param course: course id (string); set as None if level == all.
-    :param user: user name (string).
-    :param job_id: user-specified job id (string).
     :param session: session number (string); set as none if level != session.
     :param level: one of {session, course, all}
     :param raw_data_bucket: name of bucket containing raw data.
@@ -122,32 +112,33 @@ def run_job(docker_url, mode, course, user, job_id, session, level, raw_data_buc
     :param raw_data_buckets: list of buckets (for use with level == all)
     :return: result of call to subprocess.call().
     """
+    if not raw_data_buckets:
+        raw_data_buckets = job_config.raw_data_buckets
     # todo: just set default values as none; no need for control flow below
     # todo: specify bucket here and make a required argument (currently run_image just defaults to using morf-michigan)
     # todo: different calls to run_image for each level are probably not necessary; all defaults are set to 'none'
     print("[INFO] running docker image {} user_id {} job_id {} course {} session {} mode {}"
-          .format(docker_url, user, job_id, course, session, mode))
+          .format(job_config.docker_url, job_config.user_id, job_config.job_id, course, session, job_config.mode))
     if level == "all":
-        run_image(docker_url, user, job_id, mode, raw_data_bucket=raw_data_buckets, level=level,
+        run_image(job_config, raw_data_bucket=raw_data_buckets, level=level,
                   label_type=label_type)
     elif level == "course":
-        run_image(docker_url, user, job_id, mode, raw_data_bucket, course=course, level=level, label_type=label_type)
+        run_image(job_config, raw_data_bucket, course=course, level=level, label_type=label_type)
     elif level == "session":
-        run_image(docker_url, user, job_id, mode, raw_data_bucket, course=course, session=session, level=level,
-                  label_type=label_type)
+        run_image(job_config, raw_data_bucket, course=course, session=session, level=level, label_type=label_type)
     return None
 
 
 def run_morf_job(client_config_url, server_config_url, email_to = None, no_cache = False):
     """
     Wrapper function to run complete MORF job.
-    :param client_config_url: url to client.config file; should be located on local machine.
-    :param server_config_url: url (local or s3) to server.config file.
+    :param client_config_url: url to client.config file.
+    :param server_config_url: url to server.config file.
     :return:
     """
     controller_script_name = "controller.py"
     docker_image_name = "docker_image"
-    config_filename = "config.properties"
+    combined_config_filename = "config.properties"
     server_config_path = urlparse(server_config_url).path
     # read server.config and get those properties
     server_config = get_config_properties(server_config_path)
@@ -161,23 +152,23 @@ def run_morf_job(client_config_url, server_config_url, email_to = None, no_cache
                           aws_secret_access_key=server_config["aws_secret_access_key"])
         fetch_file(s3, working_dir, client_config_url)
         local_client_config_path = os.path.join(os.getcwd(), "client.config")
-        combine_config_files(server_config_path, local_client_config_path, outfile = config_filename)
-        job_config = MorfJobConfig(config_filename)
+        combine_config_files(server_config_path,
+                             local_client_config_path,
+                             outfile = combined_config_filename)
+        job_config = MorfJobConfig(combined_config_filename)
         if email_to: # if email_to was provided by user, this overrides in config file -- allows users to easily run mwe
             print("[INFO] email address from submission {} overriding email address in config file {}"
                   .format(email_to, job_config.email_to))
-            job_config.email_to = email_to
+            job_config.update_email_to(email_to)
             update_config_fields_in_section("client", email_to = email_to)
-        cache_job_file_in_s3(s3, job_config.user_id, job_config.job_id, job_config.proc_data_bucket)
+        cache_job_file_in_s3(job_config, filename = combined_config_filename)
         # from client.config, fetch and download the following: docker image, controller script
         try:
             fetch_file(s3, working_dir, job_config.docker_url, dest_filename=docker_image_name)
             fetch_file(s3, working_dir, job_config.controller_url, dest_filename=controller_script_name)
             if not no_cache: # cache job files in s3 unless no_cache parameter set to true
-                cache_job_file_in_s3(s3, job_config.user_id, job_config.job_id, job_config.proc_data_bucket,
-                                     docker_image_name)
-                cache_job_file_in_s3(s3, job_config.user_id, job_config.job_id, job_config.proc_data_bucket,
-                                     controller_script_name)
+                cache_job_file_in_s3(job_config, filename = docker_image_name)
+                cache_job_file_in_s3(job_config, filename = controller_script_name)
         except KeyError as e:
             cause = e.args[0]
             print("[Error]: field {} missing from client.config file.".format(cause))
@@ -187,5 +178,6 @@ def run_morf_job(client_config_url, server_config_url, email_to = None, no_cache
         send_email_alert(job_config)
         subprocess.call("python3 {}".format(controller_script_name), shell = True)
         job_config.update_status("SUCCESS")
+
         send_success_email(job_config)
         return

@@ -25,13 +25,13 @@ A test script to test the '_all()' functions from the MORF api: extract_all(), e
 Extracts features, trains a model, and evaluates it using the MORF 2.0 architecture.
 """
 
-from morf.morf_api.extract import extract_all, extract_holdout_all
-from morf.morf_api.train import train_all
-from morf.morf_api.test import test_all
-from morf.morf_api.evaluate import evaluate_course
+from morf.workflow.extract import extract_all, extract_holdout_all
+from morf.workflow.train import train_all
+from morf.workflow.test import test_all
+from morf.workflow.evaluate import evaluate_course
 
 extract_all()
 extract_holdout_all()
-train_all(label_type = 'dropout')
-test_all()
-evaluate_course(label_type = 'dropout')
+train_all(label_type='dropout')
+test_all(label_type='dropout')
+evaluate_course(label_type='dropout')
