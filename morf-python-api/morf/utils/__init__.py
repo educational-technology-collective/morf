@@ -505,13 +505,12 @@ def download_models(job_config, course, dest_dir, level, session = None):
     aws_access_key_id = job_config.aws_access_key_id
     aws_secret_access_key = job_config.aws_secret_access_key
     job_id = job_config.job_id
-
     if level == "all":
         # just one model file
         mod_archive_file = generate_archive_filename(job_config, mode = "train")
-        key = make_s3_key_path(job_config, filename = mod_archive_file)
+        key = make_s3_key_path(job_config, mode = "train", filename = mod_archive_file)
         download_model_from_s3(bucket, key, s3, dest_dir)
-    if level in ["course","session"]: # model files might be in either course- or session-level directories
+    elif level in ["course","session"]: # model files might be in either course- or session-level directories
         train_files = [obj.key
                        for obj in boto3.resource("s3", aws_access_key_id=aws_access_key_id,
                                                          aws_secret_access_key=aws_secret_access_key)
