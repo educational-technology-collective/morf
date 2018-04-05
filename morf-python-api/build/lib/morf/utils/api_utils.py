@@ -41,7 +41,7 @@ def fetch_result_csv_fp(dir):
     return csv
 
 
-def collect_session_results(s3, raw_data_buckets, proc_data_bucket, mode, user_id, job_id, holdout = False, raw_data_dir = "morf-data/"):
+def collect_session_results(job_config, holdout = False, raw_data_dir = "morf-data/", raw_data_buckets = None):
     """
     Iterate through course- and session-level directories in bucket, download individual files from [mode], add column for course and session, and concatenate into single 'master' csv.
     :param s3: boto3.client object with appropriate access credentials.
@@ -52,15 +52,19 @@ def collect_session_results(s3, raw_data_buckets, proc_data_bucket, mode, user_i
     :param holdout: flag; fetch holdout run only (boolean; default False).
     :return: path to csv.
     """
-    # todo: possibly parallelize this using pool.map_async
+    mode = job_config.mode
+    user_id = job_config.user_id
+    job_id = job_config.job_id
+    if not raw_data_buckets: # can utilize this parameter to override job_config buckets; used for label extraction
+        raw_data_buckets = job_config.raw_data_buckets
     feat_df_list = list()
     for raw_data_bucket in raw_data_buckets:
-        for course in fetch_courses(s3, raw_data_bucket, raw_data_dir):
-            for run in fetch_sessions(s3, raw_data_bucket, raw_data_dir, course, fetch_holdout_session_only=holdout):
+        for course in fetch_courses(job_config, raw_data_bucket, raw_data_dir):
+            for run in fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course, fetch_holdout_session_only=holdout):
                 with tempfile.TemporaryDirectory(dir=os.getcwd()) as working_dir:
                     print("[INFO] fetching extraction results for course {} run {}".format(course, run))
                     try:
-                        fetch_result_file(s3, proc_data_bucket, user_id=user_id, job_id=job_id, mode=mode, course=course, session= run, dir = working_dir)
+                        fetch_result_file(job_config, course=course, session= run, dir = working_dir)
                         csv = fetch_result_csv_fp(working_dir)
                         feat_df = pd.read_csv(csv, dtype=object)
                         feat_df['course'] = course
@@ -70,12 +74,12 @@ def collect_session_results(s3, raw_data_buckets, proc_data_bucket, mode, user_i
                         print("[WARNING] no results found for course {} run {} mode {}".format(course, run, mode))
                         continue
     master_feat_df = pd.concat(feat_df_list)
-    csv_fp = generate_archive_filename(user_id=user_id, job_id=job_id, mode=mode, extension='csv')
+    csv_fp = generate_archive_filename(job_config, extension='csv')
     master_feat_df.to_csv(csv_fp, index = False, header = True)
     return csv_fp
 
 
-def collect_course_results(s3, raw_data_buckets, proc_data_bucket, mode, user_id, job_id, raw_data_dir = "morf-data/"):
+def collect_course_results(job_config, raw_data_dir = "morf-data/"):
     """
     Iterate through course-level directories in bucket, download individual files from [mode], add column for course and session, and concatenate into single 'master' csv.
     :param s3: boto3.client object with appropriate access credentials.
@@ -86,13 +90,19 @@ def collect_course_results(s3, raw_data_buckets, proc_data_bucket, mode, user_id
     :param holdout: flag; fetch holdout run only (boolean; default False).
     :return: path to csv.
     """
+    s3 = job_config.initialize_s3()
+    raw_data_buckets = job_config.raw_data_buckets
+    proc_data_bucket = job_config.proc_data_bucket
+    mode = job_config.mode
+    user_id = job_config.user_id
+    job_id = job_config.job_id
     feat_df_list = list()
     for raw_data_bucket in raw_data_buckets:
-        for course in fetch_courses(s3, raw_data_bucket, raw_data_dir):
+        for course in fetch_courses(job_config, raw_data_bucket, raw_data_dir):
             with tempfile.TemporaryDirectory(dir=os.getcwd()) as working_dir:
                 print("[INFO] fetching extraction results for course {}".format(course))
                 try:
-                    fetch_result_file(s3, proc_data_bucket, user_id=user_id, job_id=job_id, mode=mode, course=course, dir=working_dir)
+                    fetch_result_file(job_config, dir=working_dir, course=course)
                     csv = fetch_result_csv_fp(working_dir)
                     feat_df = pd.read_csv(csv, dtype=object)
                     feat_df['course'] = course
@@ -101,12 +111,12 @@ def collect_course_results(s3, raw_data_buckets, proc_data_bucket, mode, user_id
                     print("[WARNING] no results found for course {} mode {}".format(course, mode))
                     continue
     master_feat_df = pd.concat(feat_df_list)
-    csv_fp = generate_archive_filename(user_id=user_id, job_id=job_id, mode=mode, extension='csv')
+    csv_fp = generate_archive_filename(job_config, extension='csv')
     master_feat_df.to_csv(csv_fp, index=False, header=True)
     return csv_fp
 
 
-def collect_all_results(s3, proc_data_bucket, mode, user_id, job_id, raw_data_dir = "morf-data/"):
+def collect_all_results(job_config, raw_data_dir = "morf-data/"):
     """
     Pull results for all-level job and return path to csv.
     Similar wrapper to replicated workflow for collect_course_results and collect_session_results, but no iteration over courses/sessions required.
@@ -119,9 +129,9 @@ def collect_all_results(s3, proc_data_bucket, mode, user_id, job_id, raw_data_di
     :return:
     """
     working_dir = os.getcwd()
-    fetch_result_file(s3, proc_data_bucket, user_id=user_id, job_id=job_id, mode=mode, dir=working_dir)
+    fetch_result_file(job_config, dir=working_dir)
     csv = fetch_result_csv_fp(working_dir)
-    csv_fp = generate_archive_filename(user_id=user_id, job_id=job_id, mode=mode, extension="csv")
+    csv_fp = generate_archive_filename(job_config, extension="csv")
     shutil.move(csv, csv_fp)
     return csv_fp
 

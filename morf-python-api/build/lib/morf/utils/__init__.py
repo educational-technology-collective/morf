@@ -102,14 +102,15 @@ def set_all_file_permissions(dir):
     return
 
 
-def fetch_courses(s3, data_bucket, data_dir ="morf-data/"):
+def fetch_courses(job_config, data_bucket, data_dir ="morf-data/"):
     """
     Fetch list of course names in data_bucket/data_dir.
-    :param s3: boto3.client object with appropriate access credentials.
+    :param job_config: MorfJobConfig object.
     :param data_bucket: name of bucket containing data; s3 should have read/copy access to this bucket.
     :param data_dir: path to directory in data_bucket that contains course-level directories of raw data.
     :return: courses; list of course names as strings.
     """
+    s3 = job_config.initialize_s3()
     if not data_dir.endswith("/"):
         data_dir = "{0}/".format(data_dir)
     bucket_objects = s3.list_objects(Bucket=data_bucket, Prefix=data_dir, Delimiter="/")
@@ -117,16 +118,17 @@ def fetch_courses(s3, data_bucket, data_dir ="morf-data/"):
     return courses
 
 
-def fetch_sessions(s3, data_bucket, data_dir, course, fetch_holdout_session_only = False):
+def fetch_sessions(job_config, data_bucket, data_dir, course, fetch_holdout_session_only = False):
     """
     Fetch course sessions in data_bucket/data_dir.
-    :param s3: boto3.client object with appropriate access credentials.
+    :param job_config: MorfJobConfig object.
     :param data_bucket: name of bucket containing data; s3 should have read/copy access to this bucket.
     :param data_dir: path to directory in data_bucket that contains course-level directories of raw data.
     :param course: string; name of course (should match course-level directory name in s3 directory tree).
     :param fetch_holdout_session_only: logical; used to determine whether to fetch holdout (final) session or a list of all training sessions (all other sessions besides holdout).
     :return: list of session numbers as strings.
     """
+    s3 = job_config.initialize_s3()
     if not data_dir.endswith("/"):
         data_dir = data_dir + "/"
     course_bucket_objects = s3.list_objects(Bucket=data_bucket, Prefix="".join([data_dir, course, "/"]), Delimiter="/")
@@ -139,19 +141,19 @@ def fetch_sessions(s3, data_bucket, data_dir, course, fetch_holdout_session_only
         return sessions
 
 
-def fetch_complete_courses(s3, data_bucket, data_dir ="morf-data/", n_train=1):
+def fetch_complete_courses(job_config, data_bucket, data_dir ="morf-data/", n_train=1):
     """
     Fetch names of courses in data_bucket/data_dir which have at least n_train training sessions and one holdout session.
-    :param s3: boto3.client object with appropriate access credentials.
+    :param job_config: MorfJobConfig object
     :param data_bucket: name of bucket containing data; s3 should have read/copy access to this bucket.
     :param data_dir: path to directory in data_bucket that contains course-level directories of raw data.
     :param n_train: minimum number of training sessions a course needs to have in order to be returned.
     :return: list of course names.
     """
     complete_courses = []
-    for course in fetch_courses(s3, data_bucket, data_dir):
-        training_sessions = fetch_sessions(s3, data_bucket, data_dir, course, fetch_holdout_session_only=False)
-        testing_session = fetch_sessions(s3, data_bucket, data_dir, course, fetch_holdout_session_only=True)
+    for course in fetch_courses(job_config, data_bucket, data_dir):
+        training_sessions = fetch_sessions(job_config, data_bucket, data_dir, course, fetch_holdout_session_only=False)
+        testing_session = fetch_sessions(job_config, data_bucket, data_dir, course, fetch_holdout_session_only=True)
         if (len(testing_session) == 1) and (len(training_sessions) >= n_train):
             complete_courses.append(course)
     return complete_courses
@@ -225,26 +227,25 @@ def initialize_labels(s3, aws_access_key_id, aws_secret_access_key, bucket, cour
     return
 
 
-#todo: complete this docstring
-def download_train_test_data(s3, aws_access_key_id, aws_secret_access_key, raw_data_bucket, raw_data_dir,
-                             proc_data_bucket, course, session, input_dir, proc_data_dir, mode, label_type,
-                             user_id, job_id):
+def download_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, session, input_dir, label_type):
     """
-    Download pre-extracted train or test data (specified by mode) for course/session into input_dir. Used for MORF API (for Xing, use download_train_test_data_xing()).
-    :param s3: boto3.client object for s3 connection.
-    :param aws_access_key_id: aws_access_key_id.
-    :param aws_secret_access_key: aws_secret_access_key.
-    :param raw_data_bucket:
-    :param raw_data_dir:
-    :param proc_data_bucket: proc_data_bucket with extracted data.
+    Download pre-extracted train or test data (specified by mode) for course/session into input_dir.
+    :param job_config: MorfJobConfig object.
+    :param raw_data_bucket: bucket containing raw data.
+    :param raw_data_dir: directory in raw_data_bucket containing course-level data.
     :param course: course to fetch data for.
     :param session: session to fetch data for.
     :param input_dir: /input directory to load data into. This should be same directory mounted to Docker image.
-    :param proc_data_dir: directory in proc_data_bucket containing course-level data directories.
-    :param mode: mode of job; should be in [train, test].
     :param label_type: valid label type to reatin for 'label' column of MORF-provided labels.
     :return: None
     """
+    s3 = job_config.initialize_s3()
+    aws_access_key_id = job_config.aws_access_key_id
+    aws_secret_access_key = job_config.aws_secret_access_key
+    proc_data_bucket = job_config.proc_data_bucket
+    mode = job_config.mode
+    user_id = job_config.user_id
+    job_id = job_config.job_id
     if mode == "train":
         fetch_mode = "extract"
     if mode == "test":
@@ -253,7 +254,7 @@ def download_train_test_data(s3, aws_access_key_id, aws_secret_access_key, raw_d
     session_input_dir = os.path.join(input_dir, course, session)
     os.makedirs(session_input_dir)
     # download features file
-    feature_csv = generate_archive_filename(user_id=user_id, job_id=job_id, mode=fetch_mode, extension="csv")
+    feature_csv = generate_archive_filename(job_config, mode=fetch_mode, extension="csv")
     key = "{}/{}/{}/{}".format(user_id, job_id, fetch_mode, feature_csv)
     download_from_s3(proc_data_bucket, key, s3, session_input_dir)
     # read features file and filter to only include specific course/session
@@ -269,7 +270,7 @@ def download_train_test_data(s3, aws_access_key_id, aws_secret_access_key, raw_d
     return
 
 
-def initialize_raw_course_data(s3, aws_access_key_id, aws_secret_access_key, raw_data_bucket, level, mode,
+def initialize_raw_course_data(job_config, raw_data_bucket, level, mode,
                                data_dir ="morf-data", course = None, session = None, input_dir ="./input",
                                course_date_file_name ="coursera_course_dates.csv"):
     """
@@ -287,6 +288,9 @@ def initialize_raw_course_data(s3, aws_access_key_id, aws_secret_access_key, raw
     :param course_date_file_name: name of csv file located at bucket/data_dir containing course start and end dates.
     :return: None
     """
+    s3 = job_config.initialize_s3()
+    aws_access_key_id = job_config.aws_access_key_id
+    aws_secret_access_key = job_config.aws_secret_access_key
     if level != "all": # course_date_file_url is unique across the entire job
 
         course_date_file_url = "s3://{}/{}/{}".format(raw_data_bucket, data_dir, course_date_file_name)
@@ -294,28 +298,28 @@ def initialize_raw_course_data(s3, aws_access_key_id, aws_secret_access_key, raw
         # download all data; every session of every course
         for bucket in raw_data_bucket:
             course_date_file_url = "s3://{}/{}/{}".format(bucket, data_dir, course_date_file_name)
-            for course in fetch_courses(s3, bucket, data_dir):
+            for course in fetch_courses(job_config, bucket):
                 if mode == "extract":
-                    sessions = fetch_sessions(s3, bucket, data_dir, course)
+                    sessions = fetch_sessions(job_config, bucket, data_dir, course)
                     for session in sessions:
                         download_raw_course_data(s3, aws_access_key_id, aws_secret_access_key, bucket=bucket,
                                                  course=course, session=session, input_dir=input_dir,
                                                  course_date_file_url=course_date_file_url, data_dir=data_dir)
                 if mode == "extract-holdout":
-                    holdout_session = fetch_sessions(s3, bucket, data_dir, course, fetch_holdout_session_only=True)[0]
+                    holdout_session = fetch_sessions(job_config, bucket, data_dir, course, fetch_holdout_session_only=True)[0]
                     download_raw_course_data(s3, aws_access_key_id, aws_secret_access_key, bucket=bucket,
                                              course=course, session=holdout_session, input_dir=input_dir,
                                              course_date_file_url=course_date_file_url, data_dir=data_dir)
     elif level == "course":
         # download all data for every session of course
         if mode == "extract":
-            sessions = fetch_sessions(s3, raw_data_bucket, data_dir, course)
+            sessions = fetch_sessions(job_config, raw_data_bucket, data_dir, course)
             for session in sessions:
                 download_raw_course_data(s3, aws_access_key_id, aws_secret_access_key, bucket=raw_data_bucket,
                                          course=course, session=session, input_dir=input_dir,
                                          course_date_file_url=course_date_file_url, data_dir=data_dir)
         if mode == "extract-holdout":
-            holdout_session = fetch_sessions(s3, raw_data_bucket, data_dir, course, fetch_holdout_session_only=True)[0]
+            holdout_session = fetch_sessions(job_config, raw_data_bucket, data_dir, course, fetch_holdout_session_only=True)[0]
             download_raw_course_data(s3, aws_access_key_id, aws_secret_access_key, bucket=raw_data_bucket,
                                      course=course, session=holdout_session, input_dir=input_dir,
                                      course_date_file_url=course_date_file_url, data_dir=data_dir)
@@ -327,56 +331,38 @@ def initialize_raw_course_data(s3, aws_access_key_id, aws_secret_access_key, raw
     return
 
 
-# todo: update docstring
-def initialize_train_test_data(s3, aws_access_key_id, aws_secret_access_key, raw_data_bucket, proc_data_bucket, mode,
-                               level, user_id, job_id, label_type, course = None, session = None, input_dir ='./input',
-                               raw_data_dir = 'morf-data/'):
+def initialize_train_test_data(job_config, raw_data_bucket, level, label_type, course = None, session = None, input_dir ='./input', raw_data_dir = 'morf-data/'):
     """
     Mounts data in /input/course/session directories for MORF API train/test jobs.
-    :param s3: boto3.client object for s3 connection.
-    :param aws_access_key_id: AWS access key.
-    :param aws_secret_access_key: AWS secret access key.
+    :param job_config: MorfJobConfig object.
     :param raw_data_bucket: S3 bucket containing raw data (used to find all sessions of course).
-    :param proc_data_bucket: S3 bucket containing extracted features (this is where data is fetched from).
-    :param mode: mode of job; should be in [train, test].
     :param level: level of job; should be in [all, course, session].
-    :param user_id: user id job job.
-    :param job_id: job id of job.
     :param course: course (if level in [course, session]).
     :param session: session number (if level == session).
     :param input_dir: path to temporary /input directory to be mounted in Docker image.
     :param data_dir: path to directory in raw_data_bucket containing course-level directories.
     :return: None
     """
-    if mode == "train":
-        proc_data_dir = "{}/{}/{}".format(user_id, job_id, "extract")
-    elif mode == "test":
-        proc_data_dir = "{}/{}/{}".format(user_id, job_id, "extract-holdout")
+    mode = job_config.mode
     if level == "all": # download data for every course and session
         # download all data; every session of every course
         for bucket in raw_data_bucket:
-            for course in fetch_courses(s3, bucket, raw_data_dir):
+            for course in fetch_courses(job_config, bucket):
                 if mode == "train":
-                    sessions = fetch_sessions(s3, bucket, raw_data_dir, course)
+                    sessions = fetch_sessions(job_config, bucket, raw_data_dir, course)
                 elif mode == "test":
-                    sessions = fetch_sessions(s3, bucket, raw_data_dir, course, fetch_holdout_session_only=True)
+                    sessions = fetch_sessions(job_config, bucket, raw_data_dir, course, fetch_holdout_session_only=True)
                 for session in sessions:
-                    download_train_test_data(s3, aws_access_key_id, aws_secret_access_key, bucket, raw_data_dir,
-                                             proc_data_bucket, course, session, input_dir, proc_data_dir, mode,
-                                             label_type, user_id, job_id)
+                    download_train_test_data(job_config, bucket, raw_data_dir, course, session, input_dir, label_type)
     if level == "course": # download data for every session of course
         if mode == "train":
-            sessions = fetch_sessions(s3, raw_data_bucket, raw_data_dir, course)
+            sessions = fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course)
         elif mode == "test":
-            sessions = fetch_sessions(s3, raw_data_bucket, raw_data_dir, course, fetch_holdout_session_only=True)
+            sessions = fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course, fetch_holdout_session_only=True)
         for session in sessions:
-            download_train_test_data(s3, aws_access_key_id, aws_secret_access_key, raw_data_bucket, raw_data_dir,
-                                     proc_data_bucket, course, session, input_dir, proc_data_dir, mode, label_type,
-                                     user_id, job_id)
+            download_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, session, input_dir, label_type)
     if level == "session": # download data for this session only
-        download_train_test_data(s3, aws_access_key_id, aws_secret_access_key, raw_data_bucket, raw_data_dir,
-                                 proc_data_bucket, course, session, input_dir, proc_data_dir, mode, label_type,
-                                 user_id, job_id)
+        download_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, session, input_dir, label_type)
     return
 
 
@@ -420,20 +406,17 @@ def delete_s3_keys(bucket, prefix = None):
     return
 
 
-def clear_s3_subdirectory(bucket, user_id, job_id, mode, course = None, session = None):
+def clear_s3_subdirectory(job_config, course = None, session = None):
     """
     Clear all files for user_id, job_id, and mode; used to wipe s3 subdirectory before uploading new files.
-    :param s3:
-    :param bucket:
-    :param user_id:
-    :param job_id:
+    :job_config: MorfJobConfig object.
     :param course:
     :param session:
     :return:
     """
-    s3_prefix = "/".join([x for x in [user_id, job_id, mode, course, session] if x is not None]) + "/"
+    s3_prefix = "/".join([x for x in [job_config.user_id, job_config.job_id, job_config.mode, course, session] if x is not None]) + "/"
     print("[INFO] clearing previous job data at s3://{}".format(s3_prefix))
-    delete_s3_keys(bucket, prefix = s3_prefix)
+    delete_s3_keys(job_config.proc_data_bucket, prefix = s3_prefix)
     return
 
 
@@ -488,32 +471,6 @@ def compile_test_results(s3, courses, bucket, user_id, job_id, temp_dir = "./tem
     return None
 
 
-def download_train_test_data_xing(s3, course_dir, bucket, user_id, job_id, course):
-    """
-    Download and untar previously-extracted data for user_id/job_id/course. Used for Xing replication only.
-    :param s3: boto3.client object with appropriate access credentials.
-    :param course_dir: destination to download data to.
-    :param bucket: s3 bucket containing train-test data archive file.
-    :param user_id: user_id for job (string).
-    :param job_id: job_id for job (string).
-    :param course: course slug for job (string).
-    :return: None.
-    """
-    train_file = "{}-{}-{}-{}.tgz".format(user_id, job_id, "train-test-data", course) #TODO: should use generate_archive_filename
-    key = make_s3_key_path(user_id, job_id, 'extract', course, train_file)
-    train_fp = os.path.join(course_dir, train_file)
-    print("[INFO] downloading compressed data file from bucket {} key {}".format(bucket, key))
-    try:
-        s3.download_file(bucket, key, train_fp)
-        tar = tarfile.open(train_fp)
-        tar.extractall(course_dir)
-        tar.close()
-    except:
-        sys.exit(
-            "[WARNING] error downloading file from s3; likely train/test data for this course does not exist. Skipping.")
-    return None
-
-
 def download_model_from_s3(bucket, key, s3, dest_dir):
     """
     Download and untar a model file from S3; or print a warning message if it doesn't exist.
@@ -532,26 +489,28 @@ def download_model_from_s3(bucket, key, s3, dest_dir):
     return
 
 
-def download_models(bucket, user_id, s3, aws_access_key_id, aws_secret_access_key, job_id, course, dest_dir, level,
-                    session = None):
+def download_models(job_config, course, dest_dir, level, session = None):
     """
     Download and untar archived file of pre-trained models for specified user_id/job_id/course.
-    :param bucket: bucket containing models.
-    :param user_id: user_id for job (string).
-    :param s3: boto3.client object with appropriate access credentials.
-    :param job_id: job_id for job (string).
+    :param job_config: MorfJobConfig object.
     :param course: course: course slug for job (string).
     :param dest_dir: location to download models to; this should be /input directory mounted to Docker image.
     :param level: Level for job.
     :param session: Session id for session-level jobs.
     :return: None
     """
+    bucket = job_config.proc_data_bucket
+    user_id = job_config.user_id
+    s3 = job_config.initialize_s3()
+    aws_access_key_id = job_config.aws_access_key_id
+    aws_secret_access_key = job_config.aws_secret_access_key
+    job_id = job_config.job_id
     if level == "all":
         # just one model file
-        mod_archive_file = generate_archive_filename(user_id, job_id, "train")
-        key = make_s3_key_path(user_id, job_id, "train", mod_archive_file)
+        mod_archive_file = generate_archive_filename(job_config, mode = "train")
+        key = make_s3_key_path(job_config, mode = "train", filename = mod_archive_file)
         download_model_from_s3(bucket, key, s3, dest_dir)
-    if level in ["course","session"]: # model files might be in either course- or session-level directories
+    elif level in ["course","session"]: # model files might be in either course- or session-level directories
         train_files = [obj.key
                        for obj in boto3.resource("s3", aws_access_key_id=aws_access_key_id,
                                                          aws_secret_access_key=aws_secret_access_key)
@@ -561,52 +520,63 @@ def download_models(bucket, user_id, s3, aws_access_key_id, aws_secret_access_ke
                        and course in obj.key.split("/")[-1]]
         for key in train_files:
             download_model_from_s3(bucket, key, s3, dest_dir)
-    else: # level == None; this is for legacy jobs (especially Xing) and should eventually be deprecated altogether.
-        mod_archive_file = generate_archive_filename(user_id, job_id, "train", course)
-        key = make_s3_key_path(user_id, job_id, "train", course, mod_archive_file)
-        download_model_from_s3(bucket, key, s3, dest_dir)
+    else:
+        print("[ERROR] the procedure for executing this job is unsupported in this version of MORF.")
+        raise
     return
 
 
 def fetch_file(s3, dest_dir, remote_file_url, dest_filename = None):
+    """
+
+    :param s3: boto3.client object for s3 connection.
+    :param dest_dir: directory to download file to (string).
+    :param remote_file_url: url of remote file; must be either file://, s3, or http format (string).
+    :param dest_filename: base name of file to use (otherwise defaults to current file name) (string).
+    :return:
+    """
     print("[INFO] retrieving file {} to {}".format(remote_file_url, dest_dir))
-    if not dest_filename:
-        dest_filename = os.path.basename(remote_file_url)
-    url = urlparse(remote_file_url)
-    if url.scheme == "file":
-        shutil.copyfile(url.path, os.path.join(dest_dir, dest_filename))
-    elif url.scheme == "s3":
-        bucket = url.netloc
-        key = url.path[1:]  # ignore initial /
-        download_from_s3(bucket, key, s3, dest_dir, dest_filename = dest_filename)
-    elif url.scheme == "https":
-        urllib.request.urlretrieve(remote_file_url, os.path.join(dest_dir, dest_filename))
-    else:
-        print(
-        "[ERROR] A URL which was not s3:// or file:// or https:// was passed in for a file location, this is not supported. {}"
-            .format(remote_file_url))
-        sys.exit(-1)
+    try:
+        if not dest_filename:
+            dest_filename = os.path.basename(remote_file_url)
+        url = urlparse(remote_file_url)
+        if url.scheme == "file":
+            shutil.copyfile(url.path, os.path.join(dest_dir, dest_filename))
+        elif url.scheme == "s3":
+            bucket = url.netloc
+            key = url.path[1:]  # ignore initial /
+            download_from_s3(bucket, key, s3, dest_dir, dest_filename = dest_filename)
+        elif url.scheme == "https":
+            urllib.request.urlretrieve(remote_file_url, os.path.join(dest_dir, dest_filename))
+        else:
+            print(
+            "[ERROR] A URL which was not s3:// or file:// or https:// was passed in for a file location, this is not supported. {}"
+                .format(remote_file_url))
+            sys.exit(-1)
+    except Exception as e:
+        print("[ERROR] {} when attempting to fetch and copy file at {}".format(e, remote_file_url))
     return
 
 
-def generate_archive_filename(user_id, job_id, mode, course=None, session=None, extension ="tgz"):
+def generate_archive_filename(job_config, course=None, session=None, extension ="tgz", mode = None):
     """
     Generate filenames using a consistent and uniquely identifiable format based on user_id, job_id, mode, course, session.
-    :param user_id: user id for job (string).
-    :param job_id: job id for job (string).
-    :param mode: mode for job (string).
+    :param job_config: MorfJobConfig object.
     :param course: course id (string).
     :param session: session number (string).
     :param extension: extension of file to generate name for (the part after the '.'; i.e. 'tgz', 'csv', etc.)
+    :param mode: mode for job; only needed if overriding current mode of job_config (string).
     :return: name of file (string).
     """
-    job_attributes = [user_id, job_id, mode, course, session]
+    if not mode:
+        mode = job_config.mode
+    job_attributes = [job_config.user_id, job_config.job_id, mode, course, session]
     active_attributes = [x for x in job_attributes if x is not None]
     archive_file = '-'.join(active_attributes) + "." + extension
     return archive_file
 
 
-def make_output_archive_file(output_dir, mode, user_id, job_id, course=None, session = None):
+def make_output_archive_file(output_dir, job_config, course=None, session = None):
     """
     Archive output_dir into archive file, and return name of archive file.
     :param output_dir: directory to compress into archive_file.
@@ -617,7 +587,7 @@ def make_output_archive_file(output_dir, mode, user_id, job_id, course=None, ses
     :param session: session number of course (string) (optional, only needed when mode == extract).
     :return: name of archive file (string).
     """
-    archive_file = generate_archive_filename(user_id, job_id, mode, course, session)
+    archive_file = generate_archive_filename(job_config, course, session)
     # archive results; only save directory structure relative to output_dir (NOT absolute directory structure)
     print("[INFO] archiving results to {} as {}".format(output_dir, archive_file))
     # todo: use python tarfile here
@@ -626,37 +596,33 @@ def make_output_archive_file(output_dir, mode, user_id, job_id, course=None, ses
     return archive_file
 
 
-def make_s3_key_path(user_id, job_id, mode = None, course = None, filename = None, session = None):
+def make_s3_key_path(job_config, course = None, filename = None, session = None, mode = None):
     """
     Create a key path following MORF's subdirectory organization and any non-null parameters provided.
-    :param user_id: user id (string).
-    :param job_id: job id (string).
-    :param mode: mode (string).
+    :param job_config: MorfJobConfig object.
     :param course: course slug (string).
     :param filename: file name (string; base filename only - no path).
     :param session: course session (string).
+    :param mode: optional mode to override job_config.mode attribute (string).
     :return: key path (string) for use in s3.
     """
-    job_attributes = [user_id, job_id, mode, course, session, filename]
+    if not mode:
+        mode = job_config.mode
+    job_attributes = [job_config.user_id, job_config.job_id, mode, course, session, filename]
     active_attributes = [x for x in job_attributes if x is not None]
     key = "/".join(active_attributes)
     return key
 
 
-def move_results_to_destination(archive_file, bucket, user_id, job_id, mode, course = None, session = None):
+def move_results_to_destination(archive_file, job_config, course = None, session = None):
     """
     Moves tar of output file to destination, either local file path or s3 url.
     :param archive_file: name of archive output file to move (string).
-    :param bucket: bucket to move results to.
-    :param user_id: user_id for job (string).
-    :param job_id: job_id for job (string).
-    :param mode: mode for job (string); one of: {extract, test, train}.
-    :param course: name of course for job (string).
-    :param session: session number of course (string).
+    :param job_config: MorfJobConfig object.
     :return: None.
     """
-    key = make_s3_key_path(user_id = user_id, job_id=job_id, mode=mode, course=course, session=session,
-                           filename=archive_file)
+    bucket = job_config.proc_data_bucket
+    key = make_s3_key_path(job_config, filename=archive_file, course = course, session = session)
     print("[INFO] uploading results to bucket {} key {}".format(bucket, key))
     session = boto3.Session()
     s3_client = session.client("s3")
@@ -667,20 +633,18 @@ def move_results_to_destination(archive_file, bucket, user_id, job_id, mode, cou
     return
 
 
-def fetch_result_file(s3, bucket, user_id, job_id, mode, dir, course = None, session = None):
+def fetch_result_file(job_config, dir, course = None, session = None):
     """
-    Download and untar result file for user_id, job_id, mode, and (optional) course and session from bucket.
-    :param s3:
-    :param bucket: bucket containing data
-    :param user_id: 
-    :param job_id: 
-    :param mode: 
-    :param course:
-    :param session:
-    :return: 
+    Download and untar result file for user_id, job_id, mode, and (optional) course and session from job_config.proc_data_bucket.
+    :param job_config: MorfJobConfig object.
+    :param course: course shorname.
+    :param session: session number.
+    :return:  None.
     """
-    archive_file = generate_archive_filename(user_id, job_id, mode, course, session)
-    key = make_s3_key_path(user_id=user_id, job_id=job_id, mode=mode, course=course, session=session,
+    s3 = job_config.initialize_s3()
+    bucket = job_config.proc_data_bucket
+    archive_file = generate_archive_filename(job_config, course, session)
+    key = make_s3_key_path(job_config, course=course, session=session,
                            filename=archive_file)
     dest = os.path.join(dir, archive_file)
     print("[INFO] fetching s3://{}/{}".format(bucket, key))
@@ -716,17 +680,17 @@ def remove_readonly(func, path, _):
     func(path)
 
 
-def cache_job_file_in_s3(s3, user_id, job_id, bucket, filename ="config.properties"):
+def cache_job_file_in_s3(job_config, bucket = None, filename ="config.properties"):
     """
-    Cache job files in s3 bucket, allowing for full reproducibility.
-    :param s3:
-    :param user_id:
-    :param job_id:
-    :param bucket:
-    :param filename:
-    :return:
+    Cache job files in s3 bucket.
+    :param job_config: MorfJobConfig object.
+    :param bucket: S3 bucket name (string); if not provided then job_config.proc_data_bucket is used.
+    :param filename: name of file to upload as (string).
+    :return: None
     """
-    key = make_s3_key_path(user_id, job_id, filename = filename)
+    if not bucket:
+        bucket = job_config.proc_data_bucket
+    key = make_s3_key_path(job_config, filename = filename)
     upload_file_to_s3(filename, bucket, key)
     return
 

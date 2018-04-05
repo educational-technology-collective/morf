@@ -63,7 +63,7 @@ def run_image(job_config, raw_data_bucket, course=None, session=None, level=None
             initialize_raw_course_data(job_config,
                                        raw_data_bucket=raw_data_bucket, mode=mode, course=course,
                                        session=session, level=level, input_dir=input_dir)
-        # fetch training/testing data and untar file for xing
+        # fetch training/testing data
         if mode in ["train", "test"]:
             initialize_train_test_data(job_config, raw_data_bucket=raw_data_bucket, level=level,
                                        label_type=label_type, course=course, session=session,
