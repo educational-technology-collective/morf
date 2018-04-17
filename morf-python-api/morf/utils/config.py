@@ -27,12 +27,15 @@ import boto3
 import configparser
 import fileinput
 import os
+import multiprocessing
 from morf.utils import get_bucket_from_url, get_key_from_url
 
 
-def get_config_properties(config_file="config.properties"):
+def get_config_properties(config_file="config.properties", sections_to_fetch = None):
     """
     Returns the list of properties as a dict of key/value pairs in the file config.properties.
+    :param config_file: filename (string).
+    :param section: name of section to fetch properties from (if specified); all sections are returned by default (iterable).
     :return: A flat (no sections) Python dictionary of properties.
     """
     cf = configparser.ConfigParser()
@@ -42,8 +45,10 @@ def get_config_properties(config_file="config.properties"):
         print("[ERROR] exception {} reading configurations from file {}".format(e, config_file))
     properties = {}
     for section in cf.sections():
-        for item in cf.items(section):
-            properties[item[0]] = item[1]
+        # only include args section if requested
+        if (not sections_to_fetch or (section in sections_to_fetch)):
+            for item in cf.items(section):
+                properties[item[0]] = item[1]
     return properties
 
 
@@ -134,12 +139,18 @@ class MorfJobConfig:
         self.mode = None
         self.status = "START"
         properties = get_config_properties(config_file)
+        client_args = get_config_properties(config_file, sections_to_fetch="args")
         # add properties to class as attributes
         for prop in properties.items():
             setattr(self, prop[0], prop[1])
         # fetch raw data buckets as list
         self.raw_data_buckets = fetch_data_buckets_from_config()
-        # # create s3 connection object for communicating with s3
+        # set client_args dict; this is used to pass arguments to docker image at runtime
+        self.client_args = client_args
+        # if maximum number of cores is not specified, set to one less than half of current machine's cores
+        if not self.max_num_cores:
+            n_cores = multiprocessing.cpu_count()
+            self.max_num_cores = max(n_cores//2 - 1, 1)
 
     def check_configurations(self):
         # todo: check that all arguments are valid/acceptable

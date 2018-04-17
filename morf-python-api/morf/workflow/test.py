@@ -77,7 +77,7 @@ def test_course(label_type, raw_data_dir="morf-data/", multithread=True):
         print("[INFO] processing bucket {}".format(raw_data_bucket))
         courses = fetch_complete_courses(job_config, raw_data_bucket, raw_data_dir)
         if multithread:
-            with Pool() as pool:
+            with Pool(job_config.max_num_cores) as pool:
                 for course in courses:
                     poolres = pool.apply_async(run_job, [job_config, course, None, level, raw_data_bucket, label_type])
                     print(poolres.get())
