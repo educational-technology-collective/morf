@@ -81,13 +81,17 @@ def run_image(job_config, raw_data_bucket, course=None, session=None, level=None
             image_uuid = output.stdout.decode("utf-8").split("sha256:")[-1].strip()
         else: #image is tagged
             image_uuid = load_output.split()[-1].strip()
-        # execute the image
+        # build docker run command and execute the image
         if mode == "extract-holdout":  # call docker image with mode == extract
-            cmd = "{} run --network=\"none\" --rm=true --volume={}:/input --volume={}:/output {} --course {} --session {} --mode {};".format(
+            cmd = "{} run --network=\"none\" --rm=true --volume={}:/input --volume={}:/output {} --course {} --session {} --mode {}".format(
                 docker_exec, input_dir, output_dir, image_uuid, course, session, "extract")
         else:  # proceed as normal
-            cmd = "{} run --network=\"none\" --rm=true --volume={}:/input --volume={}:/output {} --course {} --session {} --mode {};".format(
+            cmd = "{} run --network=\"none\" --rm=true --volume={}:/input --volume={}:/output {} --course {} --session {} --mode {}".format(
                 docker_exec, input_dir, output_dir, image_uuid, course, session, mode)
+        # add any additional client args to cmd
+        if job_config.client_args:
+            for argname, argval in job_config.client_args.items():
+                cmd += " --{} {}".format(argname, argval)
         print("[INFO] running: " + cmd)
         subprocess.call(cmd, shell=True)
         # cleanup

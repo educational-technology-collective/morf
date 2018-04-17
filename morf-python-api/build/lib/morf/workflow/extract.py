@@ -73,7 +73,7 @@ def extract_course(raw_data_dir="morf-data/", multithread = True):
         print("[INFO] processing bucket {}".format(raw_data_bucket))
         courses = fetch_courses(job_config, raw_data_bucket, raw_data_dir)
         if multithread:
-            with Pool() as pool:
+            with Pool(job_config.max_num_cores) as pool:
                 for course in courses:
                     poolres = pool.apply_async(run_job, [job_config, course, None, level, raw_data_bucket])
                     print(poolres.get())
@@ -110,7 +110,7 @@ def extract_session(labels=False, raw_data_dir="morf-data/", label_type="labels-
         print("[INFO] processing bucket {}".format(raw_data_bucket))
         courses = fetch_courses(job_config, raw_data_bucket, raw_data_dir)
         if multithread:
-            with Pool() as pool:
+            with Pool(job_config.max_num_cores) as pool:
                 for course in courses:
                     for session in fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course,
                                                   fetch_holdout_session_only=False):
@@ -174,7 +174,7 @@ def extract_holdout_course(raw_data_dir="morf-data/", multithread = True):
         print("[INFO] processing bucket {}".format(raw_data_bucket))
         courses = fetch_courses(job_config, raw_data_bucket, raw_data_dir)
         if multithread:
-            with Pool() as pool:
+            with Pool(job_config.max_num_cores) as pool:
                 for course in courses:
                     holdout_session = fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course,
                                                  fetch_holdout_session_only=True)[0]  # only use holdout run; unlisted
@@ -212,7 +212,7 @@ def extract_holdout_session(labels=False, raw_data_dir="morf-data/", label_type=
         print("[INFO] processing bucket {}".format(raw_data_bucket))
         courses = fetch_courses(job_config, raw_data_bucket, raw_data_dir)
         if multithread:
-            with Pool() as pool:
+            with Pool(job_config.max_num_cores) as pool:
                 for course in courses:
                     holdout_run = fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course,
                                                  fetch_holdout_session_only=True)[0]  # only use holdout run; unlisted
