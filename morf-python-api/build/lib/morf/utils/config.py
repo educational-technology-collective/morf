@@ -147,10 +147,13 @@ class MorfJobConfig:
         self.raw_data_buckets = fetch_data_buckets_from_config()
         # set client_args dict; this is used to pass arguments to docker image at runtime
         self.client_args = client_args
-        # if maximum number of cores is not specified, set to one less than half of current machine's cores
-        if not self.max_num_cores:
+        # if maximum number of cores is not specified, set to one less than half of current machine's cores; otherwise cast to int
+        if not hasattr(self, "max_num_cores"):
             n_cores = multiprocessing.cpu_count()
             self.max_num_cores = max(n_cores//2 - 1, 1)
+        else:
+            n_cores = int(self.max_num_cores)
+            self.max_num_cores = n_cores
 
     def check_configurations(self):
         # todo: check that all arguments are valid/acceptable
