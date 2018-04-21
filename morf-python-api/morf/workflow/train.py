@@ -111,9 +111,6 @@ def train_session(label_type, raw_data_dir="morf-data/", multithread=True):
             with Pool(job_config.max_num_cores) as pool:
                 for course in courses:
                     for session in fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course):
-                        # todo: this only works when using the poolres and .get()
-                        # calls below...why? Potentially implement this for all
-                        # of the workflow functions
                         poolres = pool.apply_async(run_job, [job_config, course, session, level, raw_data_bucket, label_type])
                         reslist.append(poolres)
                 pool.close()
