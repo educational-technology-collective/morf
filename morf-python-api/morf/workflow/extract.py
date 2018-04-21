@@ -73,12 +73,15 @@ def extract_course(raw_data_dir="morf-data/", multithread = True):
         print("[INFO] processing bucket {}".format(raw_data_bucket))
         courses = fetch_courses(job_config, raw_data_bucket, raw_data_dir)
         if multithread:
+            reslist = []
             with Pool(job_config.max_num_cores) as pool:
                 for course in courses:
                     poolres = pool.apply_async(run_job, [job_config, course, None, level, raw_data_bucket])
-                    print(poolres.get())
+                    reslist.append(poolres)
                 pool.close()
                 pool.join()
+            for res in reslist:
+                print(res.get())
         else: # do job in serial; this is useful for debugging
             for course in courses:
                 run_job(job_config, course, None, level, raw_data_bucket)
@@ -115,7 +118,8 @@ def extract_session(labels=False, raw_data_dir="morf-data/", label_type="labels-
                 for course in courses:
                     for session in fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course,
                                                   fetch_holdout_session_only=False):
-                        pool.apply_async(run_job, [job_config, course, session, level, raw_data_bucket])
+                        poolres = pool.apply_async(run_job, [job_config, course, session, level, raw_data_bucket])
+                        reslist.append(poolres)
                 pool.close()
                 pool.join()
             for res in reslist:
@@ -177,13 +181,17 @@ def extract_holdout_course(raw_data_dir="morf-data/", multithread = True):
         print("[INFO] processing bucket {}".format(raw_data_bucket))
         courses = fetch_courses(job_config, raw_data_bucket, raw_data_dir)
         if multithread:
+            reslist = []
             with Pool(job_config.max_num_cores) as pool:
                 for course in courses:
                     holdout_session = fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course,
                                                  fetch_holdout_session_only=True)[0]  # only use holdout run; unlisted
-                    pool.apply_async(run_job, [job_config, course, holdout_session, level, raw_data_bucket])
+                    poolres = pool.apply_async(run_job, [job_config, course, holdout_session, level, raw_data_bucket])
+                    reslist.append(poolres)
                 pool.close()
                 pool.join()
+            for res in reslist:
+                print(res.get())
         else: # do job in serial; this is useful for debugging
             for course in courses:
                 holdout_session = fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course,
@@ -220,7 +228,8 @@ def extract_holdout_session(labels=False, raw_data_dir="morf-data/", label_type=
                 for course in courses:
                     holdout_run = fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course,
                                                  fetch_holdout_session_only=True)[0]  # only use holdout run; unlisted
-                    pool.apply_async(run_job, [job_config, course, holdout_run, level, raw_data_bucket])
+                    poolres = pool.apply_async(run_job, [job_config, course, holdout_run, level, raw_data_bucket])
+                    reslist.append(poolres)
                 pool.close()
                 pool.join()
             for res in reslist:
