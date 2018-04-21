@@ -110,6 +110,7 @@ def extract_session(labels=False, raw_data_dir="morf-data/", label_type="labels-
         print("[INFO] processing bucket {}".format(raw_data_bucket))
         courses = fetch_courses(job_config, raw_data_bucket, raw_data_dir)
         if multithread:
+            reslist = []
             with Pool(job_config.max_num_cores) as pool:
                 for course in courses:
                     for session in fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course,
@@ -117,6 +118,8 @@ def extract_session(labels=False, raw_data_dir="morf-data/", label_type="labels-
                         pool.apply_async(run_job, [job_config, course, session, level, raw_data_bucket])
                 pool.close()
                 pool.join()
+            for res in reslist:
+                print(res.get())
         else:  # do job in serial; this is useful for debugging
             for course in courses:
                 for session in fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course,
@@ -212,6 +215,7 @@ def extract_holdout_session(labels=False, raw_data_dir="morf-data/", label_type=
         print("[INFO] processing bucket {}".format(raw_data_bucket))
         courses = fetch_courses(job_config, raw_data_bucket, raw_data_dir)
         if multithread:
+            reslist = []
             with Pool(job_config.max_num_cores) as pool:
                 for course in courses:
                     holdout_run = fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course,
@@ -219,6 +223,8 @@ def extract_holdout_session(labels=False, raw_data_dir="morf-data/", label_type=
                     pool.apply_async(run_job, [job_config, course, holdout_run, level, raw_data_bucket])
                 pool.close()
                 pool.join()
+            for res in reslist:
+                print(res.get())
         else:  # do job in serial; this is useful for debugging
             for course in courses:
                 holdout_run = fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course,
