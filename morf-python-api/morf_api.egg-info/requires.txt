@@ -1,3 +1,4 @@
 pandas
 sklearn
 boto3
+boto
