@@ -40,7 +40,7 @@ def run_image(job_config, raw_data_bucket, course=None, session=None, level=None
     :param user_id: unique user id (string).
     :param job_id: unique job id (string).
     :param mode: mode to run image in; {extract, extract-holdout, train, test} (string).
-    :param raw_data_bucket: raw data bucket; specify multiple buckets only if level == all'
+    :param raw_data_bucket: raw data bucket; specify multiple buckets only if level == all.
     :param course: Coursera course slug or course shortname (string).
     :param session: 3-digit course session number (for trained model or extraction).
     :param level: level of aggregation of MORF API function; {session, course, all} (string).

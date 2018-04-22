@@ -28,7 +28,10 @@ import configparser
 import fileinput
 import os
 import multiprocessing
+import json
 from morf.utils import get_bucket_from_url, get_key_from_url
+from morf.utils.security import generate_md5
+
 
 
 def get_config_properties(config_file="config.properties", sections_to_fetch = None):
@@ -147,6 +150,7 @@ class MorfJobConfig:
         self.raw_data_buckets = fetch_data_buckets_from_config()
         # set client_args dict; this is used to pass arguments to docker image at runtime
         self.client_args = client_args
+        self.generate_morf_id(config_file)
         # if maximum number of cores is not specified, set to one less than half of current machine's cores; otherwise cast to int
         if not hasattr(self, "max_num_cores"):
             n_cores = multiprocessing.cpu_count()
@@ -154,6 +158,9 @@ class MorfJobConfig:
         else:
             n_cores = int(self.max_num_cores)
             self.max_num_cores = n_cores
+
+    def generate_morf_id(self, config_file):
+        self.morf_id = generate_md5(config_file)
 
     def check_configurations(self):
         # todo: check that all arguments are valid/acceptable
