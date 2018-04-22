@@ -98,7 +98,7 @@ def collect_course_results(job_config, raw_data_dir = "morf-data/"):
     job_id = job_config.job_id
     feat_df_list = list()
     for raw_data_bucket in raw_data_buckets:
-        for course in fetch_courses(job_config, raw_data_bucket, raw_data_dir):
+        for course in fetch_complete_courses(job_config, raw_data_bucket):
             with tempfile.TemporaryDirectory(dir=os.getcwd()) as working_dir:
                 print("[INFO] fetching extraction results for course {}".format(course))
                 try:
@@ -107,8 +107,8 @@ def collect_course_results(job_config, raw_data_dir = "morf-data/"):
                     feat_df = pd.read_csv(csv, dtype=object)
                     feat_df['course'] = course
                     feat_df_list.append(feat_df)
-                except:
-                    print("[WARNING] no results found for course {} mode {}".format(course, mode))
+                except Exception as e:
+                    print("[WARNING] no results found for course {} mode {}: {} ".format(course, mode, e))
                     continue
     master_feat_df = pd.concat(feat_df_list)
     csv_fp = generate_archive_filename(job_config, extension='csv')

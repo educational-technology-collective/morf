@@ -31,6 +31,7 @@ from morf.utils.config import get_config_properties, fetch_data_buckets_from_con
 from morf.utils.alerts import send_email_alert
 import tempfile
 import pandas as pd
+import numpy as np
 import sklearn.metrics
 
 mode = "evaluate"
@@ -38,14 +39,18 @@ mode = "evaluate"
 CONFIG_FILENAME = "config.properties"
 
 
-def check_dataframe_complete(df, columns):
+def check_dataframe_complete(df, job_config, columns):
     """
     Check columns for presence of NaN values; if any NaN values exist, throw message and raise exception.
     :param df: pd.DataFrame, containing columns.
     :param columns: columns to check for NaN values.
     :return:
     """
-    null_counts = df[columns].apply(lambda x: sum(x.isnull()), axis=0)
+    print("[INFO] checking predictions")
+    # filter to only include complete courses
+    courses = [x[0] for x in fetch_all_complete_courses_and_sessions(job_config)]
+    df_to_check = df[df.course.isin(courses)]
+    null_counts = df_to_check[columns].apply(lambda x: sum(x.isnull()), axis=0)
     if null_counts.sum() > 0:
         msg = "[ERROR] Null values detected in the following columns: {} \n Did you include predicted probabilities and labels for all users?".format(null_counts.loc[null_counts > 0].index.tolist())
         print(msg)
@@ -71,15 +76,23 @@ def fetch_binary_classification_metrics(df, course, pred_prob_col = "prob", pred
     y_true = df[label_col].values.astype(float)
     y_score = df[pred_prob_col].values
     metrics["accuracy"] = sklearn.metrics.accuracy_score(y_true, y_pred)
-    metrics["auc"] = sklearn.metrics.roc_auc_score(y_true, y_score)
-    metrics["log_loss"] = sklearn.metrics.log_loss(y_true, y_score)
-    metrics["precision"] = sklearn.metrics.precision_score(y_true, y_pred) #
-    metrics["recall"] = sklearn.metrics.recall_score(y_true, y_pred) # true positive rate, sensitivity
-    metrics["f1_score"] = sklearn.metrics.f1_score(y_true, y_pred)
+    try:
+        metrics["auc"] = sklearn.metrics.roc_auc_score(y_true, y_score)
+        metrics["log_loss"] = sklearn.metrics.log_loss(y_true, y_score)
+        metrics["precision"] = sklearn.metrics.precision_score(y_true, y_pred)  #
+        metrics["recall"] = sklearn.metrics.recall_score(y_true, y_pred)  # true positive rate, sensitivity
+        metrics["f1_score"] = sklearn.metrics.f1_score(y_true, y_pred)
+    except ValueError:
+        print("[WARNING]Only one class present in y_true for course {}. ROC AUC score, log_loss, precision, recall, F1 are undefined.".format(course))
+        metrics["auc"] = np.nan
+        metrics["log_loss"] = np.nan
+        metrics["precision"] = np.nan
+        metrics["recall"] = np.nan
+        metrics["f1_score"] = np.nan
     metrics["cohen_kappa_score"] = sklearn.metrics.cohen_kappa_score(y_true, y_pred)
     metrics["N"] = df.shape[0]
-    metrics["N_n"] = df[label_col].value_counts()[0]
-    metrics["N_p"] = df[label_col].value_counts()[1]
+    metrics["N_n"] = df[label_col].value_counts().get(0,0)
+    metrics["N_p"] = df[label_col].value_counts().get(1,0)
     cm = sklearn.metrics.confusion_matrix(y_true, y_pred)
     spec = cm[0,0] / float(cm[0,0] + cm[1,0])
     metrics["specificity"] = spec
@@ -131,7 +144,7 @@ def evaluate_course(label_type, label_col = "label_type", raw_data_dir = "morf-d
             lab_df = pd.read_csv("/".join([working_dir, labels_file]))
             lab_df = lab_df[lab_df[label_col] == label_type].copy()
             pred_lab_df = pd.merge(lab_df, pred_df, how = "left", on = [user_col, course_col])
-            check_dataframe_complete(pred_lab_df, columns = pred_cols)
+            check_dataframe_complete(pred_lab_df, job_config, columns = pred_cols)
             for course in fetch_complete_courses(job_config, data_bucket = raw_data_bucket, data_dir = raw_data_dir, n_train=1):
                 course_metrics_df = fetch_binary_classification_metrics(pred_lab_df, course)
                 course_data.append(course_metrics_df)

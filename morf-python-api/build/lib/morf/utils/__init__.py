@@ -159,6 +159,25 @@ def fetch_complete_courses(job_config, data_bucket, data_dir ="morf-data/", n_tr
     return complete_courses
 
 
+def fetch_all_complete_courses_and_sessions(job_config, data_dir ="morf-data/", n_train=1):
+    """
+    Returns a list of tuples, where the first element in each tuple is the course name, and the second element is the course sessions.
+    :param job_config: MorfJobConfig object.
+    :param data_dir: name of directory within buckets containing raw course data.
+    :param n_train: Number of training sessions each course must have (if n_train = 1, courses must have one training and one testing session).
+    :return: list of tuples, described above.
+    """
+    complete_courses = []
+    for data_bucket in job_config.raw_data_buckets:
+        for course in fetch_courses(job_config, data_bucket, data_dir):
+            training_sessions = fetch_sessions(job_config, data_bucket, data_dir, course,fetch_holdout_session_only=False)
+            testing_session = fetch_sessions(job_config, data_bucket, data_dir, course, fetch_holdout_session_only=True)
+            if (len(testing_session) == 1) and (len(training_sessions) >= n_train):
+                sessions = training_sessions + testing_session
+                complete_courses.append((course, sessions))
+    return complete_courses
+
+
 def download_raw_course_data(s3, aws_access_key_id, aws_secret_access_key, bucket, course, session, input_dir,
                              course_date_file_url, data_dir):
     """
