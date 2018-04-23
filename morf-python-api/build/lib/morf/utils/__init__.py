@@ -577,7 +577,7 @@ def fetch_file(s3, dest_dir, remote_file_url, dest_filename = None):
     return
 
 
-def generate_archive_filename(job_config, course=None, session=None, extension ="tgz", mode = None):
+def generate_archive_filename(job_config, course=None, session=None, extension ="tgz", mode = None, job_id = None):
     """
     Generate filenames using a consistent and uniquely identifiable format based on user_id, job_id, mode, course, session.
     :param job_config: MorfJobConfig object.
@@ -589,7 +589,9 @@ def generate_archive_filename(job_config, course=None, session=None, extension =
     """
     if not mode:
         mode = job_config.mode
-    job_attributes = [job_config.user_id, job_config.job_id, mode, course, session]
+    if not job_id: # users have option to specify another job_id for forking features
+        job_id = job_config.job_id
+    job_attributes = [job_config.user_id, job_id, mode, course, session]
     active_attributes = [x for x in job_attributes if x is not None]
     archive_file = '-'.join(active_attributes) + "." + extension
     return archive_file
@@ -615,7 +617,7 @@ def make_output_archive_file(output_dir, job_config, course=None, session = None
     return archive_file
 
 
-def make_s3_key_path(job_config, course = None, filename = None, session = None, mode = None):
+def make_s3_key_path(job_config, course = None, filename = None, session = None, mode = None, job_id = None):
     """
     Create a key path following MORF's subdirectory organization and any non-null parameters provided.
     :param job_config: MorfJobConfig object.
@@ -627,7 +629,9 @@ def make_s3_key_path(job_config, course = None, filename = None, session = None,
     """
     if not mode:
         mode = job_config.mode
-    job_attributes = [job_config.user_id, job_config.job_id, mode, course, session, filename]
+    if not job_id: # users have option to specify another job_id for forking features
+        job_id = job_config.job_id
+    job_attributes = [job_config.user_id, job_id, mode, course, session, filename]
     active_attributes = [x for x in job_attributes if x is not None]
     key = "/".join(active_attributes)
     return key
@@ -711,5 +715,20 @@ def cache_job_file_in_s3(job_config, bucket = None, filename ="config.properties
         bucket = job_config.proc_data_bucket
     key = make_s3_key_path(job_config, filename = filename)
     upload_file_to_s3(filename, bucket, key)
+    return
+
+
+def copy_s3_file(job_config, sourceloc, destloc):
+    """
+    Copy file in location "from" to location "to".
+    :param to:
+    :return:
+    """
+    #todo: check format of urls; should be s3
+    s3 = job_config.initialize_s3()
+    assert get_bucket_from_url(sourceloc) == get_bucket_from_url(destloc), "can only copy files within same s3 bucket"
+    print("[INFO] copying file from {} to {}".format(sourceloc, destloc))
+    copy_source = {'Bucket': get_bucket_from_url(sourceloc), 'Key': get_key_from_url(sourceloc)}
+    s3.copy_object(CopySource=copy_source, Bucket=get_bucket_from_url(destloc), Key=get_key_from_url(destloc))
     return
 
