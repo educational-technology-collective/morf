@@ -20,6 +20,7 @@
 # SOFTWARE.
 
 
+import logging
 import os
 import re
 import shutil
@@ -32,6 +33,8 @@ import urllib.request
 import boto3
 import pandas as pd
 from urllib.parse import urlparse
+
+logger = logging.getLogger('morf')
 
 
 def get_bucket_from_url(url):
@@ -397,11 +400,11 @@ def upload_file_to_s3(file, bucket, key):
     s3_client = session.client("s3")
     tc = boto3.s3.transfer.TransferConfig()
     t = boto3.s3.transfer.S3Transfer(client=s3_client, config=tc)
-    print("[INFO] uploading {} to s3://{}/{}".format(file, bucket, key))
+    logger.info("[INFO] uploading {} to s3://{}/{}".format(file, bucket, key))
     try:
         t.upload_file(file, bucket, key)
     except Exception as e:
-        print("[WARNING] error caching configurations: {}".format(e))
+        logger.warn("[WARNING] error caching configurations: {}".format(e))
     return
 
 
@@ -554,7 +557,7 @@ def fetch_file(s3, dest_dir, remote_file_url, dest_filename = None):
     :param dest_filename: base name of file to use (otherwise defaults to current file name) (string).
     :return:
     """
-    print("[INFO] retrieving file {} to {}".format(remote_file_url, dest_dir))
+    logger.info("[INFO] retrieving file {} to {}".format(remote_file_url, dest_dir))
     try:
         if not dest_filename:
             dest_filename = os.path.basename(remote_file_url)
@@ -568,12 +571,12 @@ def fetch_file(s3, dest_dir, remote_file_url, dest_filename = None):
         elif url.scheme == "https":
             urllib.request.urlretrieve(remote_file_url, os.path.join(dest_dir, dest_filename))
         else:
-            print(
+            logger.error(
             "[ERROR] A URL which was not s3:// or file:// or https:// was passed in for a file location, this is not supported. {}"
                 .format(remote_file_url))
             sys.exit(-1)
     except Exception as e:
-        print("[ERROR] {} when attempting to fetch and copy file at {}".format(e, remote_file_url))
+        logger.error("[ERROR] {} when attempting to fetch and copy file at {}".format(e, remote_file_url))
     return
 
 
