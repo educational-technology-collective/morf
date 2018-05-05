@@ -23,14 +23,15 @@
 Utility functions specifically for running jobs in MORF API.
 """
 
+import boto3
+import logging
+import os
 import subprocess
 import tempfile
-import boto3
 from morf.utils import *
 from morf.utils.config import get_config_properties, combine_config_files, update_config_fields_in_section, MorfJobConfig
 from morf.utils.alerts import send_success_email, send_email_alert
 from urllib.parse import urlparse
-import os
 
 
 def run_image(job_config, raw_data_bucket, course=None, session=None, level=None, label_type=None):
@@ -146,6 +147,7 @@ def run_morf_job(client_config_url, server_config_url, email_to = None, no_cache
     server_config_path = urlparse(server_config_url).path
     # read server.config and get those properties
     server_config = get_config_properties(server_config_path)
+    log_dir = server_config["logging_dir"]
     # create temporary directory in local_working_directory from server.config
     with tempfile.TemporaryDirectory(dir=server_config["local_working_directory"]) as working_dir:
         # save calling working directory; change directory into working_dir
@@ -160,8 +162,17 @@ def run_morf_job(client_config_url, server_config_url, email_to = None, no_cache
                              local_client_config_path,
                              outfile = combined_config_filename)
         job_config = MorfJobConfig(combined_config_filename)
+        ## initialize logger; TODO: this should be a function
+        logger = logging.getLogger('morf')
+        logger.setLevel(10) # set to debug level
+        # create file handler
+        fh = logging.FileHandler(os.path.join(job_config.logging_dir, job_config.morf_id + ".log"))
+        formatter = logging.Formatter("%(asctime)s %(levelname)s:%(message)s")
+        fh.setFormatter(formatter)
+        logger.addHandler(fh)
+        logger.info("TEST LOG ENTRY FROM job_runner_utils.py")
         if email_to: # if email_to was provided by user, this overrides in config file -- allows users to easily run mwe
-            print("[INFO] email address from submission {} overriding email address in config file {}"
+            logger.info("[INFO] email address from submission {} overriding email address in config file {}"
                   .format(email_to, job_config.email_to))
             job_config.update_email_to(email_to)
             update_config_fields_in_section("client", email_to = email_to)
@@ -175,9 +186,10 @@ def run_morf_job(client_config_url, server_config_url, email_to = None, no_cache
                 cache_job_file_in_s3(job_config, filename = controller_script_name)
         except KeyError as e:
             cause = e.args[0]
-            print("[Error]: field {} missing from client.config file.".format(cause))
+            logger.error("[Error]: field {} missing from client.config file.".format(cause))
             sys.exit(-1)
         # change working directory and run controller script with notifications for initialization and completion
+        # import ipdb;ipdb.set_trace()
         job_config.update_status("INITIALIZED")
         send_email_alert(job_config)
         subprocess.call("python3 {}".format(controller_script_name), shell = True)
