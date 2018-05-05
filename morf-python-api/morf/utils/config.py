@@ -26,9 +26,10 @@ Functions for working with (reading writing, modifying) MORF configuration files
 import boto3
 import configparser
 import fileinput
-import os
-import multiprocessing
 import json
+import logging
+import multiprocessing
+import os
 from morf.utils import get_bucket_from_url, get_key_from_url
 from morf.utils.security import generate_md5
 
@@ -152,12 +153,8 @@ class MorfJobConfig:
         self.client_args = client_args
         self.generate_morf_id(config_file)
         # if maximum number of cores is not specified, set to one less than half of current machine's cores; otherwise cast to int
-        if not hasattr(self, "max_num_cores"):
-            n_cores = multiprocessing.cpu_count()
-            self.max_num_cores = max(n_cores//2 - 1, 1)
-        else:
-            n_cores = int(self.max_num_cores)
-            self.max_num_cores = n_cores
+        self.setcores()
+        self.initialize_logger()
 
     def generate_morf_id(self, config_file):
         self.morf_id = generate_md5(config_file)
@@ -184,3 +181,24 @@ class MorfJobConfig:
                              aws_access_key_id=self.aws_access_key_id,
                              aws_secret_access_key=self.aws_secret_access_key)
         return s3obj
+
+    def initialize_logger(self):
+        ## initialize logger; TODO: this should be a function
+        logger = logging.getLogger('morf')
+        logger.setLevel(10)  # set to debug level
+        # create file handler
+        fh = logging.FileHandler(os.path.join(self.logging_dir, self.morf_id + ".log"))
+        formatter = logging.Formatter("%(asctime)s %(levelname)s:%(message)s")
+        fh.setFormatter(formatter)
+        logger.addHandler(fh)
+        self.logger = logger
+        return
+
+    def setcores(self):
+        if not hasattr(self, "max_num_cores"):
+            n_cores = multiprocessing.cpu_count()
+            self.max_num_cores = max(n_cores//2 - 1, 1)
+        else:
+            n_cores = int(self.max_num_cores)
+            self.max_num_cores = n_cores
+        return
