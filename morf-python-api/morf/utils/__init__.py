@@ -178,13 +178,11 @@ def fetch_all_complete_courses_and_sessions(job_config, data_dir ="morf-data/", 
     return complete_courses
 
 
-def download_raw_course_data(s3, aws_access_key_id, aws_secret_access_key, bucket, course, session, input_dir,
-                             course_date_file_url, data_dir):
+def download_raw_course_data(job_config, bucket, course, session, input_dir,
+                             data_dir, course_date_file_name = "coursera_course_dates.csv"):
     """
     Download all raw course files for course and session into input_dir.
-    :param s3: boto3.client object for s3 connection.
-    :param aws_access_key_id: aws_access_key_id.
-    :param aws_secret_access_key: aws_secret_access_key.
+    :param job_config: MorfJobConfig object
     :param bucket: bucket containing raw data.
     :param course: id of course to download data for.
     :param session: id of session to download data for.
@@ -193,6 +191,10 @@ def download_raw_course_data(s3, aws_access_key_id, aws_secret_access_key, bucke
     :param data_dir: directory in bucket that contains course-level data.
     :return: None
     """
+    s3 = job_config.initialize_s3()
+    aws_secret_access_key = job_config.aws_secret_access_key
+    aws_access_key_id = job_config.aws_access_key_id
+    course_date_file_url =  "s3://{}/{}/{}".format(bucket, data_dir, course_date_file_name)
     session_input_dir = os.path.join(input_dir, course, session)
     os.makedirs(session_input_dir)
     for obj in boto3.resource("s3", aws_access_key_id=aws_access_key_id, aws_secret_access_key=aws_secret_access_key)\
@@ -214,6 +216,30 @@ def download_raw_course_data(s3, aws_access_key_id, aws_secret_access_key, bucke
     unzip_sql_cmd = """for i in `find {} -name "*.sql.gz"`; do gunzip "$i" ; done""".format(session_input_dir)
     subprocess.call(unzip_sql_cmd, shell = True, stdout=open(os.devnull, "wb"), stderr=open(os.devnull, "wb"))
     return
+
+
+def fetch_raw_course_data(job_config, bucket, course, session, input_dir, data_dir):
+    """
+    Fetch raw course data from job_config.cache_dir, if exists; otherwise fetch from s3.
+    :param job_config: MorfJobConfig object
+    :param bucket: bucket containing raw data.
+    :param course: id of course to download data for.
+    :param session: id of session to download data for.
+    :param input_dir: input directory.
+    :param data_dir: directory in bucket that contains course-level data.
+    :return: None
+    """
+    if job_config.cache_dir:
+        try:
+            course_session_cache_dir = os.path.join(job_config.cache_dir, bucket, course, session)
+            session_input_dir = os.path.join(input_dir, course, session)
+            print("copying data from cached location {} to {}".format(course_session_cache_dir, session_input_dir))
+            shutil.copytree(course_session_cache_dir, session_input_dir)
+    else:
+        download_raw_course_data(job_config, bucket=raw_data_bucket,
+                                 course=course, session=session, input_dir=input_dir,
+                                 data_dir=data_dir)
+
 
 
 def initialize_labels(s3, aws_access_key_id, aws_secret_access_key, bucket, course, session, mode, label_type, dest_dir, data_dir):
@@ -290,8 +316,7 @@ def download_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, 
 
 
 def initialize_raw_course_data(job_config, raw_data_bucket, level, mode,
-                               data_dir ="morf-data", course = None, session = None, input_dir ="./input",
-                               course_date_file_name ="coursera_course_dates.csv"):
+                               data_dir ="morf-data", course = None, session = None, input_dir ="./input"):
     """
     Initialize input directory of raw course data for extract or extract-holdout jobs.
     :param s3: boto3.client object for s3 connection.
@@ -307,46 +332,44 @@ def initialize_raw_course_data(job_config, raw_data_bucket, level, mode,
     :param course_date_file_name: name of csv file located at bucket/data_dir containing course start and end dates.
     :return: None
     """
-    s3 = job_config.initialize_s3()
     aws_access_key_id = job_config.aws_access_key_id
     aws_secret_access_key = job_config.aws_secret_access_key
-    if level != "all": # course_date_file_url is unique across the entire job
-
-        course_date_file_url = "s3://{}/{}/{}".format(raw_data_bucket, data_dir, course_date_file_name)
+    # if level != "all": # course_date_file_url is unique across the entire job
+    #     course_date_file_url = "s3://{}/{}/{}".format(raw_data_bucket, data_dir, course_date_file_name)
     if level == "all": # there is a unique course date file for each bucket
         # download all data; every session of every course
         for bucket in raw_data_bucket:
-            course_date_file_url = "s3://{}/{}/{}".format(bucket, data_dir, course_date_file_name)
+            # course_date_file_url = "s3://{}/{}/{}".format(bucket, data_dir, course_date_file_name)
             for course in fetch_courses(job_config, bucket):
                 if mode == "extract":
                     sessions = fetch_sessions(job_config, bucket, data_dir, course)
                     for session in sessions:
-                        download_raw_course_data(s3, aws_access_key_id, aws_secret_access_key, bucket=bucket,
+                        download_raw_course_data(job_config, bucket=bucket,
                                                  course=course, session=session, input_dir=input_dir,
-                                                 course_date_file_url=course_date_file_url, data_dir=data_dir)
+                                                 data_dir=data_dir)
                 if mode == "extract-holdout":
                     holdout_session = fetch_sessions(job_config, bucket, data_dir, course, fetch_holdout_session_only=True)[0]
-                    download_raw_course_data(s3, aws_access_key_id, aws_secret_access_key, bucket=bucket,
+                    download_raw_course_data(job_config, bucket=bucket,
                                              course=course, session=holdout_session, input_dir=input_dir,
-                                             course_date_file_url=course_date_file_url, data_dir=data_dir)
+                                             data_dir=data_dir)
     elif level == "course":
         # download all data for every session of course
         if mode == "extract":
             sessions = fetch_sessions(job_config, raw_data_bucket, data_dir, course)
             for session in sessions:
-                download_raw_course_data(s3, aws_access_key_id, aws_secret_access_key, bucket=raw_data_bucket,
+                download_raw_course_data(job_config, bucket=raw_data_bucket,
                                          course=course, session=session, input_dir=input_dir,
-                                         course_date_file_url=course_date_file_url, data_dir=data_dir)
+                                         data_dir=data_dir)
         if mode == "extract-holdout":
             holdout_session = fetch_sessions(job_config, raw_data_bucket, data_dir, course, fetch_holdout_session_only=True)[0]
-            download_raw_course_data(s3, aws_access_key_id, aws_secret_access_key, bucket=raw_data_bucket,
+            download_raw_course_data(job_config, bucket=raw_data_bucket,
                                      course=course, session=holdout_session, input_dir=input_dir,
-                                     course_date_file_url=course_date_file_url, data_dir=data_dir)
+                                     data_dir=data_dir)
     elif level == "session":
         # download only specific session
-        download_raw_course_data(s3, aws_access_key_id, aws_secret_access_key, bucket=raw_data_bucket,
+        download_raw_course_data(job_config, bucket=raw_data_bucket,
                                  course=course, session=session, input_dir=input_dir,
-                                 course_date_file_url=course_date_file_url, data_dir=data_dir)
+                                 data_dir=data_dir)
     return
 
 
