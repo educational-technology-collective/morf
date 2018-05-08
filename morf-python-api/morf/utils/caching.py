@@ -15,13 +15,15 @@ def cache_s3_to_local(bucket, local_dest):
     # check paths
     s3_url = urlparse(bucket)
     assert s3_url.scheme == "s3", "specify a valid path to an s3 bucket"
-    local_url = urlparse(local_dest)
-    assert  local_url.scheme == "file" and os.path.isdir(local_url.path), "specify a valid local path to a directory e.g. file:///my_user/my_dir"
     # create local_dest directory if not exists
-    if not os.path.exists(local_url.path):
-        os.makedirs(local_url.path)
+    if not os.path.exists(local_dest):
+        try:
+            os.makedirs(local_dest)
+        except exception as e:
+            logger.error("error creating cache: {}".format(e))
+            raise
     # execute s3 sync command
-    cmd = "aws s3 sync {} {}".format(bucket, local_url.path)
+    cmd = "aws s3 sync {} {}".format(bucket, local_dest)
     logger.info("running {}".format(cmd))
     subprocess.call(cmd, shell=True)
     return
