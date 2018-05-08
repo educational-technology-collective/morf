@@ -52,6 +52,7 @@ def run_image(job_config, raw_data_bucket, course=None, session=None, level=None
     mode = job_config.mode
     s3 = job_config.initialize_s3()
     docker_exec = job_config.docker_exec
+    logger = job_config.logger
     # create local directory for processing on this instance
     with tempfile.TemporaryDirectory(dir=job_config.local_working_directory) as working_dir:
         try:
@@ -74,7 +75,7 @@ def run_image(job_config, raw_data_bucket, course=None, session=None, level=None
         # load the docker image and get its key
         local_docker_file_location = "{}/docker_image".format(working_dir)
         cmd = "{} load -i {};".format(job_config.docker_exec, local_docker_file_location)
-        print("[INFO] running: " + cmd)
+        logger.info("running: " + cmd)
         output = subprocess.run(cmd, stdout=subprocess.PIPE, shell = True)
         print(output.stdout.decode("utf-8"))
         load_output = output.stdout.decode("utf-8")
@@ -93,11 +94,11 @@ def run_image(job_config, raw_data_bucket, course=None, session=None, level=None
         if job_config.client_args:
             for argname, argval in job_config.client_args.items():
                 cmd += " --{} {}".format(argname, argval)
-        print("[INFO] running: " + cmd)
+        logger.info("running: " + cmd)
         subprocess.call(cmd, shell=True)
         # cleanup
         cmd = "{} rmi --force {}".format(docker_exec, image_uuid)
-        print("[INFO] running: " + cmd)
+        logger.info("running: " + cmd)
         subprocess.call(cmd, shell=True)
         # archive and write output
         archive_file = make_output_archive_file(output_dir, job_config, course = course, session = session)
@@ -117,12 +118,13 @@ def run_job(job_config, course, session, level, raw_data_bucket=None, label_type
     :param raw_data_buckets: list of buckets (for use with level == all)
     :return: result of call to subprocess.call().
     """
+    logger = job_config.logger
     if not raw_data_buckets:
         raw_data_buckets = job_config.raw_data_buckets
     # todo: just set default values as none; no need for control flow below
     # todo: specify bucket here and make a required argument (currently run_image just defaults to using morf-michigan)
     # todo: different calls to run_image for each level are probably not necessary; all defaults are set to 'none'
-    print("[INFO] running docker image {} user_id {} job_id {} course {} session {} mode {}"
+    logger.info("running docker image {} user_id {} job_id {} course {} session {} mode {}"
           .format(job_config.docker_url, job_config.user_id, job_config.job_id, course, session, job_config.mode))
     if level == "all":
         run_image(job_config, raw_data_bucket=raw_data_buckets, level=level,
@@ -162,15 +164,8 @@ def run_morf_job(client_config_url, server_config_url, email_to = None, no_cache
                              local_client_config_path,
                              outfile = combined_config_filename)
         job_config = MorfJobConfig(combined_config_filename)
-        ## initialize logger; TODO: this should be a function
-        logger = logging.getLogger('morf')
-        logger.setLevel(10) # set to debug level
-        # create file handler
-        fh = logging.FileHandler(os.path.join(job_config.logging_dir, job_config.morf_id + ".log"))
-        formatter = logging.Formatter("%(asctime)s %(levelname)s:%(message)s")
-        fh.setFormatter(formatter)
-        logger.addHandler(fh)
-        logger.info("TEST LOG ENTRY FROM job_runner_utils.py")
+        logger = job_config.logger
+        logger.info("TEST LOG ENTRY FROM job_runner_utils.run_morf_job")
         if email_to: # if email_to was provided by user, this overrides in config file -- allows users to easily run mwe
             logger.info("[INFO] email address from submission {} overriding email address in config file {}"
                   .format(email_to, job_config.email_to))
