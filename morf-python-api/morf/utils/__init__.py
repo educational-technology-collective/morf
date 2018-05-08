@@ -46,6 +46,7 @@ def unarchive_file(src, dest):
         tar = tarfile.open(src)
         tar.extractall(dest)
         tar.close()
+        outpath = os.path.join(dest, os.path.basename(src))
     elif src.endswith(".gz"):
         with gzip.open(src, "rb") as f_in:
             destfile = os.path.basename(src)[:-3] # source file without '.gz' extension
@@ -53,8 +54,24 @@ def unarchive_file(src, dest):
             with open(destpath, "wb") as f_out:
                 shutil.copyfileobj(f_in, f_out)
         os.remove(src)
-    return
+        outpath = destpath
+    return outpath
 
+
+def clean_filename(src):
+    """
+    Rename file, removing any non-alphanumeric characters.
+    :param src: file to rename.
+    :return: None
+    """
+    src_dir, src_file = os.path.split(src)
+    clean_src_file = re.sub('[\(\)\s]', '', src_file)
+    clean_src_path = os.path.join(src_dir, clean_src_file)
+    try:
+        os.rename(src, clean_src_path)
+    except Exception as e:
+        print("[ERROR] error renaming file: {}".format(e))
+    return
 
 def get_bucket_from_url(url):
     """
@@ -262,12 +279,13 @@ def fetch_raw_course_data(job_config, bucket, course, session, input_dir, data_d
         download_raw_course_data(job_config, bucket=raw_data_bucket,
                                  course=course, session=session, input_dir=input_dir,
                                  data_dir=data_dir)
-    # unzip all of the sql files
-    # unzip_sql_cmd = """for i in `find {} -name "*.sql.gz"`; do gunzip "$i" ; done""".format(session_input_dir)
-    # subprocess.call(unzip_sql_cmd, shell = True, stdout=open(os.devnull, "wb"), stderr=open(os.devnull, "wb"))
+    # unzip all of the sql files and remove any parens from filename
     for item in os.listdir(session_input_dir):
         if item.endswith(".sql.gz"):
-            unarchive_file(os.path.join(session_input_dir, item), session_input_dir)
+            item_path = os.path.join(session_input_dir, item)
+            unarchive_res = unarchive_file(item_path, session_input_dir)
+            clean_filename(unarchive_res)
+    import ipdb;ipdb.set_trace()
     return
 
 
