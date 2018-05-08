@@ -36,7 +36,9 @@ def update_morf_job_cache(job_config):
     :return:
     """
     job_cache_dir = job_config.cache_dir
+    # cache each bucket in a named directory within job_cache_dir
     for raw_data_bucket in job_config.raw_data_buckets:
         s3bucket = "s3://{}".format(raw_data_bucket)
-        cache_s3_to_local(s3bucket, job_cache_dir)
+        bucket_cache_dir = os.path.join(job_cache_dir, raw_data_bucket)
+        cache_s3_to_local(s3bucket, bucket_cache_dir)
     return
