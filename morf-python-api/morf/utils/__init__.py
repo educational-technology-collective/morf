@@ -231,9 +231,11 @@ def fetch_raw_course_data(job_config, bucket, course, session, input_dir, data_d
     if job_config.cache_dir:
         try:
             course_session_cache_dir = os.path.join(job_config.cache_dir, bucket, course, session)
-            session_input_dir = os.path.join(input_dir, course, session)
+            session_input_dir = os.path.join(input_dir, data_dir, course, session)
             print("copying data from cached location {} to {}".format(course_session_cache_dir, session_input_dir))
             shutil.copytree(course_session_cache_dir, session_input_dir)
+        except Exception as e:
+            print("exception while attempting to copy from cache: {}".format(e))
     else:
         download_raw_course_data(job_config, bucket=raw_data_bucket,
                                  course=course, session=session, input_dir=input_dir,
