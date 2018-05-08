@@ -27,3 +27,16 @@ def cache_s3_to_local(bucket, local_dest):
     logger.info("running {}".format(cmd))
     subprocess.call(cmd, shell=True)
     return
+
+
+def update_morf_job_cache(job_config):
+    """
+    Update the raw data cache using the parameters in job_config; if job_config contains multiple raw data buckets, cache all of them.
+    :param job_config: MorfJobConfig object.
+    :return:
+    """
+    job_cache_dir = job_config.cache_dir
+    for raw_data_bucket in job_config.raw_data_buckets:
+        s3bucket = "s3://{}".format(raw_data_bucket)
+        cache_s3_to_local(s3bucket, job_cache_dir)
+    return
