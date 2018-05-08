@@ -178,8 +178,7 @@ def fetch_all_complete_courses_and_sessions(job_config, data_dir ="morf-data/", 
     return complete_courses
 
 
-def download_raw_course_data(job_config, bucket, course, session, input_dir,
-                             data_dir, course_date_file_name = "coursera_course_dates.csv"):
+def download_raw_course_data(job_config, bucket, course, session, input_dir, data_dir, course_date_file_name = "coursera_course_dates.csv"):
     """
     Download all raw course files for course and session into input_dir.
     :param job_config: MorfJobConfig object
@@ -239,7 +238,6 @@ def fetch_raw_course_data(job_config, bucket, course, session, input_dir, data_d
         download_raw_course_data(job_config, bucket=raw_data_bucket,
                                  course=course, session=session, input_dir=input_dir,
                                  data_dir=data_dir)
-
 
 
 def initialize_labels(s3, aws_access_key_id, aws_secret_access_key, bucket, course, session, mode, label_type, dest_dir, data_dir):
@@ -344,12 +342,12 @@ def initialize_raw_course_data(job_config, raw_data_bucket, level, mode,
                 if mode == "extract":
                     sessions = fetch_sessions(job_config, bucket, data_dir, course)
                     for session in sessions:
-                        download_raw_course_data(job_config, bucket=bucket,
+                        fetch_raw_course_data(job_config, bucket=bucket,
                                                  course=course, session=session, input_dir=input_dir,
                                                  data_dir=data_dir)
                 if mode == "extract-holdout":
                     holdout_session = fetch_sessions(job_config, bucket, data_dir, course, fetch_holdout_session_only=True)[0]
-                    download_raw_course_data(job_config, bucket=bucket,
+                    fetch_raw_course_data(job_config, bucket=bucket,
                                              course=course, session=holdout_session, input_dir=input_dir,
                                              data_dir=data_dir)
     elif level == "course":
@@ -357,17 +355,17 @@ def initialize_raw_course_data(job_config, raw_data_bucket, level, mode,
         if mode == "extract":
             sessions = fetch_sessions(job_config, raw_data_bucket, data_dir, course)
             for session in sessions:
-                download_raw_course_data(job_config, bucket=raw_data_bucket,
+                fetch_raw_course_data(job_config, bucket=raw_data_bucket,
                                          course=course, session=session, input_dir=input_dir,
                                          data_dir=data_dir)
         if mode == "extract-holdout":
             holdout_session = fetch_sessions(job_config, raw_data_bucket, data_dir, course, fetch_holdout_session_only=True)[0]
-            download_raw_course_data(job_config, bucket=raw_data_bucket,
+            fetch_raw_course_data(job_config, bucket=raw_data_bucket,
                                      course=course, session=holdout_session, input_dir=input_dir,
                                      data_dir=data_dir)
     elif level == "session":
         # download only specific session
-        download_raw_course_data(job_config, bucket=raw_data_bucket,
+        fetch_raw_course_data(job_config, bucket=raw_data_bucket,
                                  course=course, session=session, input_dir=input_dir,
                                  data_dir=data_dir)
     return
