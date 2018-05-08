@@ -70,8 +70,8 @@ def collect_session_results(job_config, holdout = False, raw_data_dir = "morf-da
                         feat_df['course'] = course
                         feat_df['session'] = run
                         feat_df_list.append(feat_df)
-                    except:
-                        print("[WARNING] no results found for course {} run {} mode {}".format(course, run, mode))
+                    except Exception as e:
+                        print("[WARNING] no results found for course {} run {} mode {}; the following exception occurred:".format(course, run, mode, e))
                         continue
     master_feat_df = pd.concat(feat_df_list)
     csv_fp = generate_archive_filename(job_config, extension='csv')
