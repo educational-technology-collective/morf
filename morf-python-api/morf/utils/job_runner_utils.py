@@ -29,6 +29,7 @@ import boto3
 from morf.utils import *
 from morf.utils.config import get_config_properties, combine_config_files, update_config_fields_in_section, MorfJobConfig
 from morf.utils.alerts import send_success_email, send_email_alert
+from morf.utils.caching import update_morf_job_cache
 from urllib.parse import urlparse
 import os
 
@@ -165,7 +166,10 @@ def run_morf_job(client_config_url, server_config_url, email_to = None, no_cache
                   .format(email_to, job_config.email_to))
             job_config.update_email_to(email_to)
             update_config_fields_in_section("client", email_to = email_to)
+        # send the job config file to s3
         cache_job_file_in_s3(job_config, filename = combined_config_filename)
+        # update the data cache; if this fails there is no reason to continue execution
+        update_morf_job_cache(job_config)
         # from client.config, fetch and download the following: docker image, controller script
         try:
             fetch_file(s3, working_dir, job_config.docker_url, dest_filename=docker_image_name)
