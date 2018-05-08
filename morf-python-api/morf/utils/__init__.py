@@ -28,11 +28,52 @@ import subprocess
 import sys
 import tarfile
 import urllib.request
+import gzip
 
 import boto3
 import pandas as pd
 from urllib.parse import urlparse
 
+
+def unarchive_file(src, dest):
+    """
+    Untar or un-gzip a file from src into dest. Supports file extensions: .zip, .tgz, .gz.
+    :param src: path to source file to unarchive (string).
+    :param dest: directory to unarchive result into (string).
+    :return: None
+    """
+    if src.endswith(".zip") or src.endswith(".tgz"):
+        tar = tarfile.open(src)
+        tar.extractall(dest)
+        tar.close()
+        outpath = os.path.join(dest, os.path.basename(src))
+    elif src.endswith(".gz"):
+        with gzip.open(src, "rb") as f_in:
+            destfile = os.path.basename(src)[:-3] # source file without '.gz' extension
+            destpath = os.path.join(dest, destfile)
+            with open(destpath, "wb") as f_out:
+                shutil.copyfileobj(f_in, f_out)
+        os.remove(src)
+        outpath = destpath
+    else:
+        raise NotImplementedError("Passed in a file with an extension not supported by unarchive_file: {}".format(src))
+    return outpath
+
+
+def clean_filename(src):
+    """
+    Rename file, removing any non-alphanumeric characters.
+    :param src: file to rename.
+    :return: None
+    """
+    src_dir, src_file = os.path.split(src)
+    clean_src_file = re.sub('[\(\)\s]', '', src_file)
+    clean_src_path = os.path.join(src_dir, clean_src_file)
+    try:
+        os.rename(src, clean_src_path)
+    except Exception as e:
+        print("[ERROR] error renaming file: {}".format(e))
+    return
 
 def get_bucket_from_url(url):
     """
@@ -178,13 +219,10 @@ def fetch_all_complete_courses_and_sessions(job_config, data_dir ="morf-data/", 
     return complete_courses
 
 
-def download_raw_course_data(s3, aws_access_key_id, aws_secret_access_key, bucket, course, session, input_dir,
-                             course_date_file_url, data_dir):
+def download_raw_course_data(job_config, bucket, course, session, input_dir, data_dir, course_date_file_name = "coursera_course_dates.csv"):
     """
     Download all raw course files for course and session into input_dir.
-    :param s3: boto3.client object for s3 connection.
-    :param aws_access_key_id: aws_access_key_id.
-    :param aws_secret_access_key: aws_secret_access_key.
+    :param job_config: MorfJobConfig object
     :param bucket: bucket containing raw data.
     :param course: id of course to download data for.
     :param session: id of session to download data for.
@@ -193,6 +231,10 @@ def download_raw_course_data(s3, aws_access_key_id, aws_secret_access_key, bucke
     :param data_dir: directory in bucket that contains course-level data.
     :return: None
     """
+    s3 = job_config.initialize_s3()
+    aws_secret_access_key = job_config.aws_secret_access_key
+    aws_access_key_id = job_config.aws_access_key_id
+    course_date_file_url =  "s3://{}/{}/{}".format(bucket, data_dir, course_date_file_name)
     session_input_dir = os.path.join(input_dir, course, session)
     os.makedirs(session_input_dir)
     for obj in boto3.resource("s3", aws_access_key_id=aws_access_key_id, aws_secret_access_key=aws_secret_access_key)\
@@ -210,9 +252,41 @@ def download_raw_course_data(s3, aws_access_key_id, aws_secret_access_key, bucke
     dates_key = get_key_from_url(course_date_file_url)
     dates_file = dates_key.split("/")[-1]
     s3.download_file(dates_bucket, dates_key, os.path.join(session_input_dir, dates_file))
-    # unzip all of the sql files
-    unzip_sql_cmd = """for i in `find {} -name "*.sql.gz"`; do gunzip "$i" ; done""".format(session_input_dir)
-    subprocess.call(unzip_sql_cmd, shell = True, stdout=open(os.devnull, "wb"), stderr=open(os.devnull, "wb"))
+    return
+
+
+def fetch_raw_course_data(job_config, bucket, course, session, input_dir, data_dir):
+    """
+    Fetch raw course data from job_config.cache_dir, if exists; otherwise fetch from s3.
+    :param job_config: MorfJobConfig object
+    :param bucket: bucket containing raw data.
+    :param course: id of course to download data for.
+    :param session: id of session to download data for.
+    :param input_dir: input directory.
+    :param data_dir: directory in bucket that contains course-level data.
+    :return: None
+    """
+    course_date_file = "coursera_course_dates.csv"
+    if job_config.cache_dir:
+        try:
+            course_session_cache_dir = os.path.join(job_config.cache_dir, bucket, data_dir, course, session)
+            session_input_dir = os.path.join(input_dir, course, session)
+            print("[INFO] copying data from cached location {} to {}".format(course_session_cache_dir, session_input_dir))
+            shutil.copytree(course_session_cache_dir, session_input_dir)
+            course_date_file = os.path.join(job_config.cache_dir, bucket, data_dir, course_date_file)
+            shutil.copy(course_date_file, session_input_dir)
+        except Exception as e:
+            print("[ERROR] exception while attempting to copy from cache: {}".format(e))
+    else:
+        download_raw_course_data(job_config, bucket=raw_data_bucket,
+                                 course=course, session=session, input_dir=input_dir,
+                                 data_dir=data_dir)
+    # unzip all of the sql files and remove any parens from filename
+    for item in os.listdir(session_input_dir):
+        if item.endswith(".sql.gz"):
+            item_path = os.path.join(session_input_dir, item)
+            unarchive_res = unarchive_file(item_path, session_input_dir)
+            clean_filename(unarchive_res)
     return
 
 
@@ -290,8 +364,7 @@ def download_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, 
 
 
 def initialize_raw_course_data(job_config, raw_data_bucket, level, mode,
-                               data_dir ="morf-data", course = None, session = None, input_dir ="./input",
-                               course_date_file_name ="coursera_course_dates.csv"):
+                               data_dir ="morf-data", course = None, session = None, input_dir ="./input"):
     """
     Initialize input directory of raw course data for extract or extract-holdout jobs.
     :param s3: boto3.client object for s3 connection.
@@ -307,46 +380,44 @@ def initialize_raw_course_data(job_config, raw_data_bucket, level, mode,
     :param course_date_file_name: name of csv file located at bucket/data_dir containing course start and end dates.
     :return: None
     """
-    s3 = job_config.initialize_s3()
     aws_access_key_id = job_config.aws_access_key_id
     aws_secret_access_key = job_config.aws_secret_access_key
-    if level != "all": # course_date_file_url is unique across the entire job
-
-        course_date_file_url = "s3://{}/{}/{}".format(raw_data_bucket, data_dir, course_date_file_name)
+    # if level != "all": # course_date_file_url is unique across the entire job
+    #     course_date_file_url = "s3://{}/{}/{}".format(raw_data_bucket, data_dir, course_date_file_name)
     if level == "all": # there is a unique course date file for each bucket
         # download all data; every session of every course
         for bucket in raw_data_bucket:
-            course_date_file_url = "s3://{}/{}/{}".format(bucket, data_dir, course_date_file_name)
+            # course_date_file_url = "s3://{}/{}/{}".format(bucket, data_dir, course_date_file_name)
             for course in fetch_courses(job_config, bucket):
                 if mode == "extract":
                     sessions = fetch_sessions(job_config, bucket, data_dir, course)
                     for session in sessions:
-                        download_raw_course_data(s3, aws_access_key_id, aws_secret_access_key, bucket=bucket,
+                        fetch_raw_course_data(job_config, bucket=bucket,
                                                  course=course, session=session, input_dir=input_dir,
-                                                 course_date_file_url=course_date_file_url, data_dir=data_dir)
+                                                 data_dir=data_dir)
                 if mode == "extract-holdout":
                     holdout_session = fetch_sessions(job_config, bucket, data_dir, course, fetch_holdout_session_only=True)[0]
-                    download_raw_course_data(s3, aws_access_key_id, aws_secret_access_key, bucket=bucket,
+                    fetch_raw_course_data(job_config, bucket=bucket,
                                              course=course, session=holdout_session, input_dir=input_dir,
-                                             course_date_file_url=course_date_file_url, data_dir=data_dir)
+                                             data_dir=data_dir)
     elif level == "course":
         # download all data for every session of course
         if mode == "extract":
             sessions = fetch_sessions(job_config, raw_data_bucket, data_dir, course)
             for session in sessions:
-                download_raw_course_data(s3, aws_access_key_id, aws_secret_access_key, bucket=raw_data_bucket,
+                fetch_raw_course_data(job_config, bucket=raw_data_bucket,
                                          course=course, session=session, input_dir=input_dir,
-                                         course_date_file_url=course_date_file_url, data_dir=data_dir)
+                                         data_dir=data_dir)
         if mode == "extract-holdout":
             holdout_session = fetch_sessions(job_config, raw_data_bucket, data_dir, course, fetch_holdout_session_only=True)[0]
-            download_raw_course_data(s3, aws_access_key_id, aws_secret_access_key, bucket=raw_data_bucket,
+            fetch_raw_course_data(job_config, bucket=raw_data_bucket,
                                      course=course, session=holdout_session, input_dir=input_dir,
-                                     course_date_file_url=course_date_file_url, data_dir=data_dir)
+                                     data_dir=data_dir)
     elif level == "session":
         # download only specific session
-        download_raw_course_data(s3, aws_access_key_id, aws_secret_access_key, bucket=raw_data_bucket,
+        fetch_raw_course_data(job_config, bucket=raw_data_bucket,
                                  course=course, session=session, input_dir=input_dir,
-                                 course_date_file_url=course_date_file_url, data_dir=data_dir)
+                                 data_dir=data_dir)
     return
 
 
@@ -468,9 +539,7 @@ def compile_test_results(s3, courses, bucket, user_id, job_id, temp_dir = "./tem
                 shutil.rmtree(temp_dir)
                 continue
         #untar file
-        tar = tarfile.open(dest)
-        tar.extractall(temp_dir)
-        tar.close()
+        unarchive_file(dest, temp_dir)
         # find all model summary files and read into dataframe
         course_summary_file = "{}{}_test_summary.csv".format(temp_dir, course)
         try:
@@ -499,9 +568,7 @@ def download_model_from_s3(bucket, key, s3, dest_dir):
     print("[INFO] downloading compressed model file from bucket {} key {}".format(bucket, key))
     try:
         tar_path = initialize_tar(mod_url, s3=s3, dest_dir=dest_dir)
-        tar = tarfile.open(tar_path)
-        tar.extractall(dest_dir)
-        tar.close()
+        unarchive_file(tar_path, dest_dir)
     except:
         sys.exit(
             "[WARNING] error downloading model file from s3; trained model(s) for this course may not exist. Skipping.")
@@ -673,9 +740,7 @@ def fetch_result_file(job_config, dir, course = None, session = None):
     print("[INFO] fetching s3://{}/{}".format(bucket, key))
     with open(dest, 'wb') as resource:
         s3.download_fileobj(bucket, key, resource)
-    tar = tarfile.open(dest)
-    tar.extractall(dir)
-    tar.close()
+    unarchive_file(dest, dir)
     os.remove(dest)
     return
 

@@ -29,6 +29,7 @@ import boto3
 from morf.utils import *
 from morf.utils.config import get_config_properties, combine_config_files, update_config_fields_in_section, MorfJobConfig
 from morf.utils.alerts import send_success_email, send_email_alert
+from morf.utils.caching import update_morf_job_cache
 from urllib.parse import urlparse
 import os
 
@@ -104,7 +105,7 @@ def run_image(job_config, raw_data_bucket, course=None, session=None, level=None
     return
 
 
-def run_job(job_config, course, session, level, raw_data_bucket=None, label_type=None, raw_data_buckets=None):
+def run_job(job_config, course=None, session=None, level=None, raw_data_bucket=None, label_type=None, raw_data_buckets=None):
     """
     Call job runner with correct parameters.
     :param job_config: MorfJobConfig object.
@@ -123,13 +124,14 @@ def run_job(job_config, course, session, level, raw_data_bucket=None, label_type
     # todo: different calls to run_image for each level are probably not necessary; all defaults are set to 'none'
     print("[INFO] running docker image {} user_id {} job_id {} course {} session {} mode {}"
           .format(job_config.docker_url, job_config.user_id, job_config.job_id, course, session, job_config.mode))
-    if level == "all":
-        run_image(job_config, raw_data_bucket=raw_data_buckets, level=level,
-                  label_type=label_type)
-    elif level == "course":
-        run_image(job_config, raw_data_bucket, course=course, level=level, label_type=label_type)
-    elif level == "session":
-        run_image(job_config, raw_data_bucket, course=course, session=session, level=level, label_type=label_type)
+    # if level == "all":
+    #     run_image(job_config, raw_data_bucket=raw_data_buckets, level=level,
+    #               label_type=label_type)
+    # elif level == "course":
+    #     run_image(job_config, raw_data_bucket, course=course, level=level, label_type=label_type)
+    # elif level == "session":
+    #     run_image(job_config, raw_data_bucket, course=course, session=session, level=level, label_type=label_type)
+    run_image(job_config, raw_data_bucket, course=course, session=session, level=level, label_type=label_type)
     return None
 
 
@@ -165,7 +167,10 @@ def run_morf_job(client_config_url, server_config_url, email_to = None, no_cache
                   .format(email_to, job_config.email_to))
             job_config.update_email_to(email_to)
             update_config_fields_in_section("client", email_to = email_to)
+        # send the job config file to s3
         cache_job_file_in_s3(job_config, filename = combined_config_filename)
+        # update the data cache; if this fails there is no reason to continue execution
+        update_morf_job_cache(job_config)
         # from client.config, fetch and download the following: docker image, controller script
         try:
             fetch_file(s3, working_dir, job_config.docker_url, dest_filename=docker_image_name)
