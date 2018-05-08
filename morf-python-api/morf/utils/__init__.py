@@ -28,10 +28,32 @@ import subprocess
 import sys
 import tarfile
 import urllib.request
+import gzip
 
 import boto3
 import pandas as pd
 from urllib.parse import urlparse
+
+
+def unarchive_file(src, dest):
+    """
+    Untar or un-gzip a file from src into dest.
+    :param src: path to source file to unarchive (string).
+    :param dest: directory to unarchive result into (string).
+    :return: None
+    """
+    if src.endswith(".zip"):
+        tar = tarfile.open(src)
+        tar.extractall(dest)
+        tar.close()
+    elif src.endswith(".gz"):
+        with gzip.open(src, "rb") as f_in:
+            destfile = os.path.basename(src)[:-3] # source file without '.gz' extension
+            destpath = os.path.join(dest, destfile)
+            with open(destpath, "wb") as f_out:
+                shutil.copyfileobj(f_in, f_out)
+        os.remove(src)
+    return
 
 
 def get_bucket_from_url(url):
@@ -211,9 +233,6 @@ def download_raw_course_data(job_config, bucket, course, session, input_dir, dat
     dates_key = get_key_from_url(course_date_file_url)
     dates_file = dates_key.split("/")[-1]
     s3.download_file(dates_bucket, dates_key, os.path.join(session_input_dir, dates_file))
-    # unzip all of the sql files
-    unzip_sql_cmd = """for i in `find {} -name "*.sql.gz"`; do gunzip "$i" ; done""".format(session_input_dir)
-    subprocess.call(unzip_sql_cmd, shell = True, stdout=open(os.devnull, "wb"), stderr=open(os.devnull, "wb"))
     return
 
 
@@ -228,18 +247,28 @@ def fetch_raw_course_data(job_config, bucket, course, session, input_dir, data_d
     :param data_dir: directory in bucket that contains course-level data.
     :return: None
     """
+    course_date_file = "coursera_course_dates.csv"
     if job_config.cache_dir:
         try:
-            course_session_cache_dir = os.path.join(job_config.cache_dir, bucket, course, session)
-            session_input_dir = os.path.join(input_dir, data_dir, course, session)
-            print("copying data from cached location {} to {}".format(course_session_cache_dir, session_input_dir))
+            course_session_cache_dir = os.path.join(job_config.cache_dir, bucket, data_dir, course, session)
+            session_input_dir = os.path.join(input_dir, course, session)
+            print("[INFO] copying data from cached location {} to {}".format(course_session_cache_dir, session_input_dir))
             shutil.copytree(course_session_cache_dir, session_input_dir)
+            course_date_file = os.path.join(job_config.cache_dir, bucket, data_dir, course_date_file)
+            shutil.copy(course_date_file, session_input_dir)
         except Exception as e:
-            print("exception while attempting to copy from cache: {}".format(e))
+            print("[ERROR] exception while attempting to copy from cache: {}".format(e))
     else:
         download_raw_course_data(job_config, bucket=raw_data_bucket,
                                  course=course, session=session, input_dir=input_dir,
                                  data_dir=data_dir)
+    # unzip all of the sql files
+    # unzip_sql_cmd = """for i in `find {} -name "*.sql.gz"`; do gunzip "$i" ; done""".format(session_input_dir)
+    # subprocess.call(unzip_sql_cmd, shell = True, stdout=open(os.devnull, "wb"), stderr=open(os.devnull, "wb"))
+    for item in os.listdir(session_input_dir):
+        if item.endswith(".sql.gz"):
+            unarchive_file(os.path.join(session_input_dir, item), session_input_dir)
+    return
 
 
 def initialize_labels(s3, aws_access_key_id, aws_secret_access_key, bucket, course, session, mode, label_type, dest_dir, data_dir):
@@ -491,9 +520,7 @@ def compile_test_results(s3, courses, bucket, user_id, job_id, temp_dir = "./tem
                 shutil.rmtree(temp_dir)
                 continue
         #untar file
-        tar = tarfile.open(dest)
-        tar.extractall(temp_dir)
-        tar.close()
+        unarchive_file(dest, temp_dir)
         # find all model summary files and read into dataframe
         course_summary_file = "{}{}_test_summary.csv".format(temp_dir, course)
         try:
@@ -522,9 +549,7 @@ def download_model_from_s3(bucket, key, s3, dest_dir):
     print("[INFO] downloading compressed model file from bucket {} key {}".format(bucket, key))
     try:
         tar_path = initialize_tar(mod_url, s3=s3, dest_dir=dest_dir)
-        tar = tarfile.open(tar_path)
-        tar.extractall(dest_dir)
-        tar.close()
+        unarchive_file(tar_path, dest_dir)
     except:
         sys.exit(
             "[WARNING] error downloading model file from s3; trained model(s) for this course may not exist. Skipping.")
@@ -696,9 +721,7 @@ def fetch_result_file(job_config, dir, course = None, session = None):
     print("[INFO] fetching s3://{}/{}".format(bucket, key))
     with open(dest, 'wb') as resource:
         s3.download_fileobj(bucket, key, resource)
-    tar = tarfile.open(dest)
-    tar.extractall(dir)
-    tar.close()
+    unarchive_file(dest, dir)
     os.remove(dest)
     return
 
