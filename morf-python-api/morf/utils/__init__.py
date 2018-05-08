@@ -37,12 +37,12 @@ from urllib.parse import urlparse
 
 def unarchive_file(src, dest):
     """
-    Untar or un-gzip a file from src into dest.
+    Untar or un-gzip a file from src into dest. Supports file extensions: .zip, .tgz, .gz.
     :param src: path to source file to unarchive (string).
     :param dest: directory to unarchive result into (string).
     :return: None
     """
-    if src.endswith(".zip"):
+    if src.endswith(".zip") or src.endswith(".tgz"):
         tar = tarfile.open(src)
         tar.extractall(dest)
         tar.close()
