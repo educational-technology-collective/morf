@@ -55,6 +55,8 @@ def unarchive_file(src, dest):
                 shutil.copyfileobj(f_in, f_out)
         os.remove(src)
         outpath = destpath
+    else:
+        raise NotImplementedError("Passed in a file with an extension not supported by unarchive_file: {}".format(src))
     return outpath
 
 
