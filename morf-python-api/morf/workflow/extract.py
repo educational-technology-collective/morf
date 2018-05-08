@@ -106,14 +106,18 @@ def extract_session(labels=False, raw_data_dir="morf-data/", label_type="labels-
     mode = "extract"
     job_config = MorfJobConfig(CONFIG_FILENAME)
     job_config.update_mode(mode)
+    logger = job_config.logger
     # # clear any preexisting data for this user/job/mode
     clear_s3_subdirectory(job_config)
     ## for each bucket, call job_runner once per session with --mode=extract and --level=session
     for raw_data_bucket in job_config.raw_data_buckets:
-        print("[INFO] processing bucket {}".format(raw_data_bucket))
+        logger.info("processing bucket {}".format(raw_data_bucket))
         courses = fetch_courses(job_config, raw_data_bucket, raw_data_dir)
         if multithread:
             reslist = []
+            # TODO:
+            # from multiprocessing_logging import install_mp_handler
+            # install_mp_handler(job_config.logger)
             with Pool(job_config.max_num_cores) as pool:
                 for course in courses:
                     for session in fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course,
