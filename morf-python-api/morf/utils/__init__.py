@@ -34,7 +34,7 @@ import boto3
 import pandas as pd
 from urllib.parse import urlparse
 
-logger = logging.getLogger('morf')
+logger = logging.getLogger("morf")
 
 
 def get_bucket_from_url(url):
@@ -272,7 +272,7 @@ def download_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, 
         fetch_mode = "extract"
     if mode == "test":
         fetch_mode = "extract-holdout"
-    print("[INFO] fetching {} data for course {} session {}".format(fetch_mode, course, session))
+    logger.info(" fetching {} data for course {} session {}".format(fetch_mode, course, session))
     session_input_dir = os.path.join(input_dir, course, session)
     os.makedirs(session_input_dir)
     # download features file
@@ -437,7 +437,7 @@ def clear_s3_subdirectory(job_config, course = None, session = None):
     :return:
     """
     s3_prefix = "/".join([x for x in [job_config.user_id, job_config.job_id, job_config.mode, course, session] if x is not None]) + "/"
-    print("[INFO] clearing previous job data at s3://{}".format(s3_prefix))
+    logger.info(" clearing previous job data at s3://{}".format(s3_prefix))
     delete_s3_keys(job_config.proc_data_bucket, prefix = s3_prefix)
     return
 
@@ -465,7 +465,7 @@ def compile_test_results(s3, courses, bucket, user_id, job_id, temp_dir = "./tem
             # copy docker image into working directory
             try:
                 s3.download_fileobj(bucket, key, fil)
-                print("[INFO] fetching test summary for course {}".format(course))
+                logger.info(" fetching test summary for course {}".format(course))
             except:
                 print("[WARNING] no test data found for course {}; skipping".format(course))
                 shutil.rmtree(temp_dir)
@@ -487,7 +487,7 @@ def compile_test_results(s3, courses, bucket, user_id, job_id, temp_dir = "./tem
     master_summary_filename = "{}_{}_model_performace_summary.csv".format(user_id, job_id)
     master_summary_df.to_csv(master_summary_filename, index = False, header = True)
     upload_key = "{}/{}/test/{}".format(user_id, job_id, master_summary_filename)
-    print("[INFO] uploading results to s3://{}/{}".format(bucket, upload_key))
+    logger.info(" uploading results to s3://{}/{}".format(bucket, upload_key))
     upload_file_to_s3(master_summary_filename, bucket, upload_key)
     os.remove(master_summary_filename)
     return None
@@ -499,7 +499,7 @@ def download_model_from_s3(bucket, key, s3, dest_dir):
     :return:
     """
     mod_url = 's3://{}/{}'.format(bucket, key)
-    print("[INFO] downloading compressed model file from bucket {} key {}".format(bucket, key))
+    logger.info(" downloading compressed model file from bucket {} key {}".format(bucket, key))
     try:
         tar_path = initialize_tar(mod_url, s3=s3, dest_dir=dest_dir)
         tar = tarfile.open(tar_path)
@@ -613,7 +613,7 @@ def make_output_archive_file(output_dir, job_config, course=None, session = None
     """
     archive_file = generate_archive_filename(job_config, course, session)
     # archive results; only save directory structure relative to output_dir (NOT absolute directory structure)
-    print("[INFO] archiving results to {} as {}".format(output_dir, archive_file))
+    logger.info(" archiving results to {} as {}".format(output_dir, archive_file))
     # todo: use python tarfile here
     cmd = "tar -cvf {} -C {} .".format(archive_file, output_dir)
     subprocess.call(cmd, shell = True, stdout=open(os.devnull, "wb"), stderr=open(os.devnull, "wb"))
@@ -649,7 +649,7 @@ def move_results_to_destination(archive_file, job_config, course = None, session
     """
     bucket = job_config.proc_data_bucket
     key = make_s3_key_path(job_config, filename=archive_file, course = course, session = session)
-    print("[INFO] uploading results to bucket {} key {}".format(bucket, key))
+    logger.info(" uploading results to bucket {} key {}".format(bucket, key))
     session = boto3.Session()
     s3_client = session.client("s3")
     tc = boto3.s3.transfer.TransferConfig()
@@ -673,7 +673,7 @@ def fetch_result_file(job_config, dir, course = None, session = None):
     key = make_s3_key_path(job_config, course=course, session=session,
                            filename=archive_file)
     dest = os.path.join(dir, archive_file)
-    print("[INFO] fetching s3://{}/{}".format(bucket, key))
+    logger.info(" fetching s3://{}/{}".format(bucket, key))
     with open(dest, 'wb') as resource:
         s3.download_fileobj(bucket, key, resource)
     tar = tarfile.open(dest)
@@ -730,7 +730,7 @@ def copy_s3_file(job_config, sourceloc, destloc):
     #todo: check format of urls; should be s3
     s3 = job_config.initialize_s3()
     assert get_bucket_from_url(sourceloc) == get_bucket_from_url(destloc), "can only copy files within same s3 bucket"
-    print("[INFO] copying file from {} to {}".format(sourceloc, destloc))
+    logger.info(" copying file from {} to {}".format(sourceloc, destloc))
     copy_source = {'Bucket': get_bucket_from_url(sourceloc), 'Key': get_key_from_url(sourceloc)}
     s3.copy_object(CopySource=copy_source, Bucket=get_bucket_from_url(destloc), Key=get_key_from_url(destloc))
     return
