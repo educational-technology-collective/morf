@@ -285,7 +285,6 @@ def fetch_raw_course_data(job_config, bucket, course, session, input_dir, data_d
             item_path = os.path.join(session_input_dir, item)
             unarchive_res = unarchive_file(item_path, session_input_dir)
             clean_filename(unarchive_res)
-    import ipdb;ipdb.set_trace()
     return
 
 
