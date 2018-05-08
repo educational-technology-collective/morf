@@ -105,7 +105,7 @@ def run_image(job_config, raw_data_bucket, course=None, session=None, level=None
     return
 
 
-def run_job(job_config, course, session, level, raw_data_bucket=None, label_type=None, raw_data_buckets=None):
+def run_job(job_config, course=None, session=None, level=None, raw_data_bucket=None, label_type=None, raw_data_buckets=None):
     """
     Call job runner with correct parameters.
     :param job_config: MorfJobConfig object.
@@ -124,13 +124,14 @@ def run_job(job_config, course, session, level, raw_data_bucket=None, label_type
     # todo: different calls to run_image for each level are probably not necessary; all defaults are set to 'none'
     print("[INFO] running docker image {} user_id {} job_id {} course {} session {} mode {}"
           .format(job_config.docker_url, job_config.user_id, job_config.job_id, course, session, job_config.mode))
-    if level == "all":
-        run_image(job_config, raw_data_bucket=raw_data_buckets, level=level,
-                  label_type=label_type)
-    elif level == "course":
-        run_image(job_config, raw_data_bucket, course=course, level=level, label_type=label_type)
-    elif level == "session":
-        run_image(job_config, raw_data_bucket, course=course, session=session, level=level, label_type=label_type)
+    # if level == "all":
+    #     run_image(job_config, raw_data_bucket=raw_data_buckets, level=level,
+    #               label_type=label_type)
+    # elif level == "course":
+    #     run_image(job_config, raw_data_bucket, course=course, level=level, label_type=label_type)
+    # elif level == "session":
+    #     run_image(job_config, raw_data_bucket, course=course, session=session, level=level, label_type=label_type)
+    run_image(job_config, raw_data_bucket, course=course, session=session, level=level, label_type=label_type)
     return None
 
 
