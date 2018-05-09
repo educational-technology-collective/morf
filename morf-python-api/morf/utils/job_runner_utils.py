@@ -49,11 +49,11 @@ def run_image(job_config, raw_data_bucket, course=None, session=None, level=None
     :param label_type: type of outcome label to use (required for model training and testing) (string).
     :return:
     """
+    logger = job_config.getLogger(__name__)
     docker_url = job_config.docker_url
     mode = job_config.mode
     s3 = job_config.initialize_s3()
     docker_exec = job_config.docker_exec
-    logger = job_config.logger
     # create local directory for processing on this instance
     with tempfile.TemporaryDirectory(dir=job_config.local_working_directory) as working_dir:
         try:
@@ -119,7 +119,7 @@ def run_job(job_config, course, session, level, raw_data_bucket=None, label_type
     :param raw_data_buckets: list of buckets (for use with level == all)
     :return: result of call to subprocess.call().
     """
-    logger = job_config.logger
+    logger = job_config.getLogger(__name__)
     if not raw_data_buckets:
         raw_data_buckets = job_config.raw_data_buckets
     # todo: just set default values as none; no need for control flow below
@@ -165,7 +165,7 @@ def run_morf_job(client_config_url, server_config_url, email_to = None, no_cache
                              local_client_config_path,
                              outfile = combined_config_filename)
         job_config = MorfJobConfig(combined_config_filename)
-        initialize_logger(job_config)
+        logger = initialize_logger(job_config)
         logger.info("TEST LOG ENTRY FROM job_runner_utils.run_morf_job")
         if email_to: # if email_to was provided by user, this overrides in config file -- allows users to easily run mwe
             logger.info("[INFO] email address from submission {} overriding email address in config file {}"
@@ -185,7 +185,6 @@ def run_morf_job(client_config_url, server_config_url, email_to = None, no_cache
             logger.error("[Error]: field {} missing from client.config file.".format(cause))
             sys.exit(-1)
         # change working directory and run controller script with notifications for initialization and completion
-        # import ipdb;ipdb.set_trace()
         job_config.update_status("INITIALIZED")
         send_email_alert(job_config)
         subprocess.call("python3 {}".format(controller_script_name), shell = True)
