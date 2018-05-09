@@ -154,7 +154,6 @@ class MorfJobConfig:
         self.generate_morf_id(config_file)
         # if maximum number of cores is not specified, set to one less than half of current machine's cores; otherwise cast to int
         self.setcores()
-        self.initialize_logger()
 
     def generate_morf_id(self, config_file):
         self.morf_id = generate_md5(config_file)
@@ -182,17 +181,6 @@ class MorfJobConfig:
                              aws_secret_access_key=self.aws_secret_access_key)
         return s3obj
 
-    def initialize_logger(self):
-        ## initialize logger; TODO: this should be a function
-        logger = logging.getLogger('morf')
-        logger.setLevel(10)  # set to debug level
-        # create file handler
-        fh = logging.FileHandler(os.path.join(self.logging_dir, self.morf_id + ".log"))
-        formatter = logging.Formatter("%(asctime)s %(levelname)s:%(message)s")
-        fh.setFormatter(formatter)
-        logger.addHandler(fh)
-        self.logger = logger
-        return
 
     def setcores(self):
         if not hasattr(self, "max_num_cores"):
