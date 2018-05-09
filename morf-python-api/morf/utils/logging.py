@@ -23,14 +23,18 @@
 Functions for logging MORF activity.
 """
 
+import logging
+import os
+
+
 def initialize_logger(job_config):
     ## initialize logger
     logger = logging.getLogger(job_config.morf_id)
-    logger.setLevel(10)  # set to debug level
+    logger.setLevel(logging.DEBUG)  # set to debug level
     # create file handler
     fh = logging.FileHandler(os.path.join(job_config.logging_dir, job_config.morf_id + ".log"))
-    formatter = logging.Formatter("%(asctime)s %(levelname)s:%(message)s")
+    formatter = logging.Formatter("%(asctime)s %(name)-12s %(levelname)s:%(message)s")
     fh.setFormatter(formatter)
     logger.addHandler(fh)
     logger.info("Successfully initialized logger from morf.utils.initialize_logger()")
-    return
+    return logger
