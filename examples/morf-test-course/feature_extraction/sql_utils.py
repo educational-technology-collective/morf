@@ -22,33 +22,67 @@
 import os
 import subprocess
 
+DATABASE_NAME = "course"
 
-def extract_coursera_sql_data(course, session):
-    '''
-    Initializes the MySQL database. This assumes that MySQL is correctly setup in the docker container.
+def execute_mysql_query_into_csv(query, file, database_name=DATABASE_NAME):
+    """
+    Execute a mysql query into a file.
+    :param query: valid mySQL query as string.
+    :param file: csv filename to write to.
+    :return: none
+    """
+    mysql_to_csv_cmd = """ | tr '\t' ',' """  # string to properly format result of mysql query
+    command = '''mysql -u root -proot {} -e"{}"'''.format(database_name, query)
+    command += """{} > {}""".format(mysql_to_csv_cmd, file)
+    subprocess.call(command, shell=True)
+    return
+
+
+def load_mysql_dump(dumpfile, database_name=DATABASE_NAME):
+    """
+    Load a mySQL data dump into DATABASE_NAME.
+    :param file: path to mysql database dump
     :return:
-    '''
-    cwd = os.getcwd()
-    hash_mapping_sql_dump = [x for x in os.listdir('./input/{}/{}'.format(course, session)) if 'hash_mapping' in x and session in x][0]
-    forum_sql_dump = [x for x in os.listdir('./input/{}/{}'.format(course, session)) if 'anonymized_forum' in x and session in x][0]
+    """
+    command = '''mysql -u root -proot {} < {}'''.format(database_name, dumpfile)
+    subprocess.call(command, shell=True)
+    return
+
+
+def initialize_database(database_name=DATABASE_NAME):
+    """
+    Start mySQL service and initialize mySQL database with database_name.
+    :param database_name: name of database.
+    :return:
+    """
     # start mysql server
-    subprocess.call('service mysql start',shell=True)
-    # command to create a database
-    subprocess.call('''mysql -u root -proot -e "DROP DATABASE IF EXISTS course"''', shell=True)
-    subprocess.call('''mysql -u root -proot -e "CREATE DATABASE course"''', shell=True)
-    command = '''mysql -u root -proot course < ./input/{}/{}/{}'''.format(course, session, forum_sql_dump)
-    subprocess.call(command,shell=True)
-    # command to load hash mapping
-    command = '''mysql -u root -proot course < ./input/{}/{}/{}'''.format(course, session, hash_mapping_sql_dump)
-    subprocess.call(command,shell=True)
+    subprocess.call("service mysql start", shell=True)
+    # create database
+    subprocess.call('''mysql -u root -proot -e "CREATE DATABASE {}"'''.format(database_name), shell=True)
+    return
+
+
+def extract_coursera_sql_data(course, session, forum_comment_filename="forum_comments.csv", forum_post_filename="forum_posts.csv"):
+    """
+    Initialize the mySQL database, load files, and execute queries to deposit csv files of data into /input/course/session directory.
+    :param course: course name.
+    :param session: session id.
+    :param forum_comment_filename: name of csv file to write forum comments data to.
+    :param forum_post_filename: name of csv file to write forum posts to.
+    :return:
+    """
+    course_session_dir = os.path.join(".", "input", course, session)
+    hash_mapping_sql_dump = \
+    [x for x in os.listdir(course_session_dir) if "hash_mapping" in x and session in x][0]
+    forum_sql_dump = \
+    [x for x in os.listdir(course_session_dir) if "anonymized_forum" in x and session in x][0]
+    initialize_database()
+    load_mysql_dump(os.path.join(course_session_dir, forum_sql_dump))
+    load_mysql_dump(os.path.join(course_session_dir, hash_mapping_sql_dump))
     # execute forum comment query and send to csv
-    query = """SELECT * FROM (SELECT 'thread_id', 'post_time', 'session_user_id' UNION ALL (SELECT thread_id , post_time , b.session_user_id FROM forum_comments as a LEFT JOIN hash_mapping as b ON a.user_id = b.user_id WHERE a.is_spam != 1 ORDER BY post_time)) results INTO OUTFILE '{}/input/{}/{}/forum_comments.csv' FIELDS TERMINATED BY ',' ;""".format(cwd, course, session)
-    #command = [mysql_binary_location, '-u', user, '-p', password, 'course', '<', query]
-    command = '''mysql -u root -proot course -e"{}"'''.format(query)
-    subprocess.call(command,shell=True)
+    query = """SELECT thread_id , post_time , b.session_user_id FROM forum_comments as a LEFT JOIN hash_mapping as b ON a.user_id = b.user_id WHERE a.is_spam != 1 ORDER BY post_time;"""
+    execute_mysql_query_into_csv(query, os.path.join(course_session_dir, forum_comment_filename))
     # execute forum post query and send to csv
-    query = """SELECT * FROM (SELECT 'id', 'thread_id', 'post_time', 'user_id', 'public_user_id', 'session_user_id', 'eventing_user_id' UNION ALL (SELECT id , thread_id , post_time , a.user_id , public_user_id , session_user_id , eventing_user_id FROM forum_posts as a LEFT JOIN hash_mapping as b ON a.user_id = b.user_id WHERE is_spam != 1 ORDER BY post_time)) results INTO OUTFILE '{}/input/{}/{}/forum_posts.csv' FIELDS TERMINATED BY ',' """.format(cwd, course, session)
-    #command = [mysql_binary_location, '-u', user, '-p', password, 'course', '<', query]
-    command = '''mysql -u root -proot course -e"{}"'''.format(query)
-    subprocess.call(command,shell=True)
+    query = """SELECT id , thread_id , post_time , a.user_id , public_user_id , session_user_id , eventing_user_id FROM forum_posts as a LEFT JOIN hash_mapping as b ON a.user_id = b.user_id WHERE is_spam != 1 ORDER BY post_time;"""
+    execute_mysql_query_into_csv(query, os.path.join(course_session_dir, forum_post_filename))
     return
