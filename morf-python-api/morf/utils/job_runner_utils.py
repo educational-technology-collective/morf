@@ -31,6 +31,7 @@ import tempfile
 from morf.utils import *
 from morf.utils.config import get_config_properties, combine_config_files, update_config_fields_in_section, MorfJobConfig
 from morf.utils.alerts import send_success_email, send_email_alert
+from morf.utils.logging import initialize_logger
 from urllib.parse import urlparse
 
 
@@ -164,6 +165,7 @@ def run_morf_job(client_config_url, server_config_url, email_to = None, no_cache
                              local_client_config_path,
                              outfile = combined_config_filename)
         job_config = MorfJobConfig(combined_config_filename)
+        initialize_logger(job_config)
         logger.info("TEST LOG ENTRY FROM job_runner_utils.run_morf_job")
         if email_to: # if email_to was provided by user, this overrides in config file -- allows users to easily run mwe
             logger.info("[INFO] email address from submission {} overriding email address in config file {}"
