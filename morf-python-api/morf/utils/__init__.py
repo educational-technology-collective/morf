@@ -33,6 +33,7 @@ import gzip
 import boto3
 import pandas as pd
 from urllib.parse import urlparse
+from botocore.exceptions import ClientError
 
 
 def unarchive_file(src, dest):
@@ -106,7 +107,14 @@ def download_from_s3(bucket, key, s3, dir = os.getcwd(), dest_filename = None):
     if not dest_filename:
         dest_filename = os.path.basename(key)
     with open(os.path.join(dir, dest_filename), "wb") as resource:
-        s3.download_fileobj(bucket, key, resource)
+        try:
+            s3.download_fileobj(bucket, key, resource)
+        except ClientError as ce:
+            print("[ERROR] boto ClientError downloading from location s3://{}/{}: {}".format(bucket, key, ce))
+            raise
+        except Exception as e:
+            print("[ERROR] error downloading from location s3://{}/{}: {}".format(bucket, key, e))
+            raise
     dest_path = os.path.join(dir, dest_filename)
     return dest_path
 
