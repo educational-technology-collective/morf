@@ -31,8 +31,8 @@ RUN echo "mysql-server-5.7 mysql-server/root_password password root" | sudo debc
 
 # add scripts
 ADD mwe.py /
-ADD feature_extraction /
-ADD modeling /
+ADD feature_extraction feature_extraction
+ADD modeling modeling
 # start mysql
 RUN service mysql start
 
