@@ -619,6 +619,7 @@ def make_output_archive_file(output_dir, job_config, course=None, session = None
     :param session: session number of course (string) (optional, only needed when mode == extract).
     :return: name of archive file (string).
     """
+    logger = set_logger_handlers(module_logger, job_config)
     archive_file = generate_archive_filename(job_config, course, session)
     # archive results; only save directory structure relative to output_dir (NOT absolute directory structure)
     logger.info(" archiving results to {} as {}".format(output_dir, archive_file))
@@ -655,6 +656,7 @@ def move_results_to_destination(archive_file, job_config, course = None, session
     :param job_config: MorfJobConfig object.
     :return: None.
     """
+    logger = set_logger_handlers(module_logger, job_config)
     bucket = job_config.proc_data_bucket
     key = make_s3_key_path(job_config, filename=archive_file, course = course, session = session)
     logger.info(" uploading results to bucket {} key {}".format(bucket, key))
