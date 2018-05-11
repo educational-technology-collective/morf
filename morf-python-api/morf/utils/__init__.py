@@ -33,8 +33,11 @@ import urllib.request
 import boto3
 import pandas as pd
 from urllib.parse import urlparse
+from morf.utils.log import set_logger_handlers
 
-logger = logging.getLogger("morf")
+
+# create logger
+module_logger = logging.getLogger(__name__)
 
 
 def get_bucket_from_url(url):
@@ -388,14 +391,16 @@ def initialize_train_test_data(job_config, raw_data_bucket, level, label_type, c
     return
 
 
-def upload_file_to_s3(file, bucket, key):
+def upload_file_to_s3(file, bucket, key, job_config=None):
     """
     Upload file to bucket + key in S3.
     :param file: name or path to file.
     :param bucket: bucket to upload to.
     :param key: key to upload to in bucket.
+    :param job_config: MorfJobConfig object; used for logging.
     :return: None
     """
+    logger = set_logger_handlers(module_logger, job_config)
     session = boto3.Session()
     s3_client = session.client("s3")
     tc = boto3.s3.transfer.TransferConfig()
@@ -548,15 +553,17 @@ def download_models(job_config, course, dest_dir, level, session = None):
     return
 
 
-def fetch_file(s3, dest_dir, remote_file_url, dest_filename = None):
+def fetch_file(s3, dest_dir, remote_file_url, dest_filename = None, job_config=None):
     """
 
     :param s3: boto3.client object for s3 connection.
     :param dest_dir: directory to download file to (string).
     :param remote_file_url: url of remote file; must be either file://, s3, or http format (string).
     :param dest_filename: base name of file to use (otherwise defaults to current file name) (string).
+    :param job_config: MorfJobConfig object; used for logging.
     :return:
     """
+    logger = set_logger_handlers(module_logger, job_config)
     logger.info("[INFO] retrieving file {} to {}".format(remote_file_url, dest_dir))
     try:
         if not dest_filename:
@@ -717,7 +724,7 @@ def cache_job_file_in_s3(job_config, bucket = None, filename ="config.properties
     if not bucket:
         bucket = job_config.proc_data_bucket
     key = make_s3_key_path(job_config, filename = filename)
-    upload_file_to_s3(filename, bucket, key)
+    upload_file_to_s3(filename, bucket, key, job_config)
     return
 
 
