@@ -27,14 +27,35 @@ import logging
 import os
 
 
-def initialize_logger(job_config):
-    ## initialize logger
-    logger = logging.getLogger(job_config.morf_id)
-    logger.setLevel(logging.DEBUG)  # set to debug level
-    # create file handler
-    fh = logging.FileHandler(os.path.join(job_config.logging_dir, job_config.morf_id + ".log"))
-    formatter = logging.Formatter("%(asctime)s %(name)-12s %(levelname)s:%(message)s")
-    fh.setFormatter(formatter)
-    logger.addHandler(fh)
-    logger.info("Successfully initialized logger from morf.utils.initialize_logger()")
+def set_logger_handlers(logger, job_config=None):
+    """
+    Sets filehandler and streamhandler so the logger goes to the correct output for job_config.
+    :param logger:
+    :param job_config:
+    :return:
+    """
+    logger.setLevel(logging.DEBUG)
+    # create console handler with a higher log level
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.ERROR)
+    # create formatter, this is added to handlers later
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # set formatter and handler for console handler; this is used even if job_config is not provided
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
+    # if job_config, create file handler for the job which logs even debug messages
+    if job_config:
+        fh = logging.FileHandler(os.path.join(job_config.logging_dir, 'spam.log')) # todo: change this to morf_id.log
+        fh.setLevel(logging.DEBUG)
+        fh.setFormatter(formatter)
+        logger.addHandler(fh)
     return logger
+
+
+def initialize_logger(job_config, logger_name = "morf_api"):
+    logger = logging.getLogger(logger_name)
+    logger = set_logger_handlers(logger, job_config)
+    logger.info("logger initialization complete!")
+    return logger
+
+
