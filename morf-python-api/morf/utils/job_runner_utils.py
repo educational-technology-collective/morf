@@ -29,10 +29,12 @@ import os
 import subprocess
 import tempfile
 from morf.utils import *
-from morf.utils.config import get_config_properties, combine_config_files, update_config_fields_in_section, MorfJobConfig
 from morf.utils.alerts import send_success_email, send_email_alert
-from morf.utils.logging import initialize_logger
+from morf.utils.config import get_config_properties, combine_config_files, update_config_fields_in_section, MorfJobConfig
+from morf.utils.log import set_logger_handlers
 from urllib.parse import urlparse
+
+module_logger = logging.getLogger('job_runner_utils.py')
 
 
 def run_image(job_config, raw_data_bucket, course=None, session=None, level=None, label_type=None):
@@ -49,7 +51,7 @@ def run_image(job_config, raw_data_bucket, course=None, session=None, level=None
     :param label_type: type of outcome label to use (required for model training and testing) (string).
     :return:
     """
-    logger = job_config.getLogger(__name__)
+    ## todo: define logger here
     docker_url = job_config.docker_url
     mode = job_config.mode
     s3 = job_config.initialize_s3()
@@ -137,46 +139,26 @@ def run_job(job_config, course, session, level, raw_data_bucket=None, label_type
     return None
 
 
-def run_morf_job(client_config_url, server_config_url, email_to = None, no_cache = False):
+def run_morf_job(job_config, email_to = None, no_cache = False):
     """
     Wrapper function to run complete MORF job.
     :param client_config_url: url to client.config file.
     :param server_config_url: url to server.config file.
     :return:
     """
+    logger = set_logger_handlers(module_logger, job_config)
+    logger.info("running job id: {}".format(job_config.morf_id))
     controller_script_name = "controller.py"
     docker_image_name = "docker_image"
     combined_config_filename = "config.properties"
-    server_config_path = urlparse(server_config_url).path
-    # read server.config and get those properties
-    server_config = get_config_properties(server_config_path)
-    log_dir = server_config["logging_dir"]
+    s3 = job_config.initialize_s3()
     # create temporary directory in local_working_directory from server.config
-    with tempfile.TemporaryDirectory(dir=server_config["local_working_directory"]) as working_dir:
-        # save calling working directory; change directory into working_dir
-        calling_dir = os.getcwd()
+    with tempfile.TemporaryDirectory(dir=job_config.local_working_directory) as working_dir:
         os.chdir(working_dir)
-        # download client.config into local_working_directory using AWS creds from server.config
-        s3 = boto3.client("s3", aws_access_key_id=server_config["aws_access_key_id"],
-                          aws_secret_access_key=server_config["aws_secret_access_key"])
-        fetch_file(s3, working_dir, client_config_url)
-        local_client_config_path = os.path.join(os.getcwd(), "client.config")
-        combine_config_files(server_config_path,
-                             local_client_config_path,
-                             outfile = combined_config_filename)
-        job_config = MorfJobConfig(combined_config_filename)
-        logger = initialize_logger(job_config)
-        logger.info("TEST LOG ENTRY FROM job_runner_utils.run_morf_job")
-        if email_to: # if email_to was provided by user, this overrides in config file -- allows users to easily run mwe
-            logger.info("[INFO] email address from submission {} overriding email address in config file {}"
-                  .format(email_to, job_config.email_to))
-            job_config.update_email_to(email_to)
-            update_config_fields_in_section("client", email_to = email_to)
-        cache_job_file_in_s3(job_config, filename = combined_config_filename)
         # from client.config, fetch and download the following: docker image, controller script
         try:
-            fetch_file(s3, working_dir, job_config.docker_url, dest_filename=docker_image_name)
-            fetch_file(s3, working_dir, job_config.controller_url, dest_filename=controller_script_name)
+            fetch_file(s3, working_dir, job_config.docker_url, dest_filename=docker_image_name, job_config=job_config)
+            fetch_file(s3, working_dir, job_config.controller_url, dest_filename=controller_script_name, job_config=job_config)
             if not no_cache: # cache job files in s3 unless no_cache parameter set to true
                 cache_job_file_in_s3(job_config, filename = docker_image_name)
                 cache_job_file_in_s3(job_config, filename = controller_script_name)
