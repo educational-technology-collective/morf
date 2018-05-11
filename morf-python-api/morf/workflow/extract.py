@@ -24,16 +24,18 @@
 Feature extraction functions for the MORF 2.0 API. For more information about the API, see the documentation.
 """
 
-from morf.utils.job_runner_utils import run_job
+import boto3
 from morf.utils import make_s3_key_path, generate_archive_filename, copy_s3_file
+from morf.utils.alerts import send_email_alert
 from morf.utils.api_utils import *
 from morf.utils.config import get_config_properties, fetch_data_buckets_from_config, MorfJobConfig
-from morf.utils.alerts import send_email_alert
-import boto3
+from morf.utils.job_runner_utils import run_job, run_image
+from morf.utils.log import set_logger_handlers
 from multiprocessing import Pool
 
 # define module-level variables for config.properties
 CONFIG_FILENAME = "config.properties"
+module_logger = logging.getLogger(__name__)
 
 
 def extract_all():
@@ -106,33 +108,37 @@ def extract_session(labels=False, raw_data_dir="morf-data/", label_type="labels-
     mode = "extract"
     job_config = MorfJobConfig(CONFIG_FILENAME)
     job_config.update_mode(mode)
-    logger = job_config.logger
-    # # clear any preexisting data for this user/job/mode
+    logger = set_logger_handlers(module_logger, job_config)
+    # # clear any preexisting data for this user/job/mode and set number of cores
     clear_s3_subdirectory(job_config)
+    if multithread:
+        num_cores = job_config.max_num_cores
+    else:
+        num_cores = 1
     ## for each bucket, call job_runner once per session with --mode=extract and --level=session
     for raw_data_bucket in job_config.raw_data_buckets:
         logger.info("processing bucket {}".format(raw_data_bucket))
         courses = fetch_courses(job_config, raw_data_bucket, raw_data_dir)
-        if multithread:
-            reslist = []
-            # TODO:
-            # from multiprocessing_logging import install_mp_handler
-            # install_mp_handler(job_config.logger)
-            with Pool(job_config.max_num_cores) as pool:
-                for course in courses:
-                    for session in fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course,
-                                                  fetch_holdout_session_only=False):
-                        poolres = pool.apply_async(run_job, [job_config, course, session, level, raw_data_bucket])
-                        reslist.append(poolres)
-                pool.close()
-                pool.join()
-            for res in reslist:
-                print(res.get())
-        else:  # do job in serial; this is useful for debugging
+        reslist = []
+        # TODO:
+        # from multiprocessing_logging import install_mp_handler
+        # install_mp_handler(job_config.logger)
+        with Pool(num_cores) as pool:
             for course in courses:
                 for session in fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course,
                                               fetch_holdout_session_only=False):
-                    run_job(job_config, course, session, level, raw_data_bucket)
+                    poolres = pool.apply_async(run_image, [job_config, raw_data_bucket, course, session, level])
+                    reslist.append(poolres)
+            pool.close()
+            pool.join()
+        for res in reslist:
+            print(res.get())
+        # else:  # do job in serial; this is useful for debugging
+        #     for course in courses:
+        #         for session in fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course,
+        #                                       fetch_holdout_session_only=False):
+        #             run_job(job_config, course, session, level, raw_data_bucket)
+
     if not labels:  # normal feature extraction job; collects features across all buckets and upload to proc_data_bucket
         result_file = collect_session_results(job_config)
         upload_key = "{}/{}/extract/{}".format(job_config.user_id, job_config.job_id, result_file)
