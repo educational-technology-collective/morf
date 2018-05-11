@@ -23,10 +23,7 @@
 Utility functions specifically for running jobs in MORF API.
 """
 
-import boto3
-import logging
-import os
-import subprocess
+import shutil
 import tempfile
 from morf.utils import *
 from morf.utils.alerts import send_success_email, send_email_alert
@@ -34,7 +31,7 @@ from morf.utils.config import get_config_properties, combine_config_files, updat
 from morf.utils.log import set_logger_handlers
 from urllib.parse import urlparse
 
-module_logger = logging.getLogger('job_runner_utils.py')
+module_logger = logging.getLogger(__name__)
 
 
 def run_image(job_config, raw_data_bucket, course=None, session=None, level=None, label_type=None):
@@ -51,7 +48,8 @@ def run_image(job_config, raw_data_bucket, course=None, session=None, level=None
     :param label_type: type of outcome label to use (required for model training and testing) (string).
     :return:
     """
-    ## todo: define logger here
+    logger = set_logger_handlers(module_logger, job_config)
+    logger.info("TEST entry from job_runner_utils.run_image()")
     docker_url = job_config.docker_url
     mode = job_config.mode
     s3 = job_config.initialize_s3()
@@ -121,12 +119,10 @@ def run_job(job_config, course, session, level, raw_data_bucket=None, label_type
     :param raw_data_buckets: list of buckets (for use with level == all)
     :return: result of call to subprocess.call().
     """
-    logger = job_config.getLogger(__name__)
+    logger = set_logger_handlers(module_logger, job_config)
+    logger.info("test from job_runner_utils.run_job!")
     if not raw_data_buckets:
         raw_data_buckets = job_config.raw_data_buckets
-    # todo: just set default values as none; no need for control flow below
-    # todo: specify bucket here and make a required argument (currently run_image just defaults to using morf-michigan)
-    # todo: different calls to run_image for each level are probably not necessary; all defaults are set to 'none'
     logger.info("running docker image {} user_id {} job_id {} course {} session {} mode {}"
           .format(job_config.docker_url, job_config.user_id, job_config.job_id, course, session, job_config.mode))
     if level == "all":
@@ -139,23 +135,25 @@ def run_job(job_config, course, session, level, raw_data_bucket=None, label_type
     return None
 
 
-def run_morf_job(job_config, email_to = None, no_cache = False):
+def run_morf_job(job_config, no_cache = False):
     """
     Wrapper function to run complete MORF job.
     :param client_config_url: url to client.config file.
     :param server_config_url: url to server.config file.
     :return:
     """
+    combined_config_filename = "config.properties"
     logger = set_logger_handlers(module_logger, job_config)
     logger.info("running job id: {}".format(job_config.morf_id))
     controller_script_name = "controller.py"
     docker_image_name = "docker_image"
-    combined_config_filename = "config.properties"
     s3 = job_config.initialize_s3()
     # create temporary directory in local_working_directory from server.config
     with tempfile.TemporaryDirectory(dir=job_config.local_working_directory) as working_dir:
+        # copy config file into new directory
+        shutil.copy(combined_config_filename, working_dir)
         os.chdir(working_dir)
-        # from client.config, fetch and download the following: docker image, controller script
+        # from job_config, fetch and download the following: docker image, controller script, cached config file
         try:
             fetch_file(s3, working_dir, job_config.docker_url, dest_filename=docker_image_name, job_config=job_config)
             fetch_file(s3, working_dir, job_config.controller_url, dest_filename=controller_script_name, job_config=job_config)
@@ -171,6 +169,5 @@ def run_morf_job(job_config, email_to = None, no_cache = False):
         send_email_alert(job_config)
         subprocess.call("python3 {}".format(controller_script_name), shell = True)
         job_config.update_status("SUCCESS")
-
         send_success_email(job_config)
         return
