@@ -218,7 +218,6 @@ def extract_holdout_session(labels=False, raw_data_dir="morf-data/", label_type=
     job_config = MorfJobConfig(CONFIG_FILENAME)
     job_config.update_mode(mode)
     logger = set_logger_handlers(module_logger, job_config)
-    job_config.initialize_s3()
     # call job_runner once per session with --mode=extract-holdout and --level=session
     # clear any preexisting data for this user/job/mode
     clear_s3_subdirectory(job_config)
