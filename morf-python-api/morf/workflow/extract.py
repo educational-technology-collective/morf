@@ -230,7 +230,7 @@ def extract_holdout_session(labels=False, raw_data_dir="morf-data/", label_type=
         logger.info("[INFO] processing bucket {}".format(raw_data_bucket))
         courses = fetch_courses(job_config, raw_data_bucket, raw_data_dir)
         reslist = []
-        with Pool(job_config.max_num_cores) as pool:
+        with Pool(num_cores) as pool:
             for course in courses:
                 holdout_session = fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course,
                                              fetch_holdout_session_only=True)[0]  # only use holdout run; unlisted
