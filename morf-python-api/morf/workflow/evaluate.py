@@ -52,7 +52,6 @@ def check_dataframe_complete(df, job_config, columns):
     # filter to only include complete courses
     courses = [x[0] for x in fetch_all_complete_courses_and_sessions(job_config)]
     df_to_check = df[df.course.isin(courses)]
-    import ipdb;ipdb.set_trace()
     null_counts = df_to_check[columns].apply(lambda x: sum(x.isnull()), axis=0)
     if null_counts.sum() > 0:
         logger.error("Null values detected in the following columns: {} \n Did you include predicted probabilities and labels for all users?".format(null_counts.loc[null_counts > 0].index.tolist()))
