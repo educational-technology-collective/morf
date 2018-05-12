@@ -232,14 +232,14 @@ def extract_holdout_session(labels=False, raw_data_dir="morf-data/", label_type=
         reslist = []
         with Pool(job_config.max_num_cores) as pool:
             for course in courses:
-                holdout_run = fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course,
+                holdout_session = fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course,
                                              fetch_holdout_session_only=True)[0]  # only use holdout run; unlisted
-                poolres = pool.apply_async(run_job, [job_config, course, holdout_run, level, raw_data_bucket])
+                poolres = pool.apply_async(run_image, [job_config, raw_data_bucket, course, holdout_session, level])
                 reslist.append(poolres)
             pool.close()
             pool.join()
         for res in reslist:
-            print(res.get())
+            logger.info(res.get())
     if not labels:  # normal feature extraction job; collects features across all buckets and upload to proc_data_bucket
         result_file = collect_session_results(job_config, holdout=True)
         upload_key = "{}/{}/{}/{}".format(job_config.user_id, job_config.job_id, job_config.mode, result_file)
