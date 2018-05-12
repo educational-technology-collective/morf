@@ -124,14 +124,13 @@ def extract_session(labels=False, raw_data_dir="morf-data/", label_type="labels-
         # install_mp_handler(job_config.logger)
         with Pool(num_cores) as pool:
             for course in courses:
-                for session in fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course,
-                                              fetch_holdout_session_only=False):
+                for session in fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course, fetch_holdout_session_only=False):
                     poolres = pool.apply_async(run_image, [job_config, raw_data_bucket, course, session, level])
                     reslist.append(poolres)
             pool.close()
             pool.join()
         for res in reslist:
-            print(res.get())
+            logger.info(res.get())
     if not labels:  # normal feature extraction job; collects features across all buckets and upload to proc_data_bucket
         result_file = collect_session_results(job_config)
         upload_key = "{}/{}/extract/{}".format(job_config.user_id, job_config.job_id, result_file)
