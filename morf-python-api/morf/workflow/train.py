@@ -101,27 +101,27 @@ def train_session(label_type, raw_data_dir="morf-data/", multithread=True):
     level = "session"
     job_config = MorfJobConfig(CONFIG_FILENAME)
     job_config.update_mode(mode)
+    logger = set_logger_handlers(module_logger, job_config)
     check_label_type(label_type)
     # clear any preexisting data for this user/job/mode
     clear_s3_subdirectory(job_config)
+    if multithread:
+        num_cores = job_config.max_num_cores
+    else:
+        num_cores = 1
     # for each bucket, call job_runner once per session with --mode=train and --level=session
     for raw_data_bucket in job_config.raw_data_buckets:
-        print("[INFO] processing bucket {}".format(raw_data_bucket))
+        logger.info("processing bucket {}".format(raw_data_bucket))
         courses = fetch_complete_courses(job_config, raw_data_bucket, raw_data_dir)
-        if multithread:
-            reslist = []
-            with Pool(job_config.max_num_cores) as pool:
-                for course in courses:
-                    for session in fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course):
-                        poolres = pool.apply_async(run_job, [job_config, course, session, level, raw_data_bucket, label_type])
-                        reslist.append(poolres)
-                pool.close()
-                pool.join()
-            for res in reslist:
-                print(res.get())
-        else:  # single-threaded
+        reslist = []
+        with Pool(num_cores) as pool:
             for course in courses:
                 for session in fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course):
-                    run_job(job_config, course, session, level, raw_data_bucket, label_type)
+                    poolres = pool.apply_async(run_image, [job_config, raw_data_bucket, course, session, level, label_type])
+                    reslist.append(poolres)
+            pool.close()
+            pool.join()
+        for res in reslist:
+            logger.info(res.get())
     send_email_alert(job_config)
     return
