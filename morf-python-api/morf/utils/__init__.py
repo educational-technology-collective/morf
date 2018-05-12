@@ -678,6 +678,7 @@ def fetch_result_file(job_config, dir, course = None, session = None):
     :param session: session number.
     :return:  None.
     """
+    logger = set_logger_handlers(module_logger, job_config)
     s3 = job_config.initialize_s3()
     bucket = job_config.proc_data_bucket
     archive_file = generate_archive_filename(job_config, course, session)
