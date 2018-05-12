@@ -24,11 +24,10 @@
 Feature extraction functions for the MORF 2.0 API. For more information about the API, see the documentation.
 """
 
-import boto3
-from morf.utils import make_s3_key_path, generate_archive_filename, copy_s3_file
+
 from morf.utils.alerts import send_email_alert
 from morf.utils.api_utils import *
-from morf.utils.config import get_config_properties, fetch_data_buckets_from_config, MorfJobConfig
+from morf.utils.config import MorfJobConfig
 from morf.utils.job_runner_utils import run_job, run_image
 from morf.utils.log import set_logger_handlers
 from multiprocessing import Pool
@@ -133,12 +132,6 @@ def extract_session(labels=False, raw_data_dir="morf-data/", label_type="labels-
             pool.join()
         for res in reslist:
             print(res.get())
-        # else:  # do job in serial; this is useful for debugging
-        #     for course in courses:
-        #         for session in fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course,
-        #                                       fetch_holdout_session_only=False):
-        #             run_job(job_config, course, session, level, raw_data_bucket)
-
     if not labels:  # normal feature extraction job; collects features across all buckets and upload to proc_data_bucket
         result_file = collect_session_results(job_config)
         upload_key = "{}/{}/extract/{}".format(job_config.user_id, job_config.job_id, result_file)
