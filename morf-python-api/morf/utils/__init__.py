@@ -413,7 +413,7 @@ def upload_file_to_s3(file, bucket, key, job_config=None):
     return
 
 
-def delete_s3_keys(bucket, prefix = None):
+def delete_s3_keys(job_config, prefix = None):
     """
     Delete any files in s3 bucket matching prefix.
     :param s3:
@@ -421,15 +421,16 @@ def delete_s3_keys(bucket, prefix = None):
     :param prefix:
     :return:
     """
+    bucket = job_config.proc_data_bucket
+    logger = set_logger_handlers(module_logger, job_config)
     s3 = boto3.resource('s3')
     objects_to_delete = s3.meta.client.list_objects(Bucket=bucket, Prefix=prefix)
     delete_keys = {'Objects': []}
     delete_keys['Objects'] = [{'Key': k} for k in [obj['Key'] for obj in objects_to_delete.get('Contents', [])]]
     try:
         s3.meta.client.delete_objects(Bucket=bucket, Delete=delete_keys)
-        # s3.delete_keys(keys_to_clear)
     except Exception as e:
-        print("[ERROR]: exception when cleaning S3 bucket: {}; continuing".format(e))
+        logger.warning("exception when cleaning S3 bucket: {}; continuing".format(e))
     return
 
 
@@ -444,7 +445,7 @@ def clear_s3_subdirectory(job_config, course = None, session = None):
     logger = set_logger_handlers(module_logger, job_config)
     s3_prefix = "/".join([x for x in [job_config.user_id, job_config.job_id, job_config.mode, course, session] if x is not None]) + "/"
     logger.info(" clearing previous job data at s3://{}".format(s3_prefix))
-    delete_s3_keys(job_config.proc_data_bucket, prefix = s3_prefix)
+    delete_s3_keys(job_config, prefix = s3_prefix)
     return
 
 
