@@ -23,7 +23,7 @@
 Utility functions used throughout MORF API.
 """
 
-
+import logging
 from morf.utils import *
 import tempfile
 import pandas as pd
