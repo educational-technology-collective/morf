@@ -23,6 +23,7 @@
 Functions for logging MORF activity.
 """
 
+import json
 import logging
 import os
 
@@ -65,7 +66,7 @@ def log_job_params(logger, job_config):
     logger.debug("MORF email_to {}".format(job_config.email_to))
     logger.debug("MORF docker_url {}".format(job_config.docker_url))
     logger.debug("MORF controller_url".format(job_config.controller_url))
-    logger.debug("MORF job_config.__dict__ ".format(job_config.__dict__))
+    logger.debug("MORF job_config.__dict__ ".format(json.dumps(job_config.__dict__)))
     return
 
 def initialize_logger(job_config, logger_name = "morf_api"):
