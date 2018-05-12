@@ -501,11 +501,13 @@ def compile_test_results(s3, courses, bucket, user_id, job_id, temp_dir = "./tem
     return None
 
 
-def download_model_from_s3(bucket, key, s3, dest_dir):
+def download_model_from_s3(job_config, bucket, key, dest_dir):
     """
     Download and untar a model file from S3; or print a warning message if it doesn't exist.
     :return:
     """
+    logger = set_logger_handlers(module_logger, job_config)
+    s3 = job_config.initialize_s3()
     mod_url = 's3://{}/{}'.format(bucket, key)
     logger.info(" downloading compressed model file from bucket {} key {}".format(bucket, key))
     try:
@@ -514,8 +516,7 @@ def download_model_from_s3(bucket, key, s3, dest_dir):
         tar.extractall(dest_dir)
         tar.close()
     except:
-        sys.exit(
-            "[WARNING] error downloading model file from s3; trained model(s) for this course may not exist. Skipping.")
+        logger.error("[WARNING] error downloading model file from s3; trained model(s) for this course may not exist. Skipping.")
     return
 
 
@@ -531,7 +532,6 @@ def download_models(job_config, course, dest_dir, level, session = None):
     """
     bucket = job_config.proc_data_bucket
     user_id = job_config.user_id
-    s3 = job_config.initialize_s3()
     aws_access_key_id = job_config.aws_access_key_id
     aws_secret_access_key = job_config.aws_secret_access_key
     job_id = job_config.job_id
@@ -539,7 +539,7 @@ def download_models(job_config, course, dest_dir, level, session = None):
         # just one model file
         mod_archive_file = generate_archive_filename(job_config, mode = "train")
         key = make_s3_key_path(job_config, mode = "train", filename = mod_archive_file)
-        download_model_from_s3(bucket, key, s3, dest_dir)
+        download_model_from_s3(job_config, bucket, key, dest_dir)
     elif level in ["course","session"]: # model files might be in either course- or session-level directories
         train_files = [obj.key
                        for obj in boto3.resource("s3", aws_access_key_id=aws_access_key_id,
@@ -549,7 +549,7 @@ def download_models(job_config, course, dest_dir, level, session = None):
                        and "train" in obj.key.split("/")[-1]
                        and course in obj.key.split("/")[-1]]
         for key in train_files:
-            download_model_from_s3(bucket, key, s3, dest_dir)
+            download_model_from_s3(job_config, bucket, key, dest_dir)
     else:
         print("[ERROR] the procedure for executing this job is unsupported in this version of MORF.")
         raise
