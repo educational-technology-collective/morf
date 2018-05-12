@@ -57,8 +57,6 @@ def collect_session_results(job_config, holdout = False, raw_data_dir = "morf-da
     """
     logger = set_logger_handlers(module_logger, job_config)
     mode = job_config.mode
-    user_id = job_config.user_id
-    job_id = job_config.job_id
     if not raw_data_buckets: # can utilize this parameter to override job_config buckets; used for label extraction
         raw_data_buckets = job_config.raw_data_buckets
     feat_df_list = list()
