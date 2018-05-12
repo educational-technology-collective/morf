@@ -28,7 +28,7 @@ Feature extraction functions for the MORF 2.0 API. For more information about th
 from morf.utils.alerts import send_email_alert
 from morf.utils.api_utils import *
 from morf.utils.config import MorfJobConfig
-from morf.utils.job_runner_utils import run_job, run_image
+from morf.utils.job_runner_utils import run_image
 from morf.utils.log import set_logger_handlers
 from multiprocessing import Pool
 
