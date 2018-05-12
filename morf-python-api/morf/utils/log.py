@@ -45,17 +45,34 @@ def set_logger_handlers(logger, job_config=None):
     logger.addHandler(ch)
     # if job_config, create file handler for the job which logs even debug messages
     if job_config:
-        fh = logging.FileHandler(os.path.join(job_config.logging_dir, 'spam.log')) # todo: change this to morf_id.log
+        job_log_filename = "{}.log".format(job_config.morf_id)
+        fh = logging.FileHandler(os.path.join(job_config.logging_dir, job_log_filename)) # todo: change this to morf_id.log
         fh.setLevel(logging.DEBUG)
         fh.setFormatter(formatter)
         logger.addHandler(fh)
     return logger
 
 
+def log_job_params(logger, job_config):
+    """
+    Print job params to log file for debugging
+    :param logger:
+    :param job_config:
+    :return:
+    """
+    logger.debug("MORF user_id {}".format(job_config.user_id))
+    logger.debug("MORF job_id {}".format(job_config.job_id))
+    logger.debug("MORF email_to {}".format(job_config.email_to))
+    logger.debug("MORF docker_url {}".format(job_config.docker_url))
+    logger.debug("MORF controller_url".format(job_config.controller_url))
+    logger.debug("MORF job_config.__dict__ ".format(job_config.__dict__))
+    return
+
 def initialize_logger(job_config, logger_name = "morf_api"):
     logger = logging.getLogger(logger_name)
     logger = set_logger_handlers(logger, job_config)
-    logger.info("logger initialization complete!")
+    logger.info("logger initialization complete")
+    log_job_params(logger, job_config)
     return logger
 
 
