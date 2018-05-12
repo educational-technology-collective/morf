@@ -34,7 +34,32 @@ from urllib.parse import urlparse
 module_logger = logging.getLogger(__name__)
 
 
+def execute_and_log_output(command, logger):
+    """
+    Execute command and log its output to logger.
+    :param command:
+    :param logger:
+    :return:
+    """
+    logger.info("running: " + cmd)
+    p = subprocess.Popen([command], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    stdout, stderr = p.communicate()
+    if stdout:
+        logger.info(stdout)
+    if stderr:
+        logger.error(stderr)
+    return
+
+
 def load_docker_image(dir, job_config, logger, image_name = "docker_image"):
+    """
+    Load docker_image from dir, writing output to logger.
+    :param dir: Path to directory containing image_name.
+    :param job_config: MorfJobConfig object.
+    :param logger: Logger to log output to.
+    :param image_name: base name of docker image.
+    :return: SHA256 or tag name of loaded docker image
+    """
     # load the docker image and get its key
     local_docker_file_location = os.path.join(dir, image_name)
     cmd = "{} load -i {};".format(job_config.docker_exec, local_docker_file_location)
@@ -99,12 +124,9 @@ def run_image(job_config, raw_data_bucket, course=None, session=None, level=None
         if job_config.client_args:
             for argname, argval in job_config.client_args.items():
                 cmd += " --{} {}".format(argname, argval)
-        logger.info("running: " + cmd)
-        subprocess.call(cmd, shell=True)
+        execute_and_log_output(cmd, logger)
         # cleanup
-        cmd = "{} rmi --force {}".format(docker_exec, image_uuid)
-        logger.info("running: " + cmd)
-        subprocess.call(cmd, shell=True)
+        execute_and_log_output("{} rmi --force {}".format(docker_exec, image_uuid), logger)
         # archive and write output
         archive_file = make_output_archive_file(output_dir, job_config, course = course, session = session)
         move_results_to_destination(archive_file, job_config, course = course, session = session)
