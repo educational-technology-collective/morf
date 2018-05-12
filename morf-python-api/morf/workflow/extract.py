@@ -217,29 +217,29 @@ def extract_holdout_session(labels=False, raw_data_dir="morf-data/", label_type=
     level = "session"
     job_config = MorfJobConfig(CONFIG_FILENAME)
     job_config.update_mode(mode)
+    logger = set_logger_handlers(module_logger, job_config)
     job_config.initialize_s3()
     # call job_runner once per session with --mode=extract-holdout and --level=session
     # clear any preexisting data for this user/job/mode
     clear_s3_subdirectory(job_config)
+    if multithread:
+        num_cores = job_config.max_num_cores
+    else:
+        num_cores = 1
     for raw_data_bucket in job_config.raw_data_buckets:
-        print("[INFO] processing bucket {}".format(raw_data_bucket))
+        logger.info("[INFO] processing bucket {}".format(raw_data_bucket))
         courses = fetch_courses(job_config, raw_data_bucket, raw_data_dir)
-        if multithread:
-            reslist = []
-            with Pool(job_config.max_num_cores) as pool:
-                for course in courses:
-                    holdout_run = fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course,
-                                                 fetch_holdout_session_only=True)[0]  # only use holdout run; unlisted
-                    poolres = pool.apply_async(run_job, [job_config, course, holdout_run, level, raw_data_bucket])
-                pool.close()
-                pool.join()
-            for res in reslist:
-                print(res.get())
-        else:  # do job in serial; this is useful for debugging
+        reslist = []
+        with Pool(job_config.max_num_cores) as pool:
             for course in courses:
                 holdout_run = fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course,
                                              fetch_holdout_session_only=True)[0]  # only use holdout run; unlisted
-                run_job(job_config, course, holdout_run, level, raw_data_bucket)
+                poolres = pool.apply_async(run_job, [job_config, course, holdout_run, level, raw_data_bucket])
+                reslist.append(poolres)
+            pool.close()
+            pool.join()
+        for res in reslist:
+            print(res.get())
     if not labels:  # normal feature extraction job; collects features across all buckets and upload to proc_data_bucket
         result_file = collect_session_results(job_config, holdout=True)
         upload_key = "{}/{}/{}/{}".format(job_config.user_id, job_config.job_id, job_config.mode, result_file)
