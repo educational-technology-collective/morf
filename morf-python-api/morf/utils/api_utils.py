@@ -27,6 +27,9 @@ Utility functions used throughout MORF API.
 from morf.utils import *
 import tempfile
 import pandas as pd
+from morf.utils.log import set_logger_handlers
+
+module_logger = logging.getLogger(__name__)
 
 
 def fetch_result_csv_fp(dir):
@@ -52,6 +55,7 @@ def collect_session_results(job_config, holdout = False, raw_data_dir = "morf-da
     :param holdout: flag; fetch holdout run only (boolean; default False).
     :return: path to csv.
     """
+    logger = set_logger_handlers(module_logger, job_config)
     mode = job_config.mode
     user_id = job_config.user_id
     job_id = job_config.job_id
@@ -62,7 +66,7 @@ def collect_session_results(job_config, holdout = False, raw_data_dir = "morf-da
         for course in fetch_courses(job_config, raw_data_bucket, raw_data_dir):
             for run in fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course, fetch_holdout_session_only=holdout):
                 with tempfile.TemporaryDirectory(dir=os.getcwd()) as working_dir:
-                    print("[INFO] fetching extraction results for course {} run {}".format(course, run))
+                    logger.info("[INFO] fetching extraction results for course {} run {}".format(course, run))
                     try:
                         fetch_result_file(job_config, course=course, session= run, dir = working_dir)
                         csv = fetch_result_csv_fp(working_dir)
@@ -70,8 +74,8 @@ def collect_session_results(job_config, holdout = False, raw_data_dir = "morf-da
                         feat_df['course'] = course
                         feat_df['session'] = run
                         feat_df_list.append(feat_df)
-                    except:
-                        print("[WARNING] no results found for course {} run {} mode {}".format(course, run, mode))
+                    except Exception as e:
+                        logger.warning("exception while collecting results for course {} run {} mode {}: {}".format(course, run, mode, e))
                         continue
     master_feat_df = pd.concat(feat_df_list)
     csv_fp = generate_archive_filename(job_config, extension='csv')
