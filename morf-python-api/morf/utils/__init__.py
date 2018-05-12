@@ -264,6 +264,7 @@ def download_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, 
     :param label_type: valid label type to reatin for 'label' column of MORF-provided labels.
     :return: None
     """
+    logger = set_logger_handlers(module_logger, job_config)
     s3 = job_config.initialize_s3()
     aws_access_key_id = job_config.aws_access_key_id
     aws_secret_access_key = job_config.aws_secret_access_key
