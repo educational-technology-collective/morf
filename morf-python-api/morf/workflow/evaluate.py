@@ -96,7 +96,12 @@ def fetch_binary_classification_metrics(df, course, pred_prob_col = "prob", pred
     metrics["N_n"] = df[label_col].value_counts().get(0,0)
     metrics["N_p"] = df[label_col].value_counts().get(1,0)
     cm = sklearn.metrics.confusion_matrix(y_true, y_pred)
-    spec = cm[0,0] / float(cm[0,0] + cm[1,0])
+    try:
+        spec = cm[0,0] / float(cm[0,0] + cm[1,0])
+    except Exception as e:
+        print("[ERROR] error when computing specificity from confusion matrix: {}".format(e))
+        print("confusion matrix is: {}".format(cm))
+        spec = np.nan
     metrics["specificity"] = spec
     metrics_df = pd.DataFrame(metrics, index = [course])
     return metrics_df
