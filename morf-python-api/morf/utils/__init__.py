@@ -530,6 +530,7 @@ def download_models(job_config, course, dest_dir, level, session = None):
     :param session: Session id for session-level jobs.
     :return: None
     """
+    logger = set_logger_handlers(module_logger, job_config)
     bucket = job_config.proc_data_bucket
     user_id = job_config.user_id
     aws_access_key_id = job_config.aws_access_key_id
@@ -551,7 +552,7 @@ def download_models(job_config, course, dest_dir, level, session = None):
         for key in train_files:
             download_model_from_s3(job_config, bucket, key, dest_dir)
     else:
-        print("[ERROR] the procedure for executing this job is unsupported in this version of MORF.")
+        logger.error("the procedure for executing this job is unsupported in this version of MORF.")
         raise
     return
 
