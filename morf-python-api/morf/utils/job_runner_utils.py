@@ -23,7 +23,7 @@
 Utility functions specifically for running jobs in MORF API.
 """
 
-import shutil
+import shlex
 import tempfile
 from morf.utils import *
 from morf.utils.alerts import send_success_email, send_email_alert
@@ -41,8 +41,9 @@ def execute_and_log_output(command, logger):
     :param logger:
     :return:
     """
-    logger.info("running: " + cmd)
-    p = subprocess.Popen([command], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    logger.info("running: " + command)
+    command_ary = shlex.split(command)
+    p = subprocess.Popen(command_ary, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = p.communicate()
     if stdout:
         logger.info(stdout)
