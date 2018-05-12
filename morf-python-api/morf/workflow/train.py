@@ -25,15 +25,16 @@ Training functions for the MORF 2.0 API. For more information about the API, see
 
 from morf.utils import *
 from morf.utils.api_utils import *
-from morf.utils.job_runner_utils import run_job
+from morf.utils.job_runner_utils import run_image
 from morf.utils.alerts import send_email_alert
-from morf.utils.config import get_config_properties, fetch_data_buckets_from_config, MorfJobConfig
-import boto3
+from morf.utils.config import MorfJobConfig
+from morf.utils.log import set_logger_handlers
 from multiprocessing import Pool
 
 mode = "train"
 # define module-level variables for config.properties
 CONFIG_FILENAME = "config.properties"
+module_logger = logging.getLogger(__name__)
 
 
 def train_all(label_type):
@@ -64,26 +65,27 @@ def train_course(label_type, raw_data_dir="morf-data/", multithread=True):
     level = "course"
     job_config = MorfJobConfig(CONFIG_FILENAME)
     job_config.update_mode(mode)
+    logger = set_logger_handlers(module_logger, job_config)
     check_label_type(label_type)
     # clear any preexisting data for this user/job/mode
     clear_s3_subdirectory(job_config)
+    if multithread:
+        num_cores = job_config.max_num_cores
+    else:
+        num_cores = 1
     # for each bucket, call job_runner once per course with --mode=train and --level=course
     for raw_data_bucket in job_config.raw_data_buckets:
-        print("[INFO] processing bucket {}".format(raw_data_bucket))
+        logger.info("processing bucket {}".format(raw_data_bucket))
         courses = fetch_complete_courses(job_config, raw_data_bucket, raw_data_dir)
-        if multithread:
-            reslist = []
-            with Pool(job_config.max_num_cores) as pool:
-                for course in courses:
-                    poolres = pool.apply_async(run_job, [job_config, course, None, level, raw_data_bucket, label_type])
-                    reslist.append(poolres)
-                pool.close()
-                pool.join()
-            for res in reslist:
-                print(res.get())
-        else:  # single-threaded
+        reslist = []
+        with Pool(num_cores) as pool:
             for course in courses:
-                run_job(job_config, course, None, level, raw_data_bucket, label_type)
+                poolres = pool.apply_async(run_image, [job_config, raw_data_bucket, course, None, level, label_type])
+                reslist.append(poolres)
+            pool.close()
+            pool.join()
+        for res in reslist:
+            logger.info(res.get())
     send_email_alert(job_config)
     return
 
