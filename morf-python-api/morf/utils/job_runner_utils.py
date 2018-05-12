@@ -77,8 +77,8 @@ def run_image(job_config, raw_data_bucket, course=None, session=None, level=None
         local_docker_file_location = "{}/docker_image".format(working_dir)
         cmd = "{} load -i {};".format(job_config.docker_exec, local_docker_file_location)
         logger.info("running: " + cmd)
-        output = subprocess.run(cmd, stdout=subprocess.PIPE, shell = True)
-        print(output.stdout.decode("utf-8"))
+        output = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell = True)
+        logger.info(output.stdout.decode("utf-8"))
         load_output = output.stdout.decode("utf-8")
         if "sha256:" in load_output:
             image_uuid = output.stdout.decode("utf-8").split("sha256:")[-1].strip()
