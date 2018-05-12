@@ -27,9 +27,8 @@ import shlex
 import tempfile
 from morf.utils import *
 from morf.utils.alerts import send_success_email, send_email_alert
-from morf.utils.config import get_config_properties, combine_config_files, update_config_fields_in_section, MorfJobConfig
 from morf.utils.log import set_logger_handlers
-from urllib.parse import urlparse
+
 
 module_logger = logging.getLogger(__name__)
 
