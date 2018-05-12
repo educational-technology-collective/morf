@@ -119,9 +119,6 @@ def extract_session(labels=False, raw_data_dir="morf-data/", label_type="labels-
         logger.info("processing bucket {}".format(raw_data_bucket))
         courses = fetch_courses(job_config, raw_data_bucket, raw_data_dir)
         reslist = []
-        # TODO:
-        # from multiprocessing_logging import install_mp_handler
-        # install_mp_handler(job_config.logger)
         with Pool(num_cores) as pool:
             for course in courses:
                 for session in fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course, fetch_holdout_session_only=False):
