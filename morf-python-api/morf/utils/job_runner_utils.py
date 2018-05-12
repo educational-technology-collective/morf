@@ -34,6 +34,21 @@ from urllib.parse import urlparse
 module_logger = logging.getLogger(__name__)
 
 
+def load_docker_image(dir, job_config, logger, image_name = "docker_image"):
+    # load the docker image and get its key
+    local_docker_file_location = os.path.join(dir, image_name)
+    cmd = "{} load -i {};".format(job_config.docker_exec, local_docker_file_location)
+    logger.info("running: " + cmd)
+    output = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+    logger.info(output.stdout.decode("utf-8"))
+    load_output = output.stdout.decode("utf-8")
+    if "sha256:" in load_output:
+        image_uuid = output.stdout.decode("utf-8").split("sha256:")[-1].strip()
+    else:  # image is tagged
+        image_uuid = load_output.split()[-1].strip()
+    return image_uuid
+
+
 def run_image(job_config, raw_data_bucket, course=None, session=None, level=None, label_type=None):
     """
     Run a docker image with the specified parameters.
@@ -49,7 +64,6 @@ def run_image(job_config, raw_data_bucket, course=None, session=None, level=None
     :return:
     """
     logger = set_logger_handlers(module_logger, job_config)
-    logger.info("TEST entry from job_runner_utils.run_image()")
     docker_url = job_config.docker_url
     mode = job_config.mode
     s3 = job_config.initialize_s3()
@@ -59,7 +73,7 @@ def run_image(job_config, raw_data_bucket, course=None, session=None, level=None
         try:
             fetch_file(s3, working_dir, docker_url, dest_filename="docker_image")
         except Exception as e:
-            print("[ERROR] Error downloading file {} to {}".format(docker_url, working_dir))
+            logger.error("[ERROR] Error downloading file {} to {}".format(docker_url, working_dir))
         input_dir, output_dir = initialize_input_output_dirs(working_dir)
         # fetch any data or models needed
         if "extract" in mode:  # download raw data
@@ -73,17 +87,7 @@ def run_image(job_config, raw_data_bucket, course=None, session=None, level=None
                                        input_dir=input_dir)
         if mode == "test":  # fetch models and untar
             download_models(job_config, course=course, session=session, dest_dir=input_dir, level=level)
-        # load the docker image and get its key
-        local_docker_file_location = "{}/docker_image".format(working_dir)
-        cmd = "{} load -i {};".format(job_config.docker_exec, local_docker_file_location)
-        logger.info("running: " + cmd)
-        output = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell = True)
-        logger.info(output.stdout.decode("utf-8"))
-        load_output = output.stdout.decode("utf-8")
-        if "sha256:" in load_output:
-            image_uuid = output.stdout.decode("utf-8").split("sha256:")[-1].strip()
-        else: #image is tagged
-            image_uuid = load_output.split()[-1].strip()
+        image_uuid = load_docker_image(dir=working_dir, job_config=job_config, logger=logger)
         # build docker run command and execute the image
         if mode == "extract-holdout":  # call docker image with mode == extract
             cmd = "{} run --network=\"none\" --rm=true --volume={}:/input --volume={}:/output {} --course {} --session {} --mode {}".format(
