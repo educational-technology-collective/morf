@@ -50,7 +50,7 @@ def test_all(label_type):
     check_label_type(label_type)
     # clear any preexisting data for this user/job/mode
     clear_s3_subdirectory(job_config)
-    run_job(job_config, None, None, level, raw_data_buckets=job_config.raw_data_buckets)
+    run_image(job_config, job_config.raw_data_buckets, level=level, label_type=label_type)
     # fetch archived result file and push csv result back to s3, mimicking session- and course-level workflow
     result_file = collect_all_results(job_config)
     upload_key = make_s3_key_path(job_config, filename=generate_archive_filename(job_config, extension="csv"))
