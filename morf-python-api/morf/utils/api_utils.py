@@ -23,10 +23,13 @@
 Utility functions used throughout MORF API.
 """
 
-
+import logging
 from morf.utils import *
 import tempfile
 import pandas as pd
+from morf.utils.log import set_logger_handlers
+
+module_logger = logging.getLogger(__name__)
 
 
 def fetch_result_csv_fp(dir):
@@ -52,9 +55,8 @@ def collect_session_results(job_config, holdout = False, raw_data_dir = "morf-da
     :param holdout: flag; fetch holdout run only (boolean; default False).
     :return: path to csv.
     """
+    logger = set_logger_handlers(module_logger, job_config)
     mode = job_config.mode
-    user_id = job_config.user_id
-    job_id = job_config.job_id
     if not raw_data_buckets: # can utilize this parameter to override job_config buckets; used for label extraction
         raw_data_buckets = job_config.raw_data_buckets
     feat_df_list = list()
@@ -62,7 +64,7 @@ def collect_session_results(job_config, holdout = False, raw_data_dir = "morf-da
         for course in fetch_courses(job_config, raw_data_bucket, raw_data_dir):
             for run in fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course, fetch_holdout_session_only=holdout):
                 with tempfile.TemporaryDirectory(dir=os.getcwd()) as working_dir:
-                    print("[INFO] fetching extraction results for course {} run {}".format(course, run))
+                    logger.info("[INFO] fetching extraction results for course {} run {}".format(course, run))
                     try:
                         fetch_result_file(job_config, course=course, session= run, dir = working_dir)
                         csv = fetch_result_csv_fp(working_dir)
@@ -71,7 +73,7 @@ def collect_session_results(job_config, holdout = False, raw_data_dir = "morf-da
                         feat_df['session'] = run
                         feat_df_list.append(feat_df)
                     except Exception as e:
-                        print("[WARNING] no results found for course {} run {} mode {}; the following exception occurred:".format(course, run, mode, e))
+                        logger.warning("exception while collecting session results for course {} session {} mode {}: {}".format(course, run, mode, e))
                         continue
     master_feat_df = pd.concat(feat_df_list)
     csv_fp = generate_archive_filename(job_config, extension='csv')
@@ -79,7 +81,7 @@ def collect_session_results(job_config, holdout = False, raw_data_dir = "morf-da
     return csv_fp
 
 
-def collect_course_results(job_config, raw_data_dir = "morf-data/"):
+def collect_course_results(job_config, raw_data_dir="morf-data/"):
     """
     Iterate through course-level directories in bucket, download individual files from [mode], add column for course and session, and concatenate into single 'master' csv.
     :param s3: boto3.client object with appropriate access credentials.
@@ -90,25 +92,26 @@ def collect_course_results(job_config, raw_data_dir = "morf-data/"):
     :param holdout: flag; fetch holdout run only (boolean; default False).
     :return: path to csv.
     """
-    s3 = job_config.initialize_s3()
+    logger = set_logger_handlers(module_logger, job_config)
     raw_data_buckets = job_config.raw_data_buckets
-    proc_data_bucket = job_config.proc_data_bucket
     mode = job_config.mode
-    user_id = job_config.user_id
-    job_id = job_config.job_id
     feat_df_list = list()
     for raw_data_bucket in raw_data_buckets:
         for course in fetch_complete_courses(job_config, raw_data_bucket):
+            if mode == "extract-holdout": # results are stored in session-level directories in extract-holdout mode; get this session
+                session = fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course, fetch_holdout_session_only=True)[0]
+            else:
+                session = None
             with tempfile.TemporaryDirectory(dir=os.getcwd()) as working_dir:
-                print("[INFO] fetching extraction results for course {}".format(course))
+                logger.info("fetching extraction results for course {} session {}".format(course, session))
                 try:
-                    fetch_result_file(job_config, dir=working_dir, course=course)
+                    fetch_result_file(job_config, dir=working_dir, course=course, session=session)
                     csv = fetch_result_csv_fp(working_dir)
                     feat_df = pd.read_csv(csv, dtype=object)
                     feat_df['course'] = course
                     feat_df_list.append(feat_df)
                 except Exception as e:
-                    print("[WARNING] no results found for course {} mode {}: {} ".format(course, mode, e))
+                    logger.warning("exception occurred: {} ".format(e))
                     continue
     master_feat_df = pd.concat(feat_df_list)
     csv_fp = generate_archive_filename(job_config, extension='csv')

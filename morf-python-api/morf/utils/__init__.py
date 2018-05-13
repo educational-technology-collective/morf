@@ -20,6 +20,7 @@
 # SOFTWARE.
 
 
+import logging
 import os
 import re
 import shutil
@@ -29,11 +30,16 @@ import sys
 import tarfile
 import urllib.request
 import gzip
-
 import boto3
+from botocore.exceptions import ClientError
 import pandas as pd
 from urllib.parse import urlparse
-from botocore.exceptions import ClientError
+from morf.utils.log import set_logger_handlers
+
+
+# create logger
+module_logger = logging.getLogger(__name__)
+
 
 
 def unarchive_file(src, dest):
@@ -227,10 +233,11 @@ def fetch_all_complete_courses_and_sessions(job_config, data_dir ="morf-data/", 
     return complete_courses
 
 
-def download_raw_course_data(job_config, bucket, course, session, input_dir, data_dir, course_date_file_name = "coursera_course_dates.csv"):
+def download_raw_course_data(job_config, bucket, course, session, input_dir,
+                             course_date_file_url, data_dir):
     """
     Download all raw course files for course and session into input_dir.
-    :param job_config: MorfJobConfig object
+    :param job_config: MorfJobConfig object.
     :param bucket: bucket containing raw data.
     :param course: id of course to download data for.
     :param session: id of session to download data for.
@@ -240,21 +247,22 @@ def download_raw_course_data(job_config, bucket, course, session, input_dir, dat
     :return: None
     """
     s3 = job_config.initialize_s3()
+    logger = set_logger_handlers(module_logger, job_config)
     aws_secret_access_key = job_config.aws_secret_access_key
     aws_access_key_id = job_config.aws_access_key_id
     course_date_file_url =  "s3://{}/{}/{}".format(bucket, data_dir, course_date_file_name)
     session_input_dir = os.path.join(input_dir, course, session)
     os.makedirs(session_input_dir)
-    for obj in boto3.resource("s3", aws_access_key_id=aws_access_key_id, aws_secret_access_key=aws_secret_access_key)\
+    for obj in boto3.resource("s3", aws_access_key_id=job_config.aws_access_key_id, aws_secret_access_key=job_config.aws_secret_access_key)\
             .Bucket(bucket).objects.filter(Prefix="{}/{}/{}/".format(data_dir, course, session)):
         filename = obj.key.split("/")[-1]
         filename = re.sub('[\s\(\)":!&]', "", filename)
-        filepath = "{}/{}".format(session_input_dir, filename)
+        filepath = os.path.join(session_input_dir, filename)
         try:
             with open(filepath, "wb") as resource:
                 s3.download_fileobj(bucket, obj.key, resource)
         except:
-            print("[WARNING] skipping empty object in bucket {} key {}".format(bucket, obj.key))
+            logger.warning("skipping empty object in bucket {} key {}".format(bucket, obj.key))
             continue
     dates_bucket = get_bucket_from_url(course_date_file_url)
     dates_key = get_key_from_url(course_date_file_url)
@@ -340,6 +348,7 @@ def download_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, 
     :param label_type: valid label type to reatin for 'label' column of MORF-provided labels.
     :return: None
     """
+    logger = set_logger_handlers(module_logger, job_config)
     s3 = job_config.initialize_s3()
     aws_access_key_id = job_config.aws_access_key_id
     aws_secret_access_key = job_config.aws_secret_access_key
@@ -351,7 +360,7 @@ def download_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, 
         fetch_mode = "extract"
     if mode == "test":
         fetch_mode = "extract-holdout"
-    print("[INFO] fetching {} data for course {} session {}".format(fetch_mode, course, session))
+    logger.info(" fetching {} data for course {} session {}".format(fetch_mode, course, session))
     session_input_dir = os.path.join(input_dir, course, session)
     os.makedirs(session_input_dir)
     # download features file
@@ -400,12 +409,14 @@ def initialize_raw_course_data(job_config, raw_data_bucket, level, mode,
                 if mode == "extract":
                     sessions = fetch_sessions(job_config, bucket, data_dir, course)
                     for session in sessions:
-                        fetch_raw_course_data(job_config, bucket=bucket,
+
+                        download_raw_course_data(job_config, bucket=bucket,
                                                  course=course, session=session, input_dir=input_dir,
                                                  data_dir=data_dir)
                 if mode == "extract-holdout":
                     holdout_session = fetch_sessions(job_config, bucket, data_dir, course, fetch_holdout_session_only=True)[0]
-                    fetch_raw_course_data(job_config, bucket=bucket,
+
+                    download_raw_course_data(job_config, bucket=bucket,
                                              course=course, session=holdout_session, input_dir=input_dir,
                                              data_dir=data_dir)
     elif level == "course":
@@ -413,17 +424,18 @@ def initialize_raw_course_data(job_config, raw_data_bucket, level, mode,
         if mode == "extract":
             sessions = fetch_sessions(job_config, raw_data_bucket, data_dir, course)
             for session in sessions:
-                fetch_raw_course_data(job_config, bucket=raw_data_bucket,
+
+                download_raw_course_data(job_config, bucket=raw_data_bucket,
                                          course=course, session=session, input_dir=input_dir,
                                          data_dir=data_dir)
         if mode == "extract-holdout":
             holdout_session = fetch_sessions(job_config, raw_data_bucket, data_dir, course, fetch_holdout_session_only=True)[0]
-            fetch_raw_course_data(job_config, bucket=raw_data_bucket,
+            download_raw_course_data(job_config, bucket=raw_data_bucket,
                                      course=course, session=holdout_session, input_dir=input_dir,
                                      data_dir=data_dir)
     elif level == "session":
         # download only specific session
-        fetch_raw_course_data(job_config, bucket=raw_data_bucket,
+        download_raw_course_data(job_config, bucket=raw_data_bucket,
                                  course=course, session=session, input_dir=input_dir,
                                  data_dir=data_dir)
     return
@@ -464,27 +476,29 @@ def initialize_train_test_data(job_config, raw_data_bucket, level, label_type, c
     return
 
 
-def upload_file_to_s3(file, bucket, key):
+def upload_file_to_s3(file, bucket, key, job_config=None):
     """
     Upload file to bucket + key in S3.
     :param file: name or path to file.
     :param bucket: bucket to upload to.
     :param key: key to upload to in bucket.
+    :param job_config: MorfJobConfig object; used for logging.
     :return: None
     """
+    logger = set_logger_handlers(module_logger, job_config)
     session = boto3.Session()
     s3_client = session.client("s3")
     tc = boto3.s3.transfer.TransferConfig()
     t = boto3.s3.transfer.S3Transfer(client=s3_client, config=tc)
-    print("[INFO] uploading {} to s3://{}/{}".format(file, bucket, key))
+    logger.info("uploading {} to s3://{}/{}".format(file, bucket, key))
     try:
         t.upload_file(file, bucket, key)
     except Exception as e:
-        print("[WARNING] error caching configurations: {}".format(e))
+        logger.warn("error caching configurations: {}".format(e))
     return
 
 
-def delete_s3_keys(bucket, prefix = None):
+def delete_s3_keys(job_config, prefix = None):
     """
     Delete any files in s3 bucket matching prefix.
     :param s3:
@@ -492,15 +506,16 @@ def delete_s3_keys(bucket, prefix = None):
     :param prefix:
     :return:
     """
+    bucket = job_config.proc_data_bucket
+    logger = set_logger_handlers(module_logger, job_config)
     s3 = boto3.resource('s3')
     objects_to_delete = s3.meta.client.list_objects(Bucket=bucket, Prefix=prefix)
     delete_keys = {'Objects': []}
     delete_keys['Objects'] = [{'Key': k} for k in [obj['Key'] for obj in objects_to_delete.get('Contents', [])]]
     try:
         s3.meta.client.delete_objects(Bucket=bucket, Delete=delete_keys)
-        # s3.delete_keys(keys_to_clear)
     except Exception as e:
-        print("[ERROR]: exception when cleaning S3 bucket: {}; continuing".format(e))
+        logger.warning("exception when cleaning S3 bucket: {}; continuing".format(e))
     return
 
 
@@ -512,74 +527,78 @@ def clear_s3_subdirectory(job_config, course = None, session = None):
     :param session:
     :return:
     """
+    logger = set_logger_handlers(module_logger, job_config)
     s3_prefix = "/".join([x for x in [job_config.user_id, job_config.job_id, job_config.mode, course, session] if x is not None]) + "/"
-    print("[INFO] clearing previous job data at s3://{}".format(s3_prefix))
-    delete_s3_keys(job_config.proc_data_bucket, prefix = s3_prefix)
+    logger.info(" clearing previous job data at s3://{}".format(s3_prefix))
+    delete_s3_keys(job_config, prefix = s3_prefix)
     return
 
+  
+# def compile_test_results(s3, courses, bucket, user_id, job_id, temp_dir = "./temp/"):
+#     """
+#     Aggregate model testing results from individual courses, if they exist.
+#     :param s3: boto3.client object for s3 connection.
+#     :param courses: courses to compile results for.
+#     :param bucket: get_bucket_from_url(get_config_properties()['output_data_location'])
+#     :param user_id: user id for job.
+#     :param job_id: job id for job.
+#     :param temp_dir: temporary directory location; cleaned up after course is processed
+#     :return: None
+#     """
+#     summary_df_list = []
+#     for course in courses:
+#         if not os.path.exists(temp_dir):
+#             os.makedirs(temp_dir)
+#         archive_file = "{}-{}-{}-{}.tgz".format(user_id, job_id, "test", course)
+#         key = "{}/{}/{}/{}/{}".format(user_id, job_id, "test", course, archive_file)
+#         dest = temp_dir+archive_file
+#         # download file
+#         with open(dest, "wb") as fil:
+#             # copy docker image into working directory
+#             try:
+#                 s3.download_fileobj(bucket, key, fil)
+#                 logger.info(" fetching test summary for course {}".format(course))
+#             except:
+#                 print("[WARNING] no test data found for course {}; skipping".format(course))
+#                 shutil.rmtree(temp_dir)
+#                 continue
+#         #untar file
+#         tar = tarfile.open(dest)
+#         tar.extractall(temp_dir)
+#         tar.close()
+#         # find all model summary files and read into dataframe
+#         course_summary_file = "{}{}_test_summary.csv".format(temp_dir, course)
+#         try:
+#             course_summary_df = pd.read_csv(course_summary_file)
+#             course_summary_df["course"] = course
+#             summary_df_list.append(course_summary_df)
+#         except FileNotFoundError:
+#             logger.warning("no test summary found for course {}; skipping".format(course))
+#         shutil.rmtree(temp_dir)
+#     master_summary_df = pd.concat(summary_df_list, axis = 0)
+#     master_summary_filename = "{}_{}_model_performace_summary.csv".format(user_id, job_id)
+#     master_summary_df.to_csv(master_summary_filename, index = False, header = True)
+#     upload_key = "{}/{}/test/{}".format(user_id, job_id, master_summary_filename)
+#     logger.info(" uploading results to s3://{}/{}".format(bucket, upload_key))
+#     upload_file_to_s3(master_summary_filename, bucket, upload_key)
+#     os.remove(master_summary_filename)
+#     return None
 
-def compile_test_results(s3, courses, bucket, user_id, job_id, temp_dir = "./temp/"):
-    """
-    Aggregate model testing results from individual courses, if they exist.
-    :param s3: boto3.client object for s3 connection.
-    :param courses: courses to compile results for.
-    :param bucket: get_bucket_from_url(get_config_properties()['output_data_location'])
-    :param user_id: user id for job.
-    :param job_id: job id for job.
-    :param temp_dir: temporary directory location; cleaned up after course is processed
-    :return: None
-    """
-    summary_df_list = []
-    for course in courses:
-        if not os.path.exists(temp_dir):
-            os.makedirs(temp_dir)
-        archive_file = "{}-{}-{}-{}.tgz".format(user_id, job_id, "test", course)
-        key = "{}/{}/{}/{}/{}".format(user_id, job_id, "test", course, archive_file)
-        dest = temp_dir+archive_file
-        # download file
-        with open(dest, "wb") as fil:
-            # copy docker image into working directory
-            try:
-                s3.download_fileobj(bucket, key, fil)
-                print("[INFO] fetching test summary for course {}".format(course))
-            except:
-                print("[WARNING] no test data found for course {}; skipping".format(course))
-                shutil.rmtree(temp_dir)
-                continue
-        #untar file
-        unarchive_file(dest, temp_dir)
-        # find all model summary files and read into dataframe
-        course_summary_file = "{}{}_test_summary.csv".format(temp_dir, course)
-        try:
-            course_summary_df = pd.read_csv(course_summary_file)
-            course_summary_df["course"] = course
-            summary_df_list.append(course_summary_df)
-        except FileNotFoundError:
-            print("[WARNING] no test summary found for course {}; skipping".format(course))
-        shutil.rmtree(temp_dir)
-    master_summary_df = pd.concat(summary_df_list, axis = 0)
-    master_summary_filename = "{}_{}_model_performace_summary.csv".format(user_id, job_id)
-    master_summary_df.to_csv(master_summary_filename, index = False, header = True)
-    upload_key = "{}/{}/test/{}".format(user_id, job_id, master_summary_filename)
-    print("[INFO] uploading results to s3://{}/{}".format(bucket, upload_key))
-    upload_file_to_s3(master_summary_filename, bucket, upload_key)
-    os.remove(master_summary_filename)
-    return None
 
-
-def download_model_from_s3(bucket, key, s3, dest_dir):
+def download_model_from_s3(job_config, bucket, key, dest_dir):
     """
     Download and untar a model file from S3; or print a warning message if it doesn't exist.
     :return:
     """
+    logger = set_logger_handlers(module_logger, job_config)
+    s3 = job_config.initialize_s3()
     mod_url = 's3://{}/{}'.format(bucket, key)
-    print("[INFO] downloading compressed model file from bucket {} key {}".format(bucket, key))
+    logger.info(" downloading compressed model file from bucket {} key {}".format(bucket, key))
     try:
         tar_path = initialize_tar(mod_url, s3=s3, dest_dir=dest_dir)
         unarchive_file(tar_path, dest_dir)
     except:
-        sys.exit(
-            "[WARNING] error downloading model file from s3; trained model(s) for this course may not exist. Skipping.")
+        logger.error("error downloading model file from s3; trained model(s) for this course may not exist. Skipping.")
     return
 
 
@@ -593,9 +612,9 @@ def download_models(job_config, course, dest_dir, level, session = None):
     :param session: Session id for session-level jobs.
     :return: None
     """
+    logger = set_logger_handlers(module_logger, job_config)
     bucket = job_config.proc_data_bucket
     user_id = job_config.user_id
-    s3 = job_config.initialize_s3()
     aws_access_key_id = job_config.aws_access_key_id
     aws_secret_access_key = job_config.aws_secret_access_key
     job_id = job_config.job_id
@@ -603,7 +622,7 @@ def download_models(job_config, course, dest_dir, level, session = None):
         # just one model file
         mod_archive_file = generate_archive_filename(job_config, mode = "train")
         key = make_s3_key_path(job_config, mode = "train", filename = mod_archive_file)
-        download_model_from_s3(bucket, key, s3, dest_dir)
+        download_model_from_s3(job_config, bucket, key, dest_dir)
     elif level in ["course","session"]: # model files might be in either course- or session-level directories
         train_files = [obj.key
                        for obj in boto3.resource("s3", aws_access_key_id=aws_access_key_id,
@@ -613,23 +632,25 @@ def download_models(job_config, course, dest_dir, level, session = None):
                        and "train" in obj.key.split("/")[-1]
                        and course in obj.key.split("/")[-1]]
         for key in train_files:
-            download_model_from_s3(bucket, key, s3, dest_dir)
+            download_model_from_s3(job_config, bucket, key, dest_dir)
     else:
-        print("[ERROR] the procedure for executing this job is unsupported in this version of MORF.")
+        logger.error("the procedure for executing this job is unsupported in this version of MORF.")
         raise
     return
 
 
-def fetch_file(s3, dest_dir, remote_file_url, dest_filename = None):
+def fetch_file(s3, dest_dir, remote_file_url, dest_filename = None, job_config=None):
     """
 
     :param s3: boto3.client object for s3 connection.
     :param dest_dir: directory to download file to (string).
     :param remote_file_url: url of remote file; must be either file://, s3, or http format (string).
     :param dest_filename: base name of file to use (otherwise defaults to current file name) (string).
+    :param job_config: MorfJobConfig object; used for logging.
     :return:
     """
-    print("[INFO] retrieving file {} to {}".format(remote_file_url, dest_dir))
+    logger = set_logger_handlers(module_logger, job_config)
+    logger.info("retrieving file {} to {}".format(remote_file_url, dest_dir))
     try:
         if not dest_filename:
             dest_filename = os.path.basename(remote_file_url)
@@ -643,12 +664,12 @@ def fetch_file(s3, dest_dir, remote_file_url, dest_filename = None):
         elif url.scheme == "https":
             urllib.request.urlretrieve(remote_file_url, os.path.join(dest_dir, dest_filename))
         else:
-            print(
-            "[ERROR] A URL which was not s3:// or file:// or https:// was passed in for a file location, this is not supported. {}"
+            logger.error(
+            "A URL which was not s3:// or file:// or https:// was passed in for a file location, this is not supported. {}"
                 .format(remote_file_url))
             sys.exit(-1)
     except Exception as e:
-        print("[ERROR] {} when attempting to fetch and copy file at {}".format(e, remote_file_url))
+        logger.error("{} when attempting to fetch and copy file at {}".format(e, remote_file_url))
     return
 
 
@@ -683,9 +704,10 @@ def make_output_archive_file(output_dir, job_config, course=None, session = None
     :param session: session number of course (string) (optional, only needed when mode == extract).
     :return: name of archive file (string).
     """
+    logger = set_logger_handlers(module_logger, job_config)
     archive_file = generate_archive_filename(job_config, course, session)
     # archive results; only save directory structure relative to output_dir (NOT absolute directory structure)
-    print("[INFO] archiving results to {} as {}".format(output_dir, archive_file))
+    logger.info(" archiving results to {} as {}".format(output_dir, archive_file))
     # todo: use python tarfile here
     cmd = "tar -cvf {} -C {} .".format(archive_file, output_dir)
     subprocess.call(cmd, shell = True, stdout=open(os.devnull, "wb"), stderr=open(os.devnull, "wb"))
@@ -719,9 +741,10 @@ def move_results_to_destination(archive_file, job_config, course = None, session
     :param job_config: MorfJobConfig object.
     :return: None.
     """
+    logger = set_logger_handlers(module_logger, job_config)
     bucket = job_config.proc_data_bucket
     key = make_s3_key_path(job_config, filename=archive_file, course = course, session = session)
-    print("[INFO] uploading results to bucket {} key {}".format(bucket, key))
+    logger.info(" uploading results to bucket {} key {}".format(bucket, key))
     session = boto3.Session()
     s3_client = session.client("s3")
     tc = boto3.s3.transfer.TransferConfig()
@@ -739,15 +762,19 @@ def fetch_result_file(job_config, dir, course = None, session = None):
     :param session: session number.
     :return:  None.
     """
+    logger = set_logger_handlers(module_logger, job_config)
     s3 = job_config.initialize_s3()
     bucket = job_config.proc_data_bucket
     archive_file = generate_archive_filename(job_config, course, session)
     key = make_s3_key_path(job_config, course=course, session=session,
                            filename=archive_file)
     dest = os.path.join(dir, archive_file)
-    print("[INFO] fetching s3://{}/{}".format(bucket, key))
+    logger.info("fetching s3://{}/{}".format(bucket, key))
     with open(dest, 'wb') as resource:
-        s3.download_fileobj(bucket, key, resource)
+        try:
+            s3.download_fileobj(bucket, key, resource)
+        except Exception as e:
+            logger.warning("exception while fetching results for mode {} course {} session {}:{}".format(job_config.mode, course, session, e))
     unarchive_file(dest, dir)
     os.remove(dest)
     return
@@ -787,7 +814,7 @@ def cache_job_file_in_s3(job_config, bucket = None, filename ="config.properties
     if not bucket:
         bucket = job_config.proc_data_bucket
     key = make_s3_key_path(job_config, filename = filename)
-    upload_file_to_s3(filename, bucket, key)
+    upload_file_to_s3(filename, bucket, key, job_config)
     return
 
 
@@ -800,7 +827,7 @@ def copy_s3_file(job_config, sourceloc, destloc):
     #todo: check format of urls; should be s3
     s3 = job_config.initialize_s3()
     assert get_bucket_from_url(sourceloc) == get_bucket_from_url(destloc), "can only copy files within same s3 bucket"
-    print("[INFO] copying file from {} to {}".format(sourceloc, destloc))
+    logger.info(" copying file from {} to {}".format(sourceloc, destloc))
     copy_source = {'Bucket': get_bucket_from_url(sourceloc), 'Key': get_key_from_url(sourceloc)}
     s3.copy_object(CopySource=copy_source, Bucket=get_bucket_from_url(destloc), Key=get_key_from_url(destloc))
     return
