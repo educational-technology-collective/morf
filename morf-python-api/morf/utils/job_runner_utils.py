@@ -47,11 +47,7 @@ def execute_and_log_output(command, logger):
     if stdout:
         logger.info(stdout)
     if stderr:
-        ## both warnings and errors get sent to stderr; try to separate them
-        if "warn" in stderr.lower() and "error" not in stderr.lower():
-            logger.warning(stderr)
-        else:
-            logger.error(stderr)
+        logger.error(stderr)
     return
 
 
