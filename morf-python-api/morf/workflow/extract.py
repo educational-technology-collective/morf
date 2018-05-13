@@ -173,30 +173,28 @@ def extract_holdout_course(raw_data_dir="morf-data/", multithread = True):
     level = "course"
     job_config = MorfJobConfig(CONFIG_FILENAME)
     job_config.update_mode(mode)
-    job_config.initialize_s3()
+    logger = set_logger_handlers(module_logger, job_config)
     # clear any preexisting data for this user/job/mode
     clear_s3_subdirectory(job_config)
+    if multithread:
+        num_cores = job_config.max_num_cores
+    else:
+        num_cores = 1
     # call job_runner once percourse with --mode=extract and --level=course
     for raw_data_bucket in job_config.raw_data_buckets:
-        print("[INFO] processing bucket {}".format(raw_data_bucket))
+        logger.info("processing bucket {}".format(raw_data_bucket))
         courses = fetch_courses(job_config, raw_data_bucket, raw_data_dir)
-        if multithread:
-            reslist = []
-            with Pool(job_config.max_num_cores) as pool:
-                for course in courses:
-                    holdout_session = fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course,
-                                                 fetch_holdout_session_only=True)[0]  # only use holdout run; unlisted
-                    poolres = pool.apply_async(run_job, [job_config, course, holdout_session, level, raw_data_bucket])
-                    reslist.append(poolres)
-                pool.close()
-                pool.join()
-            for res in reslist:
-                print(res.get())
-        else: # do job in serial; this is useful for debugging
+        reslist = []
+        with Pool(num_cores) as pool:
             for course in courses:
                 holdout_session = fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course,
-                                                 fetch_holdout_session_only=True)[0]  # only use holdout run; unlisted
-                run_job(job_config, course, holdout_session, level, raw_data_bucket)
+                                             fetch_holdout_session_only=True)[0]  # only use holdout run; unlisted
+                poolres = pool.apply_async(run_image, [job_config, raw_data_bucket, course, holdout_session, level, None])
+                reslist.append(poolres)
+            pool.close()
+            pool.join()
+        for res in reslist:
+            logger.info(res.get())
     result_file = collect_course_results(job_config)
     upload_key = make_s3_key_path(job_config, filename=result_file)
     upload_file_to_s3(result_file, bucket=job_config.proc_data_bucket, key=upload_key)
