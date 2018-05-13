@@ -49,7 +49,7 @@ def extract_all():
     # clear any preexisting data for this user/job/mode
     clear_s3_subdirectory(job_config)
     # only call job_runner once with --mode-extract and --level=all; this will load ALL data up and run the docker image
-    run_job(job_config, None, None, level, raw_data_buckets=job_config.raw_data_buckets)
+    run_image(job_config, job_config.raw_data_buckets)
     result_file = collect_all_results(job_config)
     upload_key = make_s3_key_path(job_config, filename=result_file)
     upload_file_to_s3(result_file, bucket=job_config.proc_data_bucket, key=upload_key)
