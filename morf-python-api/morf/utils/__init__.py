@@ -184,13 +184,11 @@ def fetch_all_complete_courses_and_sessions(job_config, data_dir ="morf-data/", 
     return complete_courses
 
 
-def download_raw_course_data(s3, aws_access_key_id, aws_secret_access_key, bucket, course, session, input_dir,
+def download_raw_course_data(job_config, bucket, course, session, input_dir,
                              course_date_file_url, data_dir):
     """
     Download all raw course files for course and session into input_dir.
-    :param s3: boto3.client object for s3 connection.
-    :param aws_access_key_id: aws_access_key_id.
-    :param aws_secret_access_key: aws_secret_access_key.
+    :param job_config: MorfJobConfig object.
     :param bucket: bucket containing raw data.
     :param course: id of course to download data for.
     :param session: id of session to download data for.
@@ -199,18 +197,20 @@ def download_raw_course_data(s3, aws_access_key_id, aws_secret_access_key, bucke
     :param data_dir: directory in bucket that contains course-level data.
     :return: None
     """
+    s3 = job_config.initialize_s3()
+    logger = set_logger_handlers(module_logger, job_config)
     session_input_dir = os.path.join(input_dir, course, session)
     os.makedirs(session_input_dir)
-    for obj in boto3.resource("s3", aws_access_key_id=aws_access_key_id, aws_secret_access_key=aws_secret_access_key)\
+    for obj in boto3.resource("s3", aws_access_key_id=job_config.aws_access_key_id, aws_secret_access_key=job_config.aws_secret_access_key)\
             .Bucket(bucket).objects.filter(Prefix="{}/{}/{}/".format(data_dir, course, session)):
         filename = obj.key.split("/")[-1]
         filename = re.sub('[\s\(\)":!&]', "", filename)
-        filepath = "{}/{}".format(session_input_dir, filename)
+        filepath = os.path.join(session_input_dir, filename)
         try:
             with open(filepath, "wb") as resource:
                 s3.download_fileobj(bucket, obj.key, resource)
         except:
-            print("[WARNING] skipping empty object in bucket {} key {}".format(bucket, obj.key))
+            logger.warning("skipping empty object in bucket {} key {}".format(bucket, obj.key))
             continue
     dates_bucket = get_bucket_from_url(course_date_file_url)
     dates_key = get_key_from_url(course_date_file_url)
@@ -314,7 +314,6 @@ def initialize_raw_course_data(job_config, raw_data_bucket, level, mode,
     :param course_date_file_name: name of csv file located at bucket/data_dir containing course start and end dates.
     :return: None
     """
-    s3 = job_config.initialize_s3()
     aws_access_key_id = job_config.aws_access_key_id
     aws_secret_access_key = job_config.aws_secret_access_key
     if level != "all": # course_date_file_url is unique across the entire job
@@ -328,12 +327,12 @@ def initialize_raw_course_data(job_config, raw_data_bucket, level, mode,
                 if mode == "extract":
                     sessions = fetch_sessions(job_config, bucket, data_dir, course)
                     for session in sessions:
-                        download_raw_course_data(s3, aws_access_key_id, aws_secret_access_key, bucket=bucket,
+                        download_raw_course_data(job_config, bucket=bucket,
                                                  course=course, session=session, input_dir=input_dir,
                                                  course_date_file_url=course_date_file_url, data_dir=data_dir)
                 if mode == "extract-holdout":
                     holdout_session = fetch_sessions(job_config, bucket, data_dir, course, fetch_holdout_session_only=True)[0]
-                    download_raw_course_data(s3, aws_access_key_id, aws_secret_access_key, bucket=bucket,
+                    download_raw_course_data(job_config, bucket=bucket,
                                              course=course, session=holdout_session, input_dir=input_dir,
                                              course_date_file_url=course_date_file_url, data_dir=data_dir)
     elif level == "course":
@@ -341,17 +340,17 @@ def initialize_raw_course_data(job_config, raw_data_bucket, level, mode,
         if mode == "extract":
             sessions = fetch_sessions(job_config, raw_data_bucket, data_dir, course)
             for session in sessions:
-                download_raw_course_data(s3, aws_access_key_id, aws_secret_access_key, bucket=raw_data_bucket,
+                download_raw_course_data(job_config, bucket=raw_data_bucket,
                                          course=course, session=session, input_dir=input_dir,
                                          course_date_file_url=course_date_file_url, data_dir=data_dir)
         if mode == "extract-holdout":
             holdout_session = fetch_sessions(job_config, raw_data_bucket, data_dir, course, fetch_holdout_session_only=True)[0]
-            download_raw_course_data(s3, aws_access_key_id, aws_secret_access_key, bucket=raw_data_bucket,
+            download_raw_course_data(job_config, bucket=raw_data_bucket,
                                      course=course, session=holdout_session, input_dir=input_dir,
                                      course_date_file_url=course_date_file_url, data_dir=data_dir)
     elif level == "session":
         # download only specific session
-        download_raw_course_data(s3, aws_access_key_id, aws_secret_access_key, bucket=raw_data_bucket,
+        download_raw_course_data(job_config, bucket=raw_data_bucket,
                                  course=course, session=session, input_dir=input_dir,
                                  course_date_file_url=course_date_file_url, data_dir=data_dir)
     return
@@ -687,9 +686,12 @@ def fetch_result_file(job_config, dir, course = None, session = None):
     key = make_s3_key_path(job_config, course=course, session=session,
                            filename=archive_file)
     dest = os.path.join(dir, archive_file)
-    logger.info(" fetching s3://{}/{}".format(bucket, key))
+    logger.info("fetching s3://{}/{}".format(bucket, key))
     with open(dest, 'wb') as resource:
-        s3.download_fileobj(bucket, key, resource)
+        try:
+            s3.download_fileobj(bucket, key, resource)
+        except Exception as e:
+            logger.warning("exception while fetching results for mode {} course {} session {}:{}".format(job_config.mode, course, session, e))
     tar = tarfile.open(dest)
     tar.extractall(dir)
     tar.close()
