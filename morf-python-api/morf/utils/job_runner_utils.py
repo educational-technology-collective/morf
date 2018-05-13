@@ -27,6 +27,9 @@ import shlex
 import tempfile
 from morf.utils import *
 from morf.utils.alerts import send_success_email, send_email_alert
+from morf.utils.caching import update_morf_job_cache
+from urllib.parse import urlparse
+import os
 from morf.utils.log import set_logger_handlers
 
 
@@ -180,6 +183,8 @@ def run_morf_job(job_config, no_cache = False):
         shutil.copy(combined_config_filename, working_dir)
         os.chdir(working_dir)
         # from job_config, fetch and download the following: docker image, controller script, cached config file
+        update_morf_job_cache(job_config)
+        # from client.config, fetch and download the following: docker image, controller script
         try:
             fetch_file(s3, working_dir, job_config.docker_url, dest_filename=docker_image_name, job_config=job_config)
             fetch_file(s3, working_dir, job_config.controller_url, dest_filename=controller_script_name, job_config=job_config)
