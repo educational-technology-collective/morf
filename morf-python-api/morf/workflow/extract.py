@@ -67,25 +67,26 @@ def extract_course(raw_data_dir="morf-data/", multithread = True):
     level = "course"
     job_config = MorfJobConfig(CONFIG_FILENAME)
     job_config.update_mode(mode)
+    logger = set_logger_handlers(module_logger, job_config)
     # clear any preexisting data for this user/job/mode
     clear_s3_subdirectory(job_config)
+    if multithread:
+        num_cores = job_config.max_num_cores
+    else:
+        num_cores = 1
     # call job_runner once percourse with --mode=extract and --level=course
     for raw_data_bucket in job_config.raw_data_buckets:
-        print("[INFO] processing bucket {}".format(raw_data_bucket))
+        logger.info("processing bucket {}".format(raw_data_bucket))
         courses = fetch_courses(job_config, raw_data_bucket, raw_data_dir)
-        if multithread:
-            reslist = []
-            with Pool(job_config.max_num_cores) as pool:
-                for course in courses:
-                    poolres = pool.apply_async(run_job, [job_config, course, None, level, raw_data_bucket])
-                    reslist.append(poolres)
-                pool.close()
-                pool.join()
-            for res in reslist:
-                print(res.get())
-        else: # do job in serial; this is useful for debugging
+        reslist = []
+        with Pool(num_cores) as pool:
             for course in courses:
-                run_job(job_config, course, None, level, raw_data_bucket)
+                poolres = pool.apply_async(run_image, [job_config, raw_data_bucket, course, None, level, None])
+                reslist.append(poolres)
+            pool.close()
+            pool.join()
+        for res in reslist:
+            logger.info(res.get())
     result_file = collect_course_results(job_config)
     upload_key = make_s3_key_path(job_config, filename=result_file)
     upload_file_to_s3(result_file, bucket=job_config.proc_data_bucket, key=upload_key)
