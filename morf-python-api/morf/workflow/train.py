@@ -49,7 +49,7 @@ def train_all(label_type):
     check_label_type(label_type)
     # clear any preexisting data for this user/job/mode
     clear_s3_subdirectory(job_config)
-    run_job(job_config, course=None, session=None, level=level, label_type=label_type)
+    run_image(job_config, raw_data_bucket=job_config.raw_data_buckets, level=level, label_type=label_type)
     send_email_alert(job_config)
     return
 
