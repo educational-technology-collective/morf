@@ -81,7 +81,7 @@ def collect_session_results(job_config, holdout = False, raw_data_dir = "morf-da
     return csv_fp
 
 
-def collect_course_results(job_config, raw_data_dir = "morf-data/"):
+def collect_course_results(job_config, raw_data_dir="morf-data/"):
     """
     Iterate through course-level directories in bucket, download individual files from [mode], add column for course and session, and concatenate into single 'master' csv.
     :param s3: boto3.client object with appropriate access credentials.
@@ -92,21 +92,26 @@ def collect_course_results(job_config, raw_data_dir = "morf-data/"):
     :param holdout: flag; fetch holdout run only (boolean; default False).
     :return: path to csv.
     """
+    logger = set_logger_handlers(module_logger, job_config)
     raw_data_buckets = job_config.raw_data_buckets
     mode = job_config.mode
     feat_df_list = list()
     for raw_data_bucket in raw_data_buckets:
         for course in fetch_complete_courses(job_config, raw_data_bucket):
+            if mode == "extract-holdout": # results are stored in session-level directories in extract-holdout mode; get this session
+                session = fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course, fetch_holdout_session_only=True)[0]
+            else:
+                session = None
             with tempfile.TemporaryDirectory(dir=os.getcwd()) as working_dir:
-                print("[INFO] fetching extraction results for course {}".format(course))
+                logger.info("fetching extraction results for course {} session {}".format(course, session))
                 try:
-                    fetch_result_file(job_config, dir=working_dir, course=course)
+                    fetch_result_file(job_config, dir=working_dir, course=course, session=session)
                     csv = fetch_result_csv_fp(working_dir)
                     feat_df = pd.read_csv(csv, dtype=object)
                     feat_df['course'] = course
                     feat_df_list.append(feat_df)
                 except Exception as e:
-                    print("[WARNING] no results found for course {} mode {}: {} ".format(course, mode, e))
+                    logger.warning("exception occurred: {} ".format(e))
                     continue
     master_feat_df = pd.concat(feat_df_list)
     csv_fp = generate_archive_filename(job_config, extension='csv')
