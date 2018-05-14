@@ -24,16 +24,17 @@
 Feature extraction functions for the MORF 2.0 API. For more information about the API, see the documentation.
 """
 
-from morf.utils.job_runner_utils import run_job
-from morf.utils import make_s3_key_path, generate_archive_filename, copy_s3_file
-from morf.utils.api_utils import *
-from morf.utils.config import get_config_properties, fetch_data_buckets_from_config, MorfJobConfig
+
 from morf.utils.alerts import send_email_alert
-import boto3
+from morf.utils.api_utils import *
+from morf.utils.config import MorfJobConfig
+from morf.utils.job_runner_utils import run_image
+from morf.utils.log import set_logger_handlers
 from multiprocessing import Pool
 
 # define module-level variables for config.properties
 CONFIG_FILENAME = "config.properties"
+module_logger = logging.getLogger(__name__)
 
 
 def extract_all():
@@ -48,7 +49,7 @@ def extract_all():
     # clear any preexisting data for this user/job/mode
     clear_s3_subdirectory(job_config)
     # only call job_runner once with --mode-extract and --level=all; this will load ALL data up and run the docker image
-    run_job(job_config, None, None, level, raw_data_buckets=job_config.raw_data_buckets)
+    run_image(job_config, job_config.raw_data_buckets, level=level)
     result_file = collect_all_results(job_config)
     upload_key = make_s3_key_path(job_config, filename=result_file)
     upload_file_to_s3(result_file, bucket=job_config.proc_data_bucket, key=upload_key)
@@ -66,25 +67,26 @@ def extract_course(raw_data_dir="morf-data/", multithread = True):
     level = "course"
     job_config = MorfJobConfig(CONFIG_FILENAME)
     job_config.update_mode(mode)
+    logger = set_logger_handlers(module_logger, job_config)
     # clear any preexisting data for this user/job/mode
     clear_s3_subdirectory(job_config)
+    if multithread:
+        num_cores = job_config.max_num_cores
+    else:
+        num_cores = 1
     # call job_runner once percourse with --mode=extract and --level=course
     for raw_data_bucket in job_config.raw_data_buckets:
-        print("[INFO] processing bucket {}".format(raw_data_bucket))
+        logger.info("processing bucket {}".format(raw_data_bucket))
         courses = fetch_courses(job_config, raw_data_bucket, raw_data_dir)
-        if multithread:
-            reslist = []
-            with Pool(job_config.max_num_cores) as pool:
-                for course in courses:
-                    poolres = pool.apply_async(run_job, [job_config, course, None, level, raw_data_bucket])
-                    reslist.append(poolres)
-                pool.close()
-                pool.join()
-            for res in reslist:
-                print(res.get())
-        else: # do job in serial; this is useful for debugging
+        reslist = []
+        with Pool(num_cores) as pool:
             for course in courses:
-                run_job(job_config, course, None, level, raw_data_bucket)
+                poolres = pool.apply_async(run_image, [job_config, raw_data_bucket, course, None, level, None])
+                reslist.append(poolres)
+            pool.close()
+            pool.join()
+        for res in reslist:
+            logger.info(res.get())
     result_file = collect_course_results(job_config)
     upload_key = make_s3_key_path(job_config, filename=result_file)
     upload_file_to_s3(result_file, bucket=job_config.proc_data_bucket, key=upload_key)
@@ -106,29 +108,27 @@ def extract_session(labels=False, raw_data_dir="morf-data/", label_type="labels-
     mode = "extract"
     job_config = MorfJobConfig(CONFIG_FILENAME)
     job_config.update_mode(mode)
-    # # clear any preexisting data for this user/job/mode
+    logger = set_logger_handlers(module_logger, job_config)
+    # # clear any preexisting data for this user/job/mode and set number of cores
     clear_s3_subdirectory(job_config)
+    if multithread:
+        num_cores = job_config.max_num_cores
+    else:
+        num_cores = 1
     ## for each bucket, call job_runner once per session with --mode=extract and --level=session
     for raw_data_bucket in job_config.raw_data_buckets:
-        print("[INFO] processing bucket {}".format(raw_data_bucket))
+        logger.info("processing bucket {}".format(raw_data_bucket))
         courses = fetch_courses(job_config, raw_data_bucket, raw_data_dir)
-        if multithread:
-            reslist = []
-            with Pool(job_config.max_num_cores) as pool:
-                for course in courses:
-                    for session in fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course,
-                                                  fetch_holdout_session_only=False):
-                        poolres = pool.apply_async(run_job, [job_config, course, session, level, raw_data_bucket])
-                        reslist.append(poolres)
-                pool.close()
-                pool.join()
-            for res in reslist:
-                print(res.get())
-        else:  # do job in serial; this is useful for debugging
+        reslist = []
+        with Pool(num_cores) as pool:
             for course in courses:
-                for session in fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course,
-                                              fetch_holdout_session_only=False):
-                    run_job(job_config, course, session, level, raw_data_bucket)
+                for session in fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course, fetch_holdout_session_only=False):
+                    poolres = pool.apply_async(run_image, [job_config, raw_data_bucket, course, session, level])
+                    reslist.append(poolres)
+            pool.close()
+            pool.join()
+        for res in reslist:
+            logger.info(res.get())
     if not labels:  # normal feature extraction job; collects features across all buckets and upload to proc_data_bucket
         result_file = collect_session_results(job_config)
         upload_key = "{}/{}/extract/{}".format(job_config.user_id, job_config.job_id, result_file)
@@ -155,7 +155,7 @@ def extract_holdout_all():
     # clear any preexisting data for this user/job/mode
     clear_s3_subdirectory(job_config)
     # only call job_runner once with --mode-extract and --level=all; this will load ALL data up and run the docker image
-    run_job(job_config, None, None, level, raw_data_buckets=job_config.raw_data_buckets)
+    run_image(job_config, job_config.raw_data_buckets, level=level)
     result_file = collect_all_results(job_config)
     upload_key = make_s3_key_path(job_config, filename=result_file)
     upload_file_to_s3(result_file, bucket=job_config.proc_data_bucket, key=upload_key)
@@ -173,30 +173,28 @@ def extract_holdout_course(raw_data_dir="morf-data/", multithread = True):
     level = "course"
     job_config = MorfJobConfig(CONFIG_FILENAME)
     job_config.update_mode(mode)
-    job_config.initialize_s3()
+    logger = set_logger_handlers(module_logger, job_config)
     # clear any preexisting data for this user/job/mode
     clear_s3_subdirectory(job_config)
+    if multithread:
+        num_cores = job_config.max_num_cores
+    else:
+        num_cores = 1
     # call job_runner once percourse with --mode=extract and --level=course
     for raw_data_bucket in job_config.raw_data_buckets:
-        print("[INFO] processing bucket {}".format(raw_data_bucket))
+        logger.info("processing bucket {}".format(raw_data_bucket))
         courses = fetch_courses(job_config, raw_data_bucket, raw_data_dir)
-        if multithread:
-            reslist = []
-            with Pool(job_config.max_num_cores) as pool:
-                for course in courses:
-                    holdout_session = fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course,
-                                                 fetch_holdout_session_only=True)[0]  # only use holdout run; unlisted
-                    poolres = pool.apply_async(run_job, [job_config, course, holdout_session, level, raw_data_bucket])
-                    reslist.append(poolres)
-                pool.close()
-                pool.join()
-            for res in reslist:
-                print(res.get())
-        else: # do job in serial; this is useful for debugging
+        reslist = []
+        with Pool(num_cores) as pool:
             for course in courses:
                 holdout_session = fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course,
-                                                 fetch_holdout_session_only=True)[0]  # only use holdout run; unlisted
-                run_job(job_config, course, holdout_session, level, raw_data_bucket)
+                                             fetch_holdout_session_only=True)[0]  # only use holdout run; unlisted
+                poolres = pool.apply_async(run_image, [job_config, raw_data_bucket, course, holdout_session, level, None])
+                reslist.append(poolres)
+            pool.close()
+            pool.join()
+        for res in reslist:
+            logger.info(res.get())
     result_file = collect_course_results(job_config)
     upload_key = make_s3_key_path(job_config, filename=result_file)
     upload_file_to_s3(result_file, bucket=job_config.proc_data_bucket, key=upload_key)
@@ -215,29 +213,28 @@ def extract_holdout_session(labels=False, raw_data_dir="morf-data/", label_type=
     level = "session"
     job_config = MorfJobConfig(CONFIG_FILENAME)
     job_config.update_mode(mode)
-    job_config.initialize_s3()
+    logger = set_logger_handlers(module_logger, job_config)
     # call job_runner once per session with --mode=extract-holdout and --level=session
     # clear any preexisting data for this user/job/mode
     clear_s3_subdirectory(job_config)
+    if multithread:
+        num_cores = job_config.max_num_cores
+    else:
+        num_cores = 1
     for raw_data_bucket in job_config.raw_data_buckets:
-        print("[INFO] processing bucket {}".format(raw_data_bucket))
+        logger.info("[INFO] processing bucket {}".format(raw_data_bucket))
         courses = fetch_courses(job_config, raw_data_bucket, raw_data_dir)
-        if multithread:
-            reslist = []
-            with Pool(job_config.max_num_cores) as pool:
-                for course in courses:
-                    holdout_run = fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course,
-                                                 fetch_holdout_session_only=True)[0]  # only use holdout run; unlisted
-                    poolres = pool.apply_async(run_job, [job_config, course, holdout_run, level, raw_data_bucket])
-                pool.close()
-                pool.join()
-            for res in reslist:
-                print(res.get())
-        else:  # do job in serial; this is useful for debugging
+        reslist = []
+        with Pool(num_cores) as pool:
             for course in courses:
-                holdout_run = fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course,
+                holdout_session = fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course,
                                              fetch_holdout_session_only=True)[0]  # only use holdout run; unlisted
-                run_job(job_config, course, holdout_run, level, raw_data_bucket)
+                poolres = pool.apply_async(run_image, [job_config, raw_data_bucket, course, holdout_session, level])
+                reslist.append(poolres)
+            pool.close()
+            pool.join()
+        for res in reslist:
+            logger.info(res.get())
     if not labels:  # normal feature extraction job; collects features across all buckets and upload to proc_data_bucket
         result_file = collect_session_results(job_config, holdout=True)
         upload_key = "{}/{}/{}/{}".format(job_config.user_id, job_config.job_id, job_config.mode, result_file)
