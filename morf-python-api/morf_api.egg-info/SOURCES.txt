@@ -5,8 +5,10 @@ morf/__init__.py
 morf/utils/__init__.py
 morf/utils/alerts.py
 morf/utils/api_utils.py
+morf/utils/caching.py
 morf/utils/config.py
 morf/utils/job_runner_utils.py
+morf/utils/log.py
 morf/utils/security.py
 morf/workflow/__init__.py
 morf/workflow/evaluate.py
