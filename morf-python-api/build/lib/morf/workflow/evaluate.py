@@ -27,8 +27,8 @@ Evaluation utility functions for the MORF 2.0 API. For more information about th
 from morf.utils import *
 from morf.utils.api_utils import *
 from morf.utils.security import hash_df_column
-from morf.utils.config import get_config_properties, fetch_data_buckets_from_config, MorfJobConfig
-from morf.utils.alerts import send_email_alert
+from morf.utils.config import MorfJobConfig
+from morf.utils.log import set_logger_handlers
 import tempfile
 import pandas as pd
 import numpy as np
@@ -37,6 +37,7 @@ import sklearn.metrics
 mode = "evaluate"
 # define module-level variables for config.properties
 CONFIG_FILENAME = "config.properties"
+module_logger = logging.getLogger(__name__)
 
 
 def check_dataframe_complete(df, job_config, columns):
@@ -46,33 +47,34 @@ def check_dataframe_complete(df, job_config, columns):
     :param columns: columns to check for NaN values.
     :return:
     """
-    print("[INFO] checking predictions")
+    logger = set_logger_handlers(module_logger, job_config)
+    logger.info("[INFO] checking predictions")
     # filter to only include complete courses
     courses = [x[0] for x in fetch_all_complete_courses_and_sessions(job_config)]
     df_to_check = df[df.course.isin(courses)]
-    import ipdb;ipdb.set_trace()
     null_counts = df_to_check[columns].apply(lambda x: sum(x.isnull()), axis=0)
     if null_counts.sum() > 0:
-        msg = "[ERROR] Null values detected in the following columns: {} \n Did you include predicted probabilities and labels for all users?".format(null_counts.loc[null_counts > 0].index.tolist())
+        logger.error("Null values detected in the following columns: {} \n Did you include predicted probabilities and labels for all users?".format(null_counts.loc[null_counts > 0].index.tolist()))
         missing_courses = df_to_check[df_to_check.prob.isnull()]['course'].unique()
-        print(msg)
-        print("[ERROR] missing values detected in these courses: {}".format(missing_courses))
+        logger.error("missing values detected in these courses: {}".format(missing_courses))
         raise
     else:
         return
 
 
-def fetch_binary_classification_metrics(df, course, pred_prob_col = "prob", pred_col = "pred", 
+def fetch_binary_classification_metrics(job_config, df, course, pred_prob_col = "prob", pred_col = "pred",
                                         label_col = "label_value", course_col = "course"):
     """
     Fetch set of binary classification metrics for df.
+    :param job_config: MorfJobConfig object.
     :param df: pd.DataFrame of predictions; must include columns with names matching pred_prob_col, pred_col, and label_col.
     :param pred_prob_col: column of predicted probability of a positive class label. Should be in interval [0,1].
     :param pred_col: column of predicted class label. Should be in {0, 1}.
     :param label_col: column of true class label. Should be in {0, 1}
     :return: pd.DataFrame with dimension [1 x n_metrics].
     """
-    print("[INFO] fetching metrics for course {}".format(course))
+    logger = set_logger_handlers(module_logger, job_config)
+    logger.info("fetching metrics for course {}".format(course))
     df = df[df[course_col] == course]
     metrics = {}
     y_pred = df[pred_col].values.astype(float)
@@ -86,7 +88,7 @@ def fetch_binary_classification_metrics(df, course, pred_prob_col = "prob", pred
         metrics["recall"] = sklearn.metrics.recall_score(y_true, y_pred)  # true positive rate, sensitivity
         metrics["f1_score"] = sklearn.metrics.f1_score(y_true, y_pred)
     except ValueError:
-        print("[WARNING]Only one class present in y_true for course {}. ROC AUC score, log_loss, precision, recall, F1 are undefined.".format(course))
+        logger.warning("Only one class present in y_true for course {}. ROC AUC score, log_loss, precision, recall, F1 are undefined.".format(course))
         metrics["auc"] = np.nan
         metrics["log_loss"] = np.nan
         metrics["precision"] = np.nan
@@ -97,7 +99,12 @@ def fetch_binary_classification_metrics(df, course, pred_prob_col = "prob", pred
     metrics["N_n"] = df[label_col].value_counts().get(0,0)
     metrics["N_p"] = df[label_col].value_counts().get(1,0)
     cm = sklearn.metrics.confusion_matrix(y_true, y_pred)
-    spec = cm[0,0] / float(cm[0,0] + cm[1,0])
+    try:
+        spec = cm[0,0] / float(cm[0,0] + cm[1,0])
+    except Exception as e:
+        print("[ERROR] error when computing specificity from confusion matrix: {}".format(e))
+        print("confusion matrix is: {}".format(cm))
+        spec = np.nan
     metrics["specificity"] = spec
     metrics_df = pd.DataFrame(metrics, index = [course])
     return metrics_df
@@ -149,7 +156,7 @@ def evaluate_course(label_type, label_col = "label_type", raw_data_dir = "morf-d
             pred_lab_df = pd.merge(lab_df, pred_df, how = "left", on = [user_col, course_col])
             check_dataframe_complete(pred_lab_df, job_config, columns = pred_cols)
             for course in fetch_complete_courses(job_config, data_bucket = raw_data_bucket, data_dir = raw_data_dir, n_train=1):
-                course_metrics_df = fetch_binary_classification_metrics(pred_lab_df, course)
+                course_metrics_df = fetch_binary_classification_metrics(job_config, pred_lab_df, course)
                 course_data.append(course_metrics_df)
     master_metrics_df = pd.concat(course_data).reset_index().rename(columns={"index": course_col})
     csv_fp = generate_archive_filename(job_config, extension="csv")

@@ -47,7 +47,7 @@ def set_logger_handlers(logger, job_config=None):
     # if job_config, create file handler for the job which logs even debug messages
     if job_config:
         job_log_filename = "{}.log".format(job_config.morf_id)
-        fh = logging.FileHandler(os.path.join(job_config.logging_dir, job_log_filename))
+        fh = logging.FileHandler(os.path.join(job_config.logging_dir, job_log_filename)) # todo: change this to morf_id.log
         fh.setLevel(logging.DEBUG)
         fh.setFormatter(formatter)
         logger.addHandler(fh)
@@ -69,14 +69,7 @@ def log_job_params(logger, job_config):
     logger.debug("MORF job_config.__dict__ ".format(json.dumps(job_config.__dict__)))
     return
 
-
 def initialize_logger(job_config, logger_name = "morf_api"):
-    """
-    Initialize the logger for a MORF job.
-    :param job_config: MorfJobConfig object.
-    :param logger_name: name of logger to use.
-    :return: open coneection to logger object
-    """
     logger = logging.getLogger(logger_name)
     logger = set_logger_handlers(logger, job_config)
     logger.info("logger initialization complete")

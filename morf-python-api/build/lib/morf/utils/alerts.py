@@ -22,12 +22,16 @@
 """
 Functions for sending alerts to users/owners/developers based on MORF jobs and usage.
 """
-from morf.utils import download_from_s3, generate_archive_filename, make_s3_key_path
 import boto3
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 import io
+import logging
+from morf.utils import download_from_s3, generate_archive_filename, make_s3_key_path
+from morf.utils.log import set_logger_handlers
+
+module_logger = logging.getLogger(__name__)
 
 
 def construct_message_body(job_config, docs_url = "https://jpgard.github.io/morf/",
