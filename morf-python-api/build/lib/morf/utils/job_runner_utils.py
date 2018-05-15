@@ -104,7 +104,7 @@ def run_image(job_config, raw_data_bucket, course=None, session=None, level=None
             logger.error("[ERROR] Error downloading file {} to {}".format(docker_url, working_dir))
         input_dir, output_dir = initialize_input_output_dirs(working_dir)
         # fetch any data or models needed
-        if "extract" in mode:  # get raw data from cache or download if necessary
+        if "extract" in mode:  # download raw data
             initialize_raw_course_data(job_config,
                                        raw_data_bucket=raw_data_bucket, mode=mode, course=course,
                                        session=session, level=level, input_dir=input_dir)
