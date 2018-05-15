@@ -527,7 +527,7 @@ def clear_s3_subdirectory(job_config, course = None, session = None):
     :return:
     """
     logger = set_logger_handlers(module_logger, job_config)
-    s3_prefix = "/".join([x for x in [job_config.user_id, job_config.job_id, job_config.mode, course, session] if x is not None]) + "/"
+    s3_prefix = "/".join([x for x in [job_config.proc_data_bucket, job_config.user_id, job_config.job_id, job_config.mode, course, session] if x is not None]) + "/"
     logger.info(" clearing previous job data at s3://{}".format(s3_prefix))
     delete_s3_keys(job_config, prefix = s3_prefix)
     return
