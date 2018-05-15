@@ -233,8 +233,7 @@ def fetch_all_complete_courses_and_sessions(job_config, data_dir ="morf-data/", 
     return complete_courses
 
 
-def download_raw_course_data(job_config, bucket, course, session, input_dir,
-                             course_date_file_url, data_dir):
+def download_raw_course_data(job_config, bucket, course, session, input_dir, data_dir, course_date_file_name = "coursera_course_dates.csv"):
     """
     Download all raw course files for course and session into input_dir.
     :param job_config: MorfJobConfig object.
@@ -242,8 +241,8 @@ def download_raw_course_data(job_config, bucket, course, session, input_dir,
     :param course: id of course to download data for.
     :param session: id of session to download data for.
     :param input_dir: input directory.
-    :param course_date_file_url: url of course date file.
     :param data_dir: directory in bucket that contains course-level data.
+    :param course_date_file_name: name of csv file in bucket which contains course start/end dates.
     :return: None
     """
     s3 = job_config.initialize_s3()
