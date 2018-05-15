@@ -247,8 +247,6 @@ def download_raw_course_data(job_config, bucket, course, session, input_dir, dat
     """
     s3 = job_config.initialize_s3()
     logger = set_logger_handlers(module_logger, job_config)
-    aws_secret_access_key = job_config.aws_secret_access_key
-    aws_access_key_id = job_config.aws_access_key_id
     course_date_file_url =  "s3://{}/{}/{}".format(bucket, data_dir, course_date_file_name)
     session_input_dir = os.path.join(input_dir, course, session)
     os.makedirs(session_input_dir)
