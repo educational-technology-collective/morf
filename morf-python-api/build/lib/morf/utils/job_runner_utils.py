@@ -104,7 +104,7 @@ def run_image(job_config, raw_data_bucket, course=None, session=None, level=None
             logger.error("[ERROR] Error downloading file {} to {}".format(docker_url, working_dir))
         input_dir, output_dir = initialize_input_output_dirs(working_dir)
         # fetch any data or models needed
-        if "extract" in mode:  # download raw data
+        if "extract" in mode:  # get raw data from cache or download if necessary
             initialize_raw_course_data(job_config,
                                        raw_data_bucket=raw_data_bucket, mode=mode, course=course,
                                        session=session, level=level, input_dir=input_dir)
@@ -134,34 +134,6 @@ def run_image(job_config, raw_data_bucket, course=None, session=None, level=None
         archive_file = make_output_archive_file(output_dir, job_config, course = course, session = session)
         move_results_to_destination(archive_file, job_config, course = course, session = session)
     return
-
-
-# def run_job(job_config, course, session, level, raw_data_bucket=None, label_type=None, raw_data_buckets=None):
-#     """
-#     Call job runner with correct parameters.
-#     :param job_config: MorfJobConfig object.
-#     :param course: course id (string); set as None if level == all.
-#     :param session: session number (string); set as none if level != session.
-#     :param level: one of {session, course, all}
-#     :param raw_data_bucket: name of bucket containing raw data.
-#     :param label_type: user-specified label type.
-#     :param raw_data_buckets: list of buckets (for use with level == all)
-#     :return: result of call to subprocess.call().
-#     """
-#     logger = set_logger_handlers(module_logger, job_config)
-#     logger.info("test from job_runner_utils.run_job!")
-#     if not raw_data_buckets:
-#         raw_data_buckets = job_config.raw_data_buckets
-#     logger.info("running docker image {} user_id {} job_id {} course {} session {} mode {}"
-#           .format(job_config.docker_url, job_config.user_id, job_config.job_id, course, session, job_config.mode))
-#     if level == "all":
-#         run_image(job_config, raw_data_bucket=raw_data_buckets, level=level,
-#                   label_type=label_type)
-#     elif level == "course":
-#         run_image(job_config, raw_data_bucket, course=course, level=level, label_type=label_type)
-#     elif level == "session":
-#         run_image(job_config, raw_data_bucket, course=course, session=session, level=level, label_type=label_type)
-#     return None
 
 
 def run_morf_job(job_config, no_cache = False):

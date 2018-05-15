@@ -268,7 +268,7 @@ def download_raw_course_data(job_config, bucket, course, session, input_dir, dat
     return
 
 
-def fetch_raw_course_data(job_config, bucket, course, session, input_dir, data_dir):
+def fetch_raw_course_data(job_config, bucket, course, session, input_dir, data_dir ="morf-data/"):
     """
     Fetch raw course data from job_config.cache_dir, if exists; otherwise fetch from s3.
     :param job_config: MorfJobConfig object
@@ -279,17 +279,18 @@ def fetch_raw_course_data(job_config, bucket, course, session, input_dir, data_d
     :param data_dir: directory in bucket that contains course-level data.
     :return: None
     """
+    logger = set_logger_handlers(module_logger, job_config)
     course_date_file = "coursera_course_dates.csv"
+    course_session_cache_dir = os.path.join(job_config.cache_dir, bucket, data_dir, course, session)
+    session_input_dir = os.path.join(input_dir, course, session)
     if job_config.cache_dir:
         try:
-            course_session_cache_dir = os.path.join(job_config.cache_dir, bucket, data_dir, course, session)
-            session_input_dir = os.path.join(input_dir, course, session)
-            print("[INFO] copying data from cached location {} to {}".format(course_session_cache_dir, session_input_dir))
+            logger.info("copying data from cached location {} to {}".format(course_session_cache_dir, session_input_dir))
             shutil.copytree(course_session_cache_dir, session_input_dir)
             course_date_file = os.path.join(job_config.cache_dir, bucket, data_dir, course_date_file)
             shutil.copy(course_date_file, session_input_dir)
         except Exception as e:
-            print("[ERROR] exception while attempting to copy from cache: {}".format(e))
+            logger.error("exception while attempting to copy from cache: {}".format(e))
     else:
         download_raw_course_data(job_config, bucket=raw_data_bucket,
                                  course=course, session=session, input_dir=input_dir,
@@ -394,47 +395,29 @@ def initialize_raw_course_data(job_config, raw_data_bucket, level, mode,
     :param course_date_file_name: name of csv file located at bucket/data_dir containing course start and end dates.
     :return: None
     """
-    aws_access_key_id = job_config.aws_access_key_id
-    aws_secret_access_key = job_config.aws_secret_access_key
-    # if level != "all": # course_date_file_url is unique across the entire job
-    #     course_date_file_url = "s3://{}/{}/{}".format(raw_data_bucket, data_dir, course_date_file_name)
     if level == "all": # there is a unique course date file for each bucket
         # download all data; every session of every course
         for bucket in raw_data_bucket:
-            # course_date_file_url = "s3://{}/{}/{}".format(bucket, data_dir, course_date_file_name)
             for course in fetch_courses(job_config, bucket):
                 if mode == "extract":
                     sessions = fetch_sessions(job_config, bucket, data_dir, course)
                     for session in sessions:
-
-                        download_raw_course_data(job_config, bucket=bucket,
-                                                 course=course, session=session, input_dir=input_dir,
-                                                 data_dir=data_dir)
+                        fetch_raw_course_data(job_config, bucket=bucket, course=course, session=session, input_dir=input_dir)
                 if mode == "extract-holdout":
                     holdout_session = fetch_sessions(job_config, bucket, data_dir, course, fetch_holdout_session_only=True)[0]
-
-                    download_raw_course_data(job_config, bucket=bucket,
-                                             course=course, session=holdout_session, input_dir=input_dir,
-                                             data_dir=data_dir)
+                    fetch_raw_course_data(job_config, bucket=bucket, course=course, session=holdout_session, input_dir=input_dir)
     elif level == "course":
         # download all data for every session of course
         if mode == "extract":
             sessions = fetch_sessions(job_config, raw_data_bucket, data_dir, course)
             for session in sessions:
-
-                download_raw_course_data(job_config, bucket=raw_data_bucket,
-                                         course=course, session=session, input_dir=input_dir,
-                                         data_dir=data_dir)
+                fetch_raw_course_data(job_config, bucket=raw_data_bucket, course=course, session=session, input_dir=input_dir)
         if mode == "extract-holdout":
             holdout_session = fetch_sessions(job_config, raw_data_bucket, data_dir, course, fetch_holdout_session_only=True)[0]
-            download_raw_course_data(job_config, bucket=raw_data_bucket,
-                                     course=course, session=holdout_session, input_dir=input_dir,
-                                     data_dir=data_dir)
+            fetch_raw_course_data(job_config, bucket=raw_data_bucket, course=course, session=holdout_session, input_dir=input_dir)
     elif level == "session":
         # download only specific session
-        download_raw_course_data(job_config, bucket=raw_data_bucket,
-                                 course=course, session=session, input_dir=input_dir,
-                                 data_dir=data_dir)
+        fetch_raw_course_data(job_config, bucket=raw_data_bucket, course=course, session=session, input_dir=input_dir)
     return
 
 
