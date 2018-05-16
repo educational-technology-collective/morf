@@ -175,12 +175,13 @@ def fetch_courses(job_config, data_bucket, data_dir ="morf-data/"):
 
 def fetch_sessions(job_config, data_bucket, data_dir, course, fetch_holdout_session_only = False, fetch_all_sessions = False):
     """
-    Fetch course sessions in data_bucket/data_dir.
+    Fetch course sessions in data_bucket/data_dir. By default, fetches only training sessions (not holdout session).
     :param job_config: MorfJobConfig object.
     :param data_bucket: name of bucket containing data; s3 should have read/copy access to this bucket.
     :param data_dir: path to directory in data_bucket that contains course-level directories of raw data.
     :param course: string; name of course (should match course-level directory name in s3 directory tree).
-    :param fetch_holdout_session_only: logical; used to determine whether to fetch holdout (final) session or a list of all training sessions (all other sessions besides holdout).
+    :param fetch_holdout_session_only: logical; return only holdout (final) session.
+    :param fetch_all_sessions: logical; return all sessions (training and holdout).
     :return: list of session numbers as strings.
     """
     assert (not (fetch_holdout_session_only & fetch_all_sessions)), "choose one - fetch holdout sessions or fetch all sessions"
@@ -326,7 +327,7 @@ def initialize_labels(s3, aws_access_key_id, aws_secret_access_key, bucket, cour
     """
     label_csv = "labels-{}.csv".format(mode) # file with labels for ALL courses
     label_csv_fp = "{}/{}".format(dest_dir, label_csv)
-    course_label_csv_fp = "{}/{}_{}_labels.csv".format(dest_dir, course, session)
+    course_label_csv_fp = os.path.join(dest_dir, make_label_csv_name(course, session))
     key = data_dir + label_csv
     with open(label_csv_fp, "wb") as resource:
         s3.download_fileobj(bucket, key, resource)
@@ -359,9 +360,9 @@ def download_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, 
     mode = job_config.mode
     user_id = job_config.user_id
     job_id = job_config.job_id
-    if mode == "train":
+    if mode == "train" or (mode == "cv" and session in fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course)):
         fetch_mode = "extract"
-    if mode == "test":
+    if mode == "test" or (mode == "cv" and session in fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course, fetch_holdout_session_only=True)):
         fetch_mode = "extract-holdout"
     logger.info(" fetching {} data for course {} session {}".format(fetch_mode, course, session))
     session_input_dir = os.path.join(input_dir, course, session)
@@ -373,11 +374,11 @@ def download_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, 
     # read features file and filter to only include specific course/session
     local_feature_csv = os.path.join(session_input_dir, feature_csv)
     temp_df = pd.read_csv(local_feature_csv, dtype = object)
-    outfile = os.path.join(session_input_dir, "{}_{}_features.csv".format(course, session))
+    outfile = os.path.join(session_input_dir, make_feature_csv_name(course, session))
     temp_df[(temp_df["course"] == course) & (temp_df["session"] == session)].drop(["course", "session"], axis = 1)\
         .to_csv(outfile, index = False)
     os.remove(local_feature_csv)
-    if mode == "train": #download labels only if training job; otherwise no labels needed
+    if mode in ("train", "cv"): #download labels only if training or cv job; otherwise no labels needed
         initialize_labels(s3, aws_access_key_id, aws_secret_access_key, raw_data_bucket, course, session, mode,
                           label_type, dest_dir = session_input_dir, data_dir = raw_data_dir)
     return
@@ -817,3 +818,12 @@ def copy_s3_file(job_config, sourceloc, destloc):
     s3.copy_object(CopySource=copy_source, Bucket=get_bucket_from_url(destloc), Key=get_key_from_url(destloc))
     return
 
+
+def make_feature_csv_name(course, session):
+    csvname = "{}_{}_features.csv".format(course, session)
+    return csvname
+
+
+def make_label_csv_name(course, session):
+    csvname = "{}_{}_labels.csv".format(course, session)
+    return csvname

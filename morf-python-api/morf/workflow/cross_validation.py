@@ -24,16 +24,20 @@ Utility functions for performing cross-validation for model training/testing.
 """
 
 from morf.utils.config import MorfJobConfig
-from morf.utils import fetch_courses, fetch_sessions
+from morf.utils import fetch_courses, fetch_sessions, download_train_test_data, initialize_input_output_dirs, make_feature_csv_name, make_label_csv_name
+from multiprocessing import Pool
 import logging
+import tempfile
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import StratifiedKFold
 
 module_logger = logging.getLogger(__name__)
 CONFIG_FILENAME = "config.properties"
 
-def create_folds(level = "session", k = 5, multithread = True, raw_data_dir="morf-data/"):
+def create_session_folds(k = 5, multithread = True, raw_data_dir="morf-data/"):
     """
     From extract and extract-holdout data, create k randomized folds and archive results to s3.
-    :param level: level to do folding within; currently only session supported.
     :param k: number of folds.
     :return:
     """
@@ -47,8 +51,23 @@ def create_folds(level = "session", k = 5, multithread = True, raw_data_dir="mor
         num_cores = job_config.max_num_cores
     else:
         num_cores = 1
-    if level == "session":
+    logger.info("creating cross-validation folds")
+    with Pool(num_cores) as pool:
         for raw_data_bucket in job_config.raw_data_buckets:
             for course in fetch_courses(job_config, raw_data_bucket):
-                for session in fetch_sessions(job_config, raw_data_bucket, data_dir = raw_data_dir, course, )
+                for session in fetch_sessions(job_config, raw_data_bucket, data_dir=raw_data_dir, course=course, fetch_all_sessions=True):
+                    with tempfile.TemporaryDirectory(dir=job_config.local_working_directory) as working_dir:
+                        input_dir, output_dir = initialize_input_output_dirs(working_dir)
+                        # get the session data
+                        download_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, session, input_dir, label_type=None)
+                        feature_file = os.path.join(input_dir, make_feature_csv_name(course, session))
+                        label_file = os.path.join(input_dir, make_label_csv_name(course, session))
+                        feat_df = pd.read_csv(feature_file, dtype=object)
+                        label_df = pd.read_csv(label_file, dtype=object)
+                        # TODO: StratifiedKFold splitting, write to file, and upload to s3
+                        # read in session dat and split into folds, make sure to read each feature as object so as not to change type
+                        for fold in range(1, k+1):
+                            pass
+        pool.close()
+        pool.join()
 
