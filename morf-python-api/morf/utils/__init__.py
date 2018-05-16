@@ -310,7 +310,7 @@ def fetch_raw_course_data(job_config, bucket, course, session, input_dir, data_d
     return
 
 
-def initialize_labels(s3, aws_access_key_id, aws_secret_access_key, bucket, course, session, mode, label_type, dest_dir, data_dir):
+def initialize_labels(job_config, bucket, course, session, label_type, dest_dir, data_dir):
     """
     Download labels file and extract results for course and session into labels.csv.
     :param s3: boto3.client object for s3 connection.
@@ -325,6 +325,13 @@ def initialize_labels(s3, aws_access_key_id, aws_secret_access_key, bucket, cour
     :param data_dir: directory in bucket containing course-level data directories.
     :return: None
     """
+    # fetch mode; need to handle special cases of cv
+    if job_config.mode == "cv" and session in fetch_sessions(job_config, bucket, data_dir, course, fetch_holdout_session_only=True):
+        mode = "test" # this is holdout session; use the "test" labels
+    elif job_config.mode == "cv":
+        mode = "train"
+    else:
+        mode = job_config.mode
     label_csv = "labels-{}.csv".format(mode) # file with labels for ALL courses
     label_csv_fp = "{}/{}".format(dest_dir, label_csv)
     course_label_csv_fp = os.path.join(dest_dir, make_label_csv_name(course, session))
@@ -379,8 +386,7 @@ def download_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, 
         .to_csv(outfile, index = False)
     os.remove(local_feature_csv)
     if mode in ("train", "cv"): #download labels only if training or cv job; otherwise no labels needed
-        initialize_labels(s3, aws_access_key_id, aws_secret_access_key, raw_data_bucket, course, session, mode,
-                          label_type, dest_dir = session_input_dir, data_dir = raw_data_dir)
+        initialize_labels(job_config, raw_data_bucket, course, session, label_type, dest_dir = session_input_dir, data_dir = raw_data_dir)
     return
 
 

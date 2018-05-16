@@ -23,8 +23,9 @@
 Utility functions for performing cross-validation for model training/testing.
 """
 
+from morf.utils.log import set_logger_handlers
 from morf.utils.config import MorfJobConfig
-from morf.utils import fetch_courses, fetch_sessions, download_train_test_data, initialize_input_output_dirs, make_feature_csv_name, make_label_csv_name
+from morf.utils import fetch_courses, fetch_sessions, download_train_test_data, initialize_input_output_dirs, make_feature_csv_name, make_label_csv_name, clear_s3_subdirectory
 from multiprocessing import Pool
 import logging
 import tempfile
@@ -64,7 +65,7 @@ def create_session_folds(k = 5, multithread = True, raw_data_dir="morf-data/"):
                         label_file = os.path.join(input_dir, make_label_csv_name(course, session))
                         feat_df = pd.read_csv(feature_file, dtype=object)
                         label_df = pd.read_csv(label_file, dtype=object)
-                        # TODO: StratifiedKFold splitting, write to file, and upload to s3
+                        import ipdb;ipdb.set_trace() # TODO: StratifiedKFold splitting, write to file, and upload to s3
                         # read in session dat and split into folds, make sure to read each feature as object so as not to change type
                         for fold in range(1, k+1):
                             pass
