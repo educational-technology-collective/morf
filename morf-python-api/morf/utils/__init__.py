@@ -519,57 +519,6 @@ def clear_s3_subdirectory(job_config, course = None, session = None):
     delete_s3_keys(job_config, prefix = s3_prefix)
     return
 
-  
-# def compile_test_results(s3, courses, bucket, user_id, job_id, temp_dir = "./temp/"):
-#     """
-#     Aggregate model testing results from individual courses, if they exist.
-#     :param s3: boto3.client object for s3 connection.
-#     :param courses: courses to compile results for.
-#     :param bucket: get_bucket_from_url(get_config_properties()['output_data_location'])
-#     :param user_id: user id for job.
-#     :param job_id: job id for job.
-#     :param temp_dir: temporary directory location; cleaned up after course is processed
-#     :return: None
-#     """
-#     summary_df_list = []
-#     for course in courses:
-#         if not os.path.exists(temp_dir):
-#             os.makedirs(temp_dir)
-#         archive_file = "{}-{}-{}-{}.tgz".format(user_id, job_id, "test", course)
-#         key = "{}/{}/{}/{}/{}".format(user_id, job_id, "test", course, archive_file)
-#         dest = temp_dir+archive_file
-#         # download file
-#         with open(dest, "wb") as fil:
-#             # copy docker image into working directory
-#             try:
-#                 s3.download_fileobj(bucket, key, fil)
-#                 logger.info(" fetching test summary for course {}".format(course))
-#             except:
-#                 print("[WARNING] no test data found for course {}; skipping".format(course))
-#                 shutil.rmtree(temp_dir)
-#                 continue
-#         #untar file
-#         tar = tarfile.open(dest)
-#         tar.extractall(temp_dir)
-#         tar.close()
-#         # find all model summary files and read into dataframe
-#         course_summary_file = "{}{}_test_summary.csv".format(temp_dir, course)
-#         try:
-#             course_summary_df = pd.read_csv(course_summary_file)
-#             course_summary_df["course"] = course
-#             summary_df_list.append(course_summary_df)
-#         except FileNotFoundError:
-#             logger.warning("no test summary found for course {}; skipping".format(course))
-#         shutil.rmtree(temp_dir)
-#     master_summary_df = pd.concat(summary_df_list, axis = 0)
-#     master_summary_filename = "{}_{}_model_performace_summary.csv".format(user_id, job_id)
-#     master_summary_df.to_csv(master_summary_filename, index = False, header = True)
-#     upload_key = "{}/{}/test/{}".format(user_id, job_id, master_summary_filename)
-#     logger.info(" uploading results to s3://{}/{}".format(bucket, upload_key))
-#     upload_file_to_s3(master_summary_filename, bucket, upload_key)
-#     os.remove(master_summary_filename)
-#     return None
-
 
 def download_model_from_s3(job_config, bucket, key, dest_dir):
     """
@@ -731,11 +680,11 @@ def move_results_to_destination(archive_file, job_config, course = None, session
     bucket = job_config.proc_data_bucket
     key = make_s3_key_path(job_config, filename=archive_file, course = course, session = session)
     logger.info(" uploading results to bucket {} key {}".format(bucket, key))
-    session = boto3.Session()
-    s3_client = session.client("s3")
-    tc = boto3.s3.transfer.TransferConfig()
-    t = boto3.s3.transfer.S3Transfer(client=s3_client, config=tc)
-    t.upload_file(archive_file, bucket, key)
+    s3 = boto3.client('s3')
+    try:
+        s3.upload_file(archive_file, bucket, key)
+    except Exception as e:
+        logger.error("error uploading result file: {}".format(e))
     os.remove(archive_file)
     return
 
