@@ -173,7 +173,7 @@ def fetch_courses(job_config, data_bucket, data_dir ="morf-data/"):
     return courses
 
 
-def fetch_sessions(job_config, data_bucket, data_dir, course, fetch_holdout_session_only = False):
+def fetch_sessions(job_config, data_bucket, data_dir, course, fetch_holdout_session_only = False, fetch_all_sessions = False):
     """
     Fetch course sessions in data_bucket/data_dir.
     :param job_config: MorfJobConfig object.
@@ -183,17 +183,22 @@ def fetch_sessions(job_config, data_bucket, data_dir, course, fetch_holdout_sess
     :param fetch_holdout_session_only: logical; used to determine whether to fetch holdout (final) session or a list of all training sessions (all other sessions besides holdout).
     :return: list of session numbers as strings.
     """
+    assert (not (fetch_holdout_session_only & fetch_all_sessions)), "choose one - fetch holdout sessions or fetch all sessions"
     s3 = job_config.initialize_s3()
     if not data_dir.endswith("/"):
         data_dir = data_dir + "/"
     course_bucket_objects = s3.list_objects(Bucket=data_bucket, Prefix="".join([data_dir, course, "/"]), Delimiter="/")
     sessions = [item.get("Prefix").split("/")[2] for item in course_bucket_objects.get("CommonPrefixes")]
     sessions = sorted(sessions, key = lambda x: x[-3:]) # handles session numbers like "2012-001" by keeping leading digits before "-" but only sorts on last 3 digits
-    holdout_session = sessions.pop(-1)
-    if fetch_holdout_session_only == True:
-        return [holdout_session]
+    if fetch_all_sessions: # return complete list of sessions
+        result = sessions
     else:
-        return sessions
+        holdout_session = sessions.pop(-1)
+        if fetch_holdout_session_only == True:
+            result = [holdout_session] # return only holdout session, but as a list, so type is consistent
+        else:
+            result = sessions # return list of sessions without holdout session
+    return tuple(result)
 
 
 def fetch_complete_courses(job_config, data_bucket, data_dir ="morf-data/", n_train=1):
