@@ -362,22 +362,17 @@ def download_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, 
     """
     logger = set_logger_handlers(module_logger, job_config)
     s3 = job_config.initialize_s3()
-    aws_access_key_id = job_config.aws_access_key_id
-    aws_secret_access_key = job_config.aws_secret_access_key
     proc_data_bucket = job_config.proc_data_bucket
-    mode = job_config.mode
-    user_id = job_config.user_id
-    job_id = job_config.job_id
-    if mode == "train" or (mode == "cv" and session in fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course)):
+    if job_config.mode == "train" or (job_config.mode == "cv" and session in fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course)):
         fetch_mode = "extract"
-    if mode == "test" or (mode == "cv" and session in fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course, fetch_holdout_session_only=True)):
+    if job_config.mode == "test" or (job_config.mode == "cv" and session in fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course, fetch_holdout_session_only=True)):
         fetch_mode = "extract-holdout"
     logger.info(" fetching {} data for course {} session {}".format(fetch_mode, course, session))
     session_input_dir = os.path.join(input_dir, course, session)
     os.makedirs(session_input_dir)
     # download features file
     feature_csv = generate_archive_filename(job_config, mode=fetch_mode, extension="csv")
-    key = "{}/{}/{}/{}".format(user_id, job_id, fetch_mode, feature_csv)
+    key = make_s3_key_path(job_config, course=course, filename=feature_csv, session=session, mode=fetch_mode)
     download_from_s3(proc_data_bucket, key, s3, session_input_dir)
     # read features file and filter to only include specific course/session
     local_feature_csv = os.path.join(session_input_dir, feature_csv)

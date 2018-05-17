@@ -26,6 +26,7 @@ Utility functions for performing cross-validation for model training/testing.
 from morf.utils.log import set_logger_handlers
 from morf.utils.config import MorfJobConfig
 from morf.utils import fetch_courses, fetch_sessions, download_train_test_data, initialize_input_output_dirs, make_feature_csv_name, make_label_csv_name, clear_s3_subdirectory, make_s3_key_path, upload_file_to_s3
+from morf.utils.s3interface import fetch_mode_files
 from multiprocessing import Pool
 import logging
 import tempfile
@@ -127,5 +128,6 @@ def cross_validate_session(label_type, k = 5, multithread = True, raw_data_dir="
                             # train model by running docker image
                             # get fold test data
                             # test model by running docker image
-
+        pool.close()
+        pool.join()
     return

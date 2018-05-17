@@ -22,3 +22,17 @@
 """
 Functions to manage push/pull of MORF files to s3.
 """
+
+def fetch_mode_files(job_config, dest_dir, mode=None):
+    """
+    Fetch the files for mode from job_config.
+    :param job_config:
+    :param dest_dir: directory to download files to
+    :param mode:
+    :return:
+    """
+    if not mode:
+        mode = job_config.mode
+    # list objects for mode
+    # for each object, download it
+    return
