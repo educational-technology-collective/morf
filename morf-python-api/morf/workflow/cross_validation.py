@@ -40,7 +40,10 @@ CONFIG_FILENAME = "config.properties"
 def create_session_folds(label_type, k = 5, multithread = True, raw_data_dir="morf-data/"):
     """
     From extract and extract-holdout data, create k randomized folds and archive results to s3.
+    :param label_type: type of outcome label to use.
     :param k: number of folds.
+    :param multithread: logical indicating whether multiple cores should be used (if available)
+    :param raw_data_dir: name of subfolder in s3 buckets containing raw data.
     :return:
     """
     user_id_col = "userID"
@@ -83,11 +86,46 @@ def create_session_folds(label_type, k = 5, multithread = True, raw_data_dir="mo
                             train_df.to_csv(train_df_name, index = False)
                             test_df.to_csv(test_df_name, index=False)
                             # upload to s3
-                            train_key = make_s3_key_path(job_config, course, os.path.basename(train_df_name), session, mode, job_config.job_id)
-                            upload_file_to_s3(train_df_name, job_config.proc_data_bucket, train_key, job_config, remove_on_success=True)
-                            test_key = make_s3_key_path(job_config, course, os.path.basename(test_df_name), session, mode, job_config.job_id)
-                            upload_file_to_s3(test_df_name, job_config.proc_data_bucket, test_key, job_config, remove_on_success=True)
+                            try:
+                                train_key = make_s3_key_path(job_config, course, os.path.basename(train_df_name), session, mode, job_config.job_id)
+                                upload_file_to_s3(train_df_name, job_config.proc_data_bucket, train_key, job_config, remove_on_success=True)
+                                test_key = make_s3_key_path(job_config, course, os.path.basename(test_df_name), session, mode, job_config.job_id)
+                                upload_file_to_s3(test_df_name, job_config.proc_data_bucket, test_key, job_config, remove_on_success=True)
+                            except Exception as e:
+                                logger.warning("exception occurrec while uploading cv results: {}".format(e))
         pool.close()
         pool.join()
     return
 
+
+def cross_validate_session(label_type, k = 5, multithread = True, raw_data_dir="morf-data/"):
+    """
+    Compute k-fold cross-validation across sessions.
+    :return:
+    """
+    # todo: call to create_session_folds() goes here
+    job_config = MorfJobConfig(CONFIG_FILENAME)
+    mode = "cv"
+    job_config.update_mode(mode)
+    logger = set_logger_handlers(module_logger, job_config)
+    # clear any preexisting data for this user/job/mode
+    clear_s3_subdirectory(job_config)
+    if multithread:
+        num_cores = job_config.max_num_cores
+    else:
+        num_cores = 1
+    logger.info("conducting cross validation")
+    with Pool(num_cores) as pool:
+        for raw_data_bucket in job_config.raw_data_buckets:
+            for course in fetch_courses(job_config, raw_data_bucket):
+                for session in fetch_sessions(job_config, raw_data_bucket, data_dir=raw_data_dir, course=course, fetch_all_sessions=True):
+                    for fold_num in range(1, k+1):
+                        with tempfile.TemporaryDirectory(dir=job_config.local_working_directory) as working_dir:
+                            # get fold train data
+
+                            # get labels
+                            # train model by running docker image
+                            # get fold test data
+                            # test model by running docker image
+
+    return

@@ -77,9 +77,23 @@ def load_docker_image(dir, job_config, logger, image_name = "docker_image"):
     return image_uuid
 
 
+def make_docker_run_command(docker_exec, input_dir, output_dir, image_uuid, course, session, mode, client_args = None):
+    """
+    Make docker run command, inserting MORF requirements along with any named arguments.
+    :param client_args: doct of {argname, argvalue} pairs to add to command.
+    :return:
+    """
+    cmd = "{} run --network=\"none\" --rm=true --volume={}:/input --volume={}:/output {} --course {} --session {} --mode {}".format(
+        docker_exec, input_dir, output_dir, image_uuid, course, session, mode)
+    if client_args:# add any additional client args to cmd
+        for argname, argval in client_args.items():
+            cmd += " --{} {}".format(argname, argval)
+    return cmd
+
+
 def run_image(job_config, raw_data_bucket, course=None, session=None, level=None, label_type=None):
     """
-    Run a docker image with the specified parameters.
+    Run a docker image with the specified parameters, initializing any data as necessary and archiving results to s3.
     :param docker_url: URL for a built and compressed (.tar) docker image
     :param user_id: unique user id (string).
     :param job_id: unique job id (string).
@@ -108,6 +122,7 @@ def run_image(job_config, raw_data_bucket, course=None, session=None, level=None
             initialize_raw_course_data(job_config,
                                        raw_data_bucket=raw_data_bucket, mode=mode, course=course,
                                        session=session, level=level, input_dir=input_dir)
+            mode = "extract" # sets mode to "extract" in case of "extract-holdout"
         # fetch training/testing data
         if mode in ["train", "test"]:
             initialize_train_test_data(job_config, raw_data_bucket=raw_data_bucket, level=level,
@@ -117,16 +132,7 @@ def run_image(job_config, raw_data_bucket, course=None, session=None, level=None
             download_models(job_config, course=course, session=session, dest_dir=input_dir, level=level)
         image_uuid = load_docker_image(dir=working_dir, job_config=job_config, logger=logger)
         # build docker run command and execute the image
-        if mode == "extract-holdout":  # call docker image with mode == extract
-            cmd = "{} run --network=\"none\" --rm=true --volume={}:/input --volume={}:/output {} --course {} --session {} --mode {}".format(
-                docker_exec, input_dir, output_dir, image_uuid, course, session, "extract")
-        else:  # proceed as normal
-            cmd = "{} run --network=\"none\" --rm=true --volume={}:/input --volume={}:/output {} --course {} --session {} --mode {}".format(
-                docker_exec, input_dir, output_dir, image_uuid, course, session, mode)
-        # add any additional client args to cmd
-        if job_config.client_args:
-            for argname, argval in job_config.client_args.items():
-                cmd += " --{} {}".format(argname, argval)
+        cmd = make_docker_run_command(docker_exec, input_dir, output_dir, image_uuid, course, session, mode, client_args=job_config.client_args)
         execute_and_log_output(cmd, logger)
         # cleanup
         execute_and_log_output("{} rmi --force {}".format(docker_exec, image_uuid), logger)
