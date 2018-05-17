@@ -88,4 +88,5 @@ def create_session_folds(label_type, k = 5, multithread = True, raw_data_dir="mo
                             upload_file_to_s3(test_df_name, job_config.proc_data_bucket, test_key, job_config, remove_on_success=True)
         pool.close()
         pool.join()
+    return
 

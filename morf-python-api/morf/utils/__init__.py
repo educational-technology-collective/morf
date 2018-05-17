@@ -469,7 +469,7 @@ def initialize_train_test_data(job_config, raw_data_bucket, level, label_type, c
     return
 
 
-def upload_file_to_s3(file, bucket, key, job_config=None):
+def upload_file_to_s3(file, bucket, key, job_config=None, remove_on_success = False):
     """
     Upload file to bucket + key in S3.
     :param file: name or path to file.
@@ -486,6 +486,8 @@ def upload_file_to_s3(file, bucket, key, job_config=None):
     logger.info("uploading {} to s3://{}/{}".format(file, bucket, key))
     try:
         t.upload_file(file, bucket, key)
+        if remove_on_success:
+            os.remove(file)
     except Exception as e:
         logger.warn("error caching configurations: {}".format(e))
     return
@@ -778,7 +780,7 @@ def copy_s3_file(job_config, sourceloc, destloc):
 
 def make_feature_csv_name(*args):
     basename = "features.csv"
-    csvname = "_".join([basename] + [str(x) for x in args])
+    csvname = "_".join([str(x) for x in args] + [basename])
     return csvname
 
 
