@@ -325,6 +325,7 @@ def initialize_labels(job_config, bucket, course, session, label_type, dest_dir,
     :param data_dir: directory in bucket containing course-level data directories.
     :return: None
     """
+    s3 = job_config.initialize_s3()
     # fetch mode; need to handle special cases of cv
     if job_config.mode == "cv" and session in fetch_sessions(job_config, bucket, data_dir, course, fetch_holdout_session_only=True):
         mode = "test" # this is holdout session; use the "test" labels
@@ -334,7 +335,6 @@ def initialize_labels(job_config, bucket, course, session, label_type, dest_dir,
         mode = job_config.mode
     label_csv = "labels-{}.csv".format(mode) # file with labels for ALL courses
     label_csv_fp = "{}/{}".format(dest_dir, label_csv)
-    course_label_csv_fp = os.path.join(dest_dir, make_label_csv_name(course, session))
     key = data_dir + label_csv
     with open(label_csv_fp, "wb") as resource:
         s3.download_fileobj(bucket, key, resource)
@@ -342,6 +342,7 @@ def initialize_labels(job_config, bucket, course, session, label_type, dest_dir,
     course_label_df = df.loc[(df["course"] == course) & (df["session"] == session) & (df["label_type"] == label_type)]\
         .copy()
     course_label_df.drop(["course", "session", "label_type"], axis = 1, inplace=True)
+    course_label_csv_fp = os.path.join(dest_dir, make_label_csv_name(course, session))
     course_label_df.to_csv(course_label_csv_fp, index=False)
     os.remove(label_csv_fp)
     return
@@ -386,7 +387,7 @@ def download_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, 
         .to_csv(outfile, index = False)
     os.remove(local_feature_csv)
     if mode in ("train", "cv"): #download labels only if training or cv job; otherwise no labels needed
-        initialize_labels(job_config, raw_data_bucket, course, session, label_type, dest_dir = session_input_dir, data_dir = raw_data_dir)
+        initialize_labels(job_config, raw_data_bucket, course, session, label_type, dest_dir=session_input_dir, data_dir=raw_data_dir)
     return
 
 
@@ -742,6 +743,7 @@ def remove_readonly(func, path, _):
     """
     os.chmod(path, stat.S_IWRITE)
     func(path)
+    return
 
 
 def cache_job_file_in_s3(job_config, bucket = None, filename ="config.properties"):
@@ -774,8 +776,9 @@ def copy_s3_file(job_config, sourceloc, destloc):
     return
 
 
-def make_feature_csv_name(course, session):
-    csvname = "{}_{}_features.csv".format(course, session)
+def make_feature_csv_name(*args):
+    basename = "features.csv"
+    csvname = "_".join([basename] + [str(x) for x in args])
     return csvname
 
 

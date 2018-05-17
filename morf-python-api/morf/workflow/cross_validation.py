@@ -30,18 +30,20 @@ from multiprocessing import Pool
 import logging
 import tempfile
 import pandas as pd
+import os
 import numpy as np
 from sklearn.model_selection import StratifiedKFold
 
 module_logger = logging.getLogger(__name__)
 CONFIG_FILENAME = "config.properties"
 
-def create_session_folds(k = 5, multithread = True, raw_data_dir="morf-data/"):
+def create_session_folds(label_type, k = 5, multithread = True, raw_data_dir="morf-data/"):
     """
     From extract and extract-holdout data, create k randomized folds and archive results to s3.
     :param k: number of folds.
     :return:
     """
+    user_id_col = "userID"
     job_config = MorfJobConfig(CONFIG_FILENAME)
     mode = "cv"
     job_config.update_mode(mode)
@@ -59,16 +61,27 @@ def create_session_folds(k = 5, multithread = True, raw_data_dir="morf-data/"):
                 for session in fetch_sessions(job_config, raw_data_bucket, data_dir=raw_data_dir, course=course, fetch_all_sessions=True):
                     with tempfile.TemporaryDirectory(dir=job_config.local_working_directory) as working_dir:
                         input_dir, output_dir = initialize_input_output_dirs(working_dir)
-                        # get the session data
-                        download_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, session, input_dir, label_type=None)
-                        feature_file = os.path.join(input_dir, make_feature_csv_name(course, session))
-                        label_file = os.path.join(input_dir, make_label_csv_name(course, session))
+                        # get the session feature and label data
+                        download_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, session, input_dir, label_type=label_type)
+                        feature_file = os.path.join(input_dir, course, session, make_feature_csv_name(course, session))
+                        label_file = os.path.join(input_dir, course, session, make_label_csv_name(course, session))
                         feat_df = pd.read_csv(feature_file, dtype=object)
                         label_df = pd.read_csv(label_file, dtype=object)
-                        import ipdb;ipdb.set_trace() # TODO: StratifiedKFold splitting, write to file, and upload to s3
-                        # read in session dat and split into folds, make sure to read each feature as object so as not to change type
-                        for fold in range(1, k+1):
-                            pass
+                        # merge features to ensure splits are correct
+                        feat_label_df = pd.merge(feat_df, label_df, on=user_id_col)
+                        assert feat_df.shape[0] == label_df.shape[0], "features and labels must contain same number of observations"
+                        # create the folds
+                        logger.info("creating cv splits with k = {} course {} session {}".format(k, course, session))
+                        skf = StratifiedKFold(n_splits=k, shuffle=True)
+                        folds = skf.split(np.zeros(feat_df.shape[0]), feat_label_df.label_value)
+                        for train_index, test_index in folds: # write each fold train/test data to csv and push to s3
+                            import ipdb;ipdb.set_trace()
+                            train_df,test_df = feat_label_df.loc[train_index,].drop(user_id_col, axis = 1), feat_label_df.loc[test_index,].drop(user_id_col, axis = 1)
+                            train_df_name = make_feature_csv_name(course, session, k, "train")
+                            test_df_name = make_feature_csv_name(course, session, k, "test")
+                            train_df.to_csv(os.path.join(working_dir, train_df_name), index = False)
+                            test_df.to_csv(os.path.join(working_dir, test_df_name), index=False)
+                            ## todo: upload to s3
         pool.close()
         pool.join()
 
