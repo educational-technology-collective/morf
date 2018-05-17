@@ -25,7 +25,7 @@ Utility functions for performing cross-validation for model training/testing.
 
 from morf.utils.log import set_logger_handlers
 from morf.utils.config import MorfJobConfig
-from morf.utils import fetch_courses, fetch_sessions, download_train_test_data, initialize_input_output_dirs, make_feature_csv_name, make_label_csv_name, clear_s3_subdirectory
+from morf.utils import fetch_courses, fetch_sessions, download_train_test_data, initialize_input_output_dirs, make_feature_csv_name, make_label_csv_name, clear_s3_subdirectory, make_s3_key_path, upload_file_to_s3
 from multiprocessing import Pool
 import logging
 import tempfile
@@ -44,6 +44,7 @@ def create_session_folds(label_type, k = 5, multithread = True, raw_data_dir="mo
     :return:
     """
     user_id_col = "userID"
+    label_col = "label_value"
     job_config = MorfJobConfig(CONFIG_FILENAME)
     mode = "cv"
     job_config.update_mode(mode)
@@ -75,13 +76,16 @@ def create_session_folds(label_type, k = 5, multithread = True, raw_data_dir="mo
                         skf = StratifiedKFold(n_splits=k, shuffle=True)
                         folds = skf.split(np.zeros(feat_df.shape[0]), feat_label_df.label_value)
                         for train_index, test_index in folds: # write each fold train/test data to csv and push to s3
-                            import ipdb;ipdb.set_trace()
-                            train_df,test_df = feat_label_df.loc[train_index,].drop(user_id_col, axis = 1), feat_label_df.loc[test_index,].drop(user_id_col, axis = 1)
-                            train_df_name = make_feature_csv_name(course, session, k, "train")
-                            test_df_name = make_feature_csv_name(course, session, k, "test")
-                            train_df.to_csv(os.path.join(working_dir, train_df_name), index = False)
-                            test_df.to_csv(os.path.join(working_dir, test_df_name), index=False)
-                            ## todo: upload to s3
+                            train_df,test_df = feat_label_df.loc[train_index,].drop(label_col, axis = 1), feat_label_df.loc[test_index,].drop(label_col, axis = 1)
+                            train_df_name = os.path.join(working_dir, make_feature_csv_name(course, session, k, "train"))
+                            test_df_name = os.path.join(working_dir, make_feature_csv_name(course, session, k, "test"))
+                            train_df.to_csv(train_df_name, index = False)
+                            test_df.to_csv(test_df_name, index=False)
+                            # upload to s3
+                            train_key = make_s3_key_path(job_config, course, os.path.basename(train_df_name), session, mode, job_config.job_id)
+                            upload_file_to_s3(train_df_name, job_config.proc_data_bucket, train_key, job_config, remove_on_success=True)
+                            test_key = make_s3_key_path(job_config, course, os.path.basename(test_df_name), session, mode, job_config.job_id)
+                            upload_file_to_s3(test_df_name, job_config.proc_data_bucket, test_key, job_config, remove_on_success=True)
         pool.close()
         pool.join()
 
