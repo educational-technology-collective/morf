@@ -75,10 +75,11 @@ def create_session_folds(label_type, k = 5, multithread = True, raw_data_dir="mo
                         logger.info("creating cv splits with k = {} course {} session {}".format(k, course, session))
                         skf = StratifiedKFold(n_splits=k, shuffle=True)
                         folds = skf.split(np.zeros(feat_df.shape[0]), feat_label_df.label_value)
-                        for train_index, test_index in folds: # write each fold train/test data to csv and push to s3
+                        for fold_num, train_test_indices in enumerate(folds,1): # write each fold train/test data to csv and push to s3
+                            train_index, test_index = train_test_indices
                             train_df,test_df = feat_label_df.loc[train_index,].drop(label_col, axis = 1), feat_label_df.loc[test_index,].drop(label_col, axis = 1)
-                            train_df_name = os.path.join(working_dir, make_feature_csv_name(course, session, k, "train"))
-                            test_df_name = os.path.join(working_dir, make_feature_csv_name(course, session, k, "test"))
+                            train_df_name = os.path.join(working_dir, make_feature_csv_name(course, session, fold_num, "train"))
+                            test_df_name = os.path.join(working_dir, make_feature_csv_name(course, session, fold_num, "test"))
                             train_df.to_csv(train_df_name, index = False)
                             test_df.to_csv(test_df_name, index=False)
                             # upload to s3
