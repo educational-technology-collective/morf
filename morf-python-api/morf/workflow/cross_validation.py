@@ -28,6 +28,7 @@ from morf.utils.config import MorfJobConfig
 from morf.utils import fetch_courses, fetch_sessions, download_train_test_data, initialize_input_output_dirs, make_feature_csv_name, make_label_csv_name, clear_s3_subdirectory, make_s3_key_path, upload_file_to_s3, download_from_s3, initialize_labels, aggregate_session_input_data
 from morf.utils.s3interface import fetch_mode_files
 from morf.utils.job_runner_utils import make_docker_run_command, load_docker_image, execute_and_log_output
+from morf.utils.api_utils import collect_course_cv_results
 from multiprocessing import Pool
 import logging
 import tempfile
@@ -239,6 +240,9 @@ def cross_validate_course(label_type, k=5, multithread=True, raw_data_dir="morf-
                         upload_file_to_s3(pred_csv, job_config.proc_data_bucket, pred_key, job_config, remove_on_success=True)
         pool.close()
         pool.join()
+    test_csv_fp = collect_course_cv_results(job_config)
+    pred_key = make_s3_key_path(job_config, os.path.basename(test_csv_fp), mode="test")
+    upload_file_to_s3(test_csv_fp, job_config.proc_data_bucket, pred_key, job_config, remove_on_success=True)
     return
 
 
