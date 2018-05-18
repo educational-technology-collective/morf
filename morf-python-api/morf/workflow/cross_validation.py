@@ -40,10 +40,100 @@ module_logger = logging.getLogger(__name__)
 CONFIG_FILENAME = "config.properties"
 
 
-# todo: this should be create_course_folds.
+
+def aggregate_session_input_data(file_type, course, input_dir = "./input"):
+    """
+    Aggregate all csv data files matching pattern within input_dir (recursive file search), and write to a single file in input_dir.
+    :param type: {"labels" or "features"}.
+    :param dest_dir:
+    :return:
+    """
+    valid_types = ("features", "labels")
+    course_dir = os.path.join(input_dir, course)
+    assert file_type in valid_types, "[ERROR] specify either features or labels as type."
+    df_out = pd.DataFrame()
+    for root, dirs, files in os.walk(course_dir, topdown=False):
+        for session in dirs:
+            session_csv = generate_archive_filename(job_config, mode=file_type, extension="csv")
+            session_feats = os.path.join(root, session, session_csv)
+            session_df = pd.read_csv(session_feats)
+            df_out = pd.concat([df_out, session_df])
+    # write single csv file
+    if file_type == "features":
+        outfile = make_feature_csv_name(course, file_type)
+    elif file_type == "labels":
+        outfile = "{}_{}.csv".format(course, file_type) #todo: use make_label_csv_name after updating that function
+    outpath = os.path.join(input_dir, outfile)
+    df_out.to_csv(outpath, index = False)
+    return outpath
+
+
+def create_course_folds(label_type, k = 5, multithread = True, raw_data_dir="morf-data/"):
+    """
+    From extract and extract-holdout data, create k randomized folds, pooling data by course (across sessions) and archive results to s3.
+    :param label_type: type of outcome label to use.
+    :param k: number of folds.
+    :param multithread: logical indicating whether multiple cores should be used (if available)
+    :param raw_data_dir: name of subfolder in s3 buckets containing raw data.
+    :return:
+    """
+    user_id_col = "userID"
+    label_col = "label_value"
+    job_config = MorfJobConfig(CONFIG_FILENAME)
+    mode = "cv"
+    job_config.update_mode(mode)
+    logger = set_logger_handlers(module_logger, job_config)
+    # clear any preexisting data for this user/job/mode
+    clear_s3_subdirectory(job_config)
+    if multithread:
+        num_cores = job_config.max_num_cores
+    else:
+        num_cores = 1
+    logger.info("creating cross-validation folds")
+    with Pool(num_cores) as pool:
+        for raw_data_bucket in job_config.raw_data_buckets:
+            for course in fetch_courses(job_config, raw_data_bucket):
+                with tempfile.TemporaryDirectory(dir=job_config.local_working_directory) as working_dir:
+                    input_dir, output_dir = initialize_input_output_dirs(working_dir)
+                    # download data for each session
+                    for session in fetch_sessions(job_config, raw_data_bucket, data_dir=raw_data_dir, course=course, fetch_all_sessions=True):
+                        # get the session feature and label data
+                        download_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, session, input_dir, label_type=label_type)
+                    # merge features to ensure splits are correct
+                    feat_csv_path = aggregate_session_input_data(file_type="features", course=course,input_dir=input_dir)
+                    label_csv_path = aggregate_session_input_data(file_type="labels", course=course,input_dir=input_dir)
+                    feat_df = pd.read_csv(feat_csv_path, dtype=object)
+                    label_df = pd.read_csv(label_csv_path, dtype=object)
+                    feat_label_df = pd.merge(feat_df, label_df, on=user_id_col)
+                    import ipdb;ipdb.set_trace()
+                    assert feat_df.shape[0] == label_df.shape[0], "features and labels must contain same number of observations"
+                    # create the folds
+                    logger.info("creating cv splits with k = {} course {} session {}".format(k, course, session))
+                    skf = StratifiedKFold(n_splits=k, shuffle=True)
+                    folds = skf.split(np.zeros(feat_df.shape[0]), feat_label_df.label_value)
+                    for fold_num, train_test_indices in enumerate(folds,1): # write each fold train/test data to csv and push to s3
+                        train_index, test_index = train_test_indices
+                        train_df,test_df = feat_label_df.loc[train_index,].drop(label_col, axis = 1), feat_label_df.loc[test_index,].drop(label_col, axis = 1)
+                        train_df_name = os.path.join(working_dir, make_feature_csv_name(course, session, fold_num, "train"))
+                        test_df_name = os.path.join(working_dir, make_feature_csv_name(course, session, fold_num, "test"))
+                        train_df.to_csv(train_df_name, index = False)
+                        test_df.to_csv(test_df_name, index=False)
+                        # upload to s3
+                        try:
+                            train_key = make_s3_key_path(job_config, course, os.path.basename(train_df_name), session)
+                            upload_file_to_s3(train_df_name, job_config.proc_data_bucket, train_key, job_config, remove_on_success=True)
+                            test_key = make_s3_key_path(job_config, course, os.path.basename(test_df_name), session)
+                            upload_file_to_s3(test_df_name, job_config.proc_data_bucket, test_key, job_config, remove_on_success=True)
+                        except Exception as e:
+                            logger.warning("exception occurrec while uploading cv results: {}".format(e))
+        pool.close()
+        pool.join()
+    return
+
+
 def create_session_folds(label_type, k = 5, multithread = True, raw_data_dir="morf-data/"):
     """
-    From extract and extract-holdout data, create k randomized folds and archive results to s3.
+    From extract and extract-holdout data, create k randomized folds for each session and archive results to s3.
     :param label_type: type of outcome label to use.
     :param k: number of folds.
     :param multithread: logical indicating whether multiple cores should be used (if available)
