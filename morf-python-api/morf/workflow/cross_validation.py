@@ -232,7 +232,8 @@ def cross_validate_course(label_type, k=5, multithread=True, raw_data_dir="morf-
                             train_labels_path = initialize_cv_labels(job_config, train_users, raw_data_bucket, course, label_type, input_dir, raw_data_dir, fold_num, "train", level="course")
                             # run docker image with mode == cv
                             image_uuid = load_docker_image(controller_working_dir, job_config, logger)
-                            cmd = make_docker_run_command(job_config.docker_exec, input_dir, output_dir, image_uuid, course, None, mode, job_config.client_args)
+                            cmd = make_docker_run_command(job_config.docker_exec, input_dir, output_dir, image_uuid, course, None, mode, job_config.client_args) + " --fold_num {}".format(fold_num)
+                            import ipdb;ipdb.set_trace()
                             execute_and_log_output(cmd, logger)
                             # upload results
         pool.close()
