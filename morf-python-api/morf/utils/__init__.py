@@ -100,18 +100,20 @@ def get_key_from_url(url):
     return re.search("^s3://[^/]+/(.+)", url).group(1)
 
 
-def download_from_s3(bucket, key, s3, dir = os.getcwd(), dest_filename = None):
+def download_from_s3(bucket, key, s3, dir = os.getcwd(), dest_filename = None, uncompress_results = False):
     """
     Downloads a file from s3 into dir and returns its path as a string for optional use.
     :param bucket: an s3 bucket name (string).
     :param key: key of a file in bucket (string).
     :param s3: boto3.client object for s3 connection.
-    :param dir: directory where file should be downloaded (string).
+    :param dir: directory where file should be downloaded (string); will be created if does not exist
     :param dest_filename: base name for file.
     :return: Path to downloaded file inside dir (string).
     """
     if not dest_filename:
         dest_filename = os.path.basename(key)
+    if not os.path.exists(dir):
+        os.makedirs(dir)
     with open(os.path.join(dir, dest_filename), "wb") as resource:
         try:
             s3.download_fileobj(bucket, key, resource)
@@ -372,17 +374,18 @@ def download_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, 
     os.makedirs(session_input_dir)
     # download features file
     feature_csv = generate_archive_filename(job_config, mode=fetch_mode, extension="csv")
-    key = make_s3_key_path(job_config, course=course, filename=feature_csv, session=session, mode=fetch_mode)
+    key = "{}/{}/{}/{}".format(job_config.user_id, job_config.job_id, fetch_mode, feature_csv)
     download_from_s3(proc_data_bucket, key, s3, session_input_dir)
     # read features file and filter to only include specific course/session
     local_feature_csv = os.path.join(session_input_dir, feature_csv)
-    temp_df = pd.read_csv(local_feature_csv, dtype = object)
+    temp_df = pd.read_csv(local_feature_csv, dtype=object)
     outfile = os.path.join(session_input_dir, make_feature_csv_name(course, session))
-    temp_df[(temp_df["course"] == course) & (temp_df["session"] == session)].drop(["course", "session"], axis = 1)\
-        .to_csv(outfile, index = False)
+    temp_df[(temp_df["course"] == course) & (temp_df["session"] == session)].drop(["course", "session"], axis=1) \
+        .to_csv(outfile, index=False)
     os.remove(local_feature_csv)
-    if mode in ("train", "cv"): #download labels only if training or cv job; otherwise no labels needed
-        initialize_labels(job_config, raw_data_bucket, course, session, label_type, dest_dir=session_input_dir, data_dir=raw_data_dir)
+    if job_config.mode in ("train", "cv"):  # download labels only if training or cv job; otherwise no labels needed
+        initialize_labels(job_config, raw_data_bucket, course, session, label_type, dest_dir=session_input_dir,
+                          data_dir=raw_data_dir)
     return
 
 
