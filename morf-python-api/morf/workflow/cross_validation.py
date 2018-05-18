@@ -25,8 +25,9 @@ Utility functions for performing cross-validation for model training/testing.
 
 from morf.utils.log import set_logger_handlers
 from morf.utils.config import MorfJobConfig
-from morf.utils import fetch_courses, fetch_sessions, download_train_test_data, initialize_input_output_dirs, make_feature_csv_name, make_label_csv_name, clear_s3_subdirectory, make_s3_key_path, upload_file_to_s3
+from morf.utils import fetch_courses, fetch_sessions, download_train_test_data, initialize_input_output_dirs, make_feature_csv_name, make_label_csv_name, clear_s3_subdirectory, make_s3_key_path, upload_file_to_s3, download_from_s3, initialize_labels
 from morf.utils.s3interface import fetch_mode_files
+from morf.utils.job_runner_utils import make_docker_run_command
 from multiprocessing import Pool
 import logging
 import tempfile
@@ -38,6 +39,8 @@ from sklearn.model_selection import StratifiedKFold
 module_logger = logging.getLogger(__name__)
 CONFIG_FILENAME = "config.properties"
 
+
+# todo: this should be create_course_folds.
 def create_session_folds(label_type, k = 5, multithread = True, raw_data_dir="morf-data/"):
     """
     From extract and extract-holdout data, create k randomized folds and archive results to s3.
@@ -88,9 +91,9 @@ def create_session_folds(label_type, k = 5, multithread = True, raw_data_dir="mo
                             test_df.to_csv(test_df_name, index=False)
                             # upload to s3
                             try:
-                                train_key = make_s3_key_path(job_config, course, os.path.basename(train_df_name), session, mode, job_config.job_id)
+                                train_key = make_s3_key_path(job_config, course, os.path.basename(train_df_name), session)
                                 upload_file_to_s3(train_df_name, job_config.proc_data_bucket, train_key, job_config, remove_on_success=True)
-                                test_key = make_s3_key_path(job_config, course, os.path.basename(test_df_name), session, mode, job_config.job_id)
+                                test_key = make_s3_key_path(job_config, course, os.path.basename(test_df_name), session)
                                 upload_file_to_s3(test_df_name, job_config.proc_data_bucket, test_key, job_config, remove_on_success=True)
                             except Exception as e:
                                 logger.warning("exception occurrec while uploading cv results: {}".format(e))
@@ -110,7 +113,7 @@ def cross_validate_session(label_type, k = 5, multithread = True, raw_data_dir="
     job_config.update_mode(mode)
     logger = set_logger_handlers(module_logger, job_config)
     # clear any preexisting data for this user/job/mode
-    clear_s3_subdirectory(job_config)
+    # clear_s3_subdirectory(job_config)
     if multithread:
         num_cores = job_config.max_num_cores
     else:
@@ -123,11 +126,19 @@ def cross_validate_session(label_type, k = 5, multithread = True, raw_data_dir="
                     for fold_num in range(1, k+1):
                         with tempfile.TemporaryDirectory(dir=job_config.local_working_directory) as working_dir:
                             # get fold train data
-
+                            input_dir, output_dir = initialize_input_output_dirs(working_dir)
+                            session_input_dir = os.path.join(input_dir, course, session)
+                            session_output_dir = os.path.join(output_dir, course, session)
+                            trainkey = make_s3_key_path(job_config, course, make_feature_csv_name(course, session, fold_num, "train"), session)
+                            train_data_path = download_from_s3(job_config.proc_data_bucket, trainkey, job_config.initialize_s3(), dir=session_input_dir)
+                            testkey = make_s3_key_path(job_config, course, make_feature_csv_name(course, session, fold_num, "test"), session)
+                            test_data_path = download_from_s3(job_config.proc_data_bucket, testkey, job_config.initialize_s3(), dir=session_input_dir)
                             # get labels
-                            # train model by running docker image
-                            # get fold test data
-                            # test model by running docker image
+                            initialize_labels(job_config, raw_data_bucket, course, session, label_type, session_input_dir, raw_data_dir)
+                            # run docker image with mode == cv
+                            import ipdb;ipdb.set_trace()
+
+                            # upload results
         pool.close()
         pool.join()
     return
