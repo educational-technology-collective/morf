@@ -312,7 +312,7 @@ def fetch_raw_course_data(job_config, bucket, course, session, input_dir, data_d
     return
 
 
-def initialize_labels(job_config, bucket, course, session, label_type, dest_dir, data_dir):
+def initialize_session_labels(job_config, bucket, course, session, label_type, dest_dir, data_dir):
     """
     Download labels file and extract results for course and session into labels.csv.
     :param s3: boto3.client object for s3 connection.
@@ -347,7 +347,17 @@ def initialize_labels(job_config, bucket, course, session, label_type, dest_dir,
     course_label_csv_fp = os.path.join(dest_dir, make_label_csv_name(course, session))
     course_label_df.to_csv(course_label_csv_fp, index=False)
     os.remove(label_csv_fp)
-    return
+    return course_label_csv_fp
+
+
+def initialize_labels(job_config, bucket, course, session, label_type, dest_dir, data_dir, level = "session"):
+    if level == "session": #initialize labels for individual session
+        label_csv_fp = initialize_session_labels(job_config, bucket, course, session, label_type, dest_dir, data_dir)
+    elif level == "course": # initialize labels for all sessions in course in a single file
+        for session in fetch_sessions(job_config, bucket, data_dir, course, fetch_all_sessions=True):
+            initialize_session_labels(job_config, bucket, course, session, label_type, dest_dir, data_dir)
+        label_csv_fp = aggregate_session_input_data("labels", course, dest_dir)
+    return label_csv_fp
 
 
 def download_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, session, input_dir, label_type):
@@ -785,3 +795,33 @@ def make_feature_csv_name(*args):
 def make_label_csv_name(course, session):
     csvname = "{}_{}_labels.csv".format(course, session)
     return csvname
+
+
+def aggregate_session_input_data(file_type, course, input_dir = "./input"):
+    """
+    Aggregate all csv data files matching pattern within input_dir (recursive file search), and write to a single file in input_dir.
+    :param job_config: MorfJobConfig object
+    :param type: {"labels" or "features"}.
+    :param dest_dir:
+    :return:
+    """
+    valid_types = ("features", "labels")
+    course_dir = os.path.join(input_dir, course)
+    assert file_type in valid_types, "[ERROR] specify either features or labels as type."
+    df_out = pd.DataFrame()
+    # read file from each session, and concatenate into df_out
+    for root, dirs, files in os.walk(course_dir, topdown=False):
+        for session in dirs:
+            session_csv = "_".join([course, session, file_type]) + ".csv"
+            session_feats = os.path.join(root, session, session_csv)
+            session_df = pd.read_csv(session_feats)
+            df_out = pd.concat([df_out, session_df])
+            os.remove(session_feats)
+    # write single csv file
+    if file_type == "features":
+        outfile = make_feature_csv_name(course, file_type)
+    elif file_type == "labels":
+        outfile = "{}_{}.csv".format(course, file_type) #todo: use make_label_csv_name after updating that function
+    outpath = os.path.join(input_dir, outfile)
+    df_out.to_csv(outpath, index=False)
+    return outpath
