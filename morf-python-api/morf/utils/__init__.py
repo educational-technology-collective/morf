@@ -328,6 +328,8 @@ def initialize_session_labels(job_config, bucket, course, session, label_type, d
     :return: None
     """
     s3 = job_config.initialize_s3()
+    if not os.path.exists(dest_dir):
+        os.makedirs(dest_dir)
     # fetch mode; need to handle special cases of cv
     if job_config.mode == "cv" and session in fetch_sessions(job_config, bucket, data_dir, course, fetch_holdout_session_only=True):
         mode = "test" # this is holdout session; use the "test" labels
@@ -351,12 +353,24 @@ def initialize_session_labels(job_config, bucket, course, session, label_type, d
 
 
 def initialize_labels(job_config, bucket, course, session, label_type, dest_dir, data_dir, level = "session"):
+    """
+
+    :param job_config:
+    :param bucket:
+    :param course:
+    :param session:
+    :param label_type:
+    :param dest_dir:
+    :param data_dir:
+    :param level:
+    :return:
+    """
     if level == "session": #initialize labels for individual session
         label_csv_fp = initialize_session_labels(job_config, bucket, course, session, label_type, dest_dir, data_dir)
     elif level == "course": # initialize labels for all sessions in course in a single file
         for session in fetch_sessions(job_config, bucket, data_dir, course, fetch_all_sessions=True):
-            initialize_session_labels(job_config, bucket, course, session, label_type, dest_dir, data_dir)
-        label_csv_fp = aggregate_session_input_data("labels", course, dest_dir)
+            initialize_session_labels(job_config, bucket, course, session, label_type, os.path.join(dest_dir, session), data_dir)
+        label_csv_fp = aggregate_session_input_data("labels", dest_dir)
     return label_csv_fp
 
 
@@ -792,21 +806,22 @@ def make_feature_csv_name(*args):
     return csvname
 
 
-def make_label_csv_name(course, session):
-    csvname = "{}_{}_labels.csv".format(course, session)
+def make_label_csv_name(*args):
+    basename = "labels.csv"
+    csvname = "_".join([str(x) for x in args] + [basename])
     return csvname
 
 
-def aggregate_session_input_data(file_type, course, input_dir = "./input"):
+def aggregate_session_input_data(file_type, course_dir, course = None):
     """
-    Aggregate all csv data files matching pattern within input_dir (recursive file search), and write to a single file in input_dir.
-    :param job_config: MorfJobConfig object
+    Aggregate all csv data files matching pattern within course_dir (recursive file search), and write to a single file in input_dir.
     :param type: {"labels" or "features"}.
-    :param dest_dir:
+    :param course_dir: course directory containing session-level subdirectories which contain data
     :return:
     """
+    if not course:
+        course = os.path.basename(course_dir)
     valid_types = ("features", "labels")
-    course_dir = os.path.join(input_dir, course)
     assert file_type in valid_types, "[ERROR] specify either features or labels as type."
     df_out = pd.DataFrame()
     # read file from each session, and concatenate into df_out
@@ -822,6 +837,6 @@ def aggregate_session_input_data(file_type, course, input_dir = "./input"):
         outfile = make_feature_csv_name(course, file_type)
     elif file_type == "labels":
         outfile = "{}_{}.csv".format(course, file_type) #todo: use make_label_csv_name after updating that function
-    outpath = os.path.join(input_dir, outfile)
+    outpath = os.path.join(course_dir, outfile)
     df_out.to_csv(outpath, index=False)
     return outpath
