@@ -100,7 +100,7 @@ def get_key_from_url(url):
     return re.search("^s3://[^/]+/(.+)", url).group(1)
 
 
-def download_from_s3(bucket, key, s3, dir = os.getcwd(), dest_filename = None, uncompress_results = False):
+def download_from_s3(bucket, key, s3, dir = os.getcwd(), dest_filename = None):
     """
     Downloads a file from s3 into dir and returns its path as a string for optional use.
     :param bucket: an s3 bucket name (string).
