@@ -218,30 +218,31 @@ def cross_validate_course(label_type, k=5, multithread=True, raw_data_dir="morf-
         for raw_data_bucket in job_config.raw_data_buckets:
             for course in fetch_courses(job_config, raw_data_bucket):
                 with tempfile.TemporaryDirectory(dir=job_config.local_working_directory) as working_dir:
+                    input_dir, output_dir = initialize_input_output_dirs(working_dir)
                     for fold_num in range(1, k + 1):
-                            # get fold train data
-                            input_dir, output_dir = initialize_input_output_dirs(working_dir)
-                            course_input_dir = os.path.join(input_dir, course)
-                            course_output_dir = os.path.join(output_dir, course)
-                            trainkey = make_s3_key_path(job_config, course, make_feature_csv_name(course, fold_num, "train"))
-                            train_data_path = download_from_s3(job_config.proc_data_bucket, trainkey, job_config.initialize_s3(), dir=course_input_dir)
-                            testkey = make_s3_key_path(job_config, course, make_feature_csv_name(course, fold_num, "test"))
-                            test_data_path = download_from_s3(job_config.proc_data_bucket, testkey, job_config.initialize_s3(), dir=course_input_dir)
-                            # get labels
-                            train_users = pd.read_csv(train_data_path)[user_id_col]
-                            train_labels_path = initialize_cv_labels(job_config, train_users, raw_data_bucket, course, label_type, input_dir, raw_data_dir, fold_num, "train", level="course")
-                            # run docker image with mode == cv
-                            image_uuid = load_docker_image(controller_working_dir, job_config, logger)
-                            cmd = make_docker_run_command(job_config.docker_exec, input_dir, output_dir, image_uuid, course, None, mode, job_config.client_args) + " --fold_num {}".format(fold_num)
-                            import ipdb;ipdb.set_trace()
-                            execute_and_log_output(cmd, logger)
-                            # upload results
+                        # get fold train data
+                        course_input_dir = os.path.join(input_dir, course)
+                        trainkey = make_s3_key_path(job_config, course, make_feature_csv_name(course, fold_num, "train"))
+                        train_data_path = download_from_s3(job_config.proc_data_bucket, trainkey, job_config.initialize_s3(), dir=course_input_dir)
+                        testkey = make_s3_key_path(job_config, course, make_feature_csv_name(course, fold_num, "test"))
+                        test_data_path = download_from_s3(job_config.proc_data_bucket, testkey, job_config.initialize_s3(), dir=course_input_dir)
+                        # get labels
+                        train_users = pd.read_csv(train_data_path)[user_id_col]
+                        train_labels_path = initialize_cv_labels(job_config, train_users, raw_data_bucket, course, label_type, input_dir, raw_data_dir, fold_num, "train", level="course")
+                        # run docker image with mode == cv
+                        image_uuid = load_docker_image(controller_working_dir, job_config, logger)
+                        cmd = make_docker_run_command(job_config.docker_exec, input_dir, output_dir, image_uuid, course, None, mode, job_config.client_args) + " --fold_num {}".format(fold_num)
+                        execute_and_log_output(cmd, logger)
+                        # upload results
+                        pred_csv = os.path.join(output_dir, "{}_{}_test.csv".format(course, fold_num))
+                        pred_key = make_s3_key_path(job_config, course, os.path.basename(pred_csv), mode="test")
+                        upload_file_to_s3(pred_csv, job_config.proc_data_bucket, pred_key, job_config, remove_on_success=True)
         pool.close()
         pool.join()
     return
 
 
-#todo: implementation not complete!
+#todo: implementation not complete and definitely not bug-free! Model this off of cross_validate_course.
 def cross_validate_session(label_type, k = 5, multithread = True, raw_data_dir="morf-data/"):
     """
     Compute k-fold cross-validation across sessions.
