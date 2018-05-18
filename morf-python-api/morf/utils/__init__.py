@@ -371,6 +371,16 @@ def initialize_labels(job_config, bucket, course, session, label_type, dest_dir,
         for session in fetch_sessions(job_config, bucket, data_dir, course, fetch_all_sessions=True):
             initialize_session_labels(job_config, bucket, course, session, label_type, os.path.join(dest_dir, session), data_dir)
         label_csv_fp = aggregate_session_input_data("labels", dest_dir)
+    elif level == "all": # initialize labels for all courses in bucket into a single file
+        course_label_df_list = []
+        for course in fetch_courses(job_config, bucket, data_dir):
+            for session in fetch_sessions(job_config, bucket, data_dir, course, fetch_all_sessions=True):
+                initialize_session_labels(job_config, bucket, course, session, label_type,
+                                          os.path.join(dest_dir, session), data_dir)
+            course_label_csv_fp = aggregate_session_input_data("labels", dest_dir, course=course)
+            course_label_df_list.append(pd.read_csv(course_label_csv_fp, dtype=object))
+        label_csv_fp = os.path.join(dest_dir, "labels.csv")
+        pd.concat(course_label_df_list).to_csv(label_csv_fp, index = False)
     return label_csv_fp
 
 
@@ -832,6 +842,7 @@ def aggregate_session_input_data(file_type, course_dir, course = None):
             session_df = pd.read_csv(session_feats)
             df_out = pd.concat([df_out, session_df])
             os.remove(session_feats)
+            os.rmdir(os.path.join(root, session))
     # write single csv file
     if file_type == "features":
         outfile = make_feature_csv_name(course, file_type)
