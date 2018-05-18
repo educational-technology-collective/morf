@@ -25,7 +25,7 @@ Utility functions for performing cross-validation for model training/testing.
 
 from morf.utils.log import set_logger_handlers
 from morf.utils.config import MorfJobConfig
-from morf.utils import fetch_courses, fetch_sessions, download_train_test_data, initialize_input_output_dirs, make_feature_csv_name, make_label_csv_name, clear_s3_subdirectory, make_s3_key_path, upload_file_to_s3, download_from_s3, initialize_labels
+from morf.utils import fetch_courses, fetch_sessions, download_train_test_data, initialize_input_output_dirs, make_feature_csv_name, make_label_csv_name, clear_s3_subdirectory, make_s3_key_path, upload_file_to_s3, download_from_s3, initialize_labels, generate_archive_filename
 from morf.utils.s3interface import fetch_mode_files
 from morf.utils.job_runner_utils import make_docker_run_command
 from multiprocessing import Pool
@@ -41,9 +41,10 @@ CONFIG_FILENAME = "config.properties"
 
 
 
-def aggregate_session_input_data(file_type, course, input_dir = "./input"):
+def aggregate_session_input_data(job_config, file_type, course, input_dir = "./input"):
     """
     Aggregate all csv data files matching pattern within input_dir (recursive file search), and write to a single file in input_dir.
+    :param job_config: MorfJobConfig object
     :param type: {"labels" or "features"}.
     :param dest_dir:
     :return:
@@ -52,9 +53,10 @@ def aggregate_session_input_data(file_type, course, input_dir = "./input"):
     course_dir = os.path.join(input_dir, course)
     assert file_type in valid_types, "[ERROR] specify either features or labels as type."
     df_out = pd.DataFrame()
+    # read file from each session, and concatenate into df_out
     for root, dirs, files in os.walk(course_dir, topdown=False):
         for session in dirs:
-            session_csv = generate_archive_filename(job_config, mode=file_type, extension="csv")
+            session_csv = "_".join([course, session, file_type]) + ".csv"
             session_feats = os.path.join(root, session, session_csv)
             session_df = pd.read_csv(session_feats)
             df_out = pd.concat([df_out, session_df])
@@ -64,7 +66,7 @@ def aggregate_session_input_data(file_type, course, input_dir = "./input"):
     elif file_type == "labels":
         outfile = "{}_{}.csv".format(course, file_type) #todo: use make_label_csv_name after updating that function
     outpath = os.path.join(input_dir, outfile)
-    df_out.to_csv(outpath, index = False)
+    df_out.to_csv(outpath, index=False)
     return outpath
 
 
@@ -100,12 +102,11 @@ def create_course_folds(label_type, k = 5, multithread = True, raw_data_dir="mor
                         # get the session feature and label data
                         download_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, session, input_dir, label_type=label_type)
                     # merge features to ensure splits are correct
-                    feat_csv_path = aggregate_session_input_data(file_type="features", course=course,input_dir=input_dir)
-                    label_csv_path = aggregate_session_input_data(file_type="labels", course=course,input_dir=input_dir)
+                    feat_csv_path = aggregate_session_input_data(job_config, file_type="features", course=course,input_dir=input_dir)
+                    label_csv_path = aggregate_session_input_data(job_config, file_type="labels", course=course,input_dir=input_dir)
                     feat_df = pd.read_csv(feat_csv_path, dtype=object)
                     label_df = pd.read_csv(label_csv_path, dtype=object)
                     feat_label_df = pd.merge(feat_df, label_df, on=user_id_col)
-                    import ipdb;ipdb.set_trace()
                     assert feat_df.shape[0] == label_df.shape[0], "features and labels must contain same number of observations"
                     # create the folds
                     logger.info("creating cv splits with k = {} course {} session {}".format(k, course, session))
@@ -113,9 +114,9 @@ def create_course_folds(label_type, k = 5, multithread = True, raw_data_dir="mor
                     folds = skf.split(np.zeros(feat_df.shape[0]), feat_label_df.label_value)
                     for fold_num, train_test_indices in enumerate(folds,1): # write each fold train/test data to csv and push to s3
                         train_index, test_index = train_test_indices
-                        train_df,test_df = feat_label_df.loc[train_index,].drop(label_col, axis = 1), feat_label_df.loc[test_index,].drop(label_col, axis = 1)
-                        train_df_name = os.path.join(working_dir, make_feature_csv_name(course, session, fold_num, "train"))
-                        test_df_name = os.path.join(working_dir, make_feature_csv_name(course, session, fold_num, "test"))
+                        train_df, test_df = feat_label_df.loc[train_index,].drop(label_col, axis = 1), feat_label_df.loc[test_index,].drop(label_col, axis = 1)
+                        train_df_name = os.path.join(working_dir, make_feature_csv_name(course, fold_num, "train"))
+                        test_df_name = os.path.join(working_dir, make_feature_csv_name(course, fold_num, "test"))
                         train_df.to_csv(train_df_name, index = False)
                         test_df.to_csv(test_df_name, index=False)
                         # upload to s3
@@ -125,7 +126,7 @@ def create_course_folds(label_type, k = 5, multithread = True, raw_data_dir="mor
                             test_key = make_s3_key_path(job_config, course, os.path.basename(test_df_name), session)
                             upload_file_to_s3(test_df_name, job_config.proc_data_bucket, test_key, job_config, remove_on_success=True)
                         except Exception as e:
-                            logger.warning("exception occurrec while uploading cv results: {}".format(e))
+                            logger.warning("exception occurred while uploading cv results: {}".format(e))
         pool.close()
         pool.join()
     return
@@ -174,7 +175,7 @@ def create_session_folds(label_type, k = 5, multithread = True, raw_data_dir="mo
                         folds = skf.split(np.zeros(feat_df.shape[0]), feat_label_df.label_value)
                         for fold_num, train_test_indices in enumerate(folds,1): # write each fold train/test data to csv and push to s3
                             train_index, test_index = train_test_indices
-                            train_df,test_df = feat_label_df.loc[train_index,].drop(label_col, axis = 1), feat_label_df.loc[test_index,].drop(label_col, axis = 1)
+                            train_df, test_df = feat_label_df.loc[train_index,].drop(label_col, axis = 1), feat_label_df.loc[test_index,].drop(label_col, axis = 1)
                             train_df_name = os.path.join(working_dir, make_feature_csv_name(course, session, fold_num, "train"))
                             test_df_name = os.path.join(working_dir, make_feature_csv_name(course, session, fold_num, "test"))
                             train_df.to_csv(train_df_name, index = False)
@@ -186,7 +187,7 @@ def create_session_folds(label_type, k = 5, multithread = True, raw_data_dir="mo
                                 test_key = make_s3_key_path(job_config, course, os.path.basename(test_df_name), session)
                                 upload_file_to_s3(test_df_name, job_config.proc_data_bucket, test_key, job_config, remove_on_success=True)
                             except Exception as e:
-                                logger.warning("exception occurrec while uploading cv results: {}".format(e))
+                                logger.warning("exception occurred while uploading cv results: {}".format(e))
         pool.close()
         pool.join()
     return
