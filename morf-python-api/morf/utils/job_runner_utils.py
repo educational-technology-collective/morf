@@ -36,24 +36,6 @@ from morf.utils.log import set_logger_handlers
 module_logger = logging.getLogger(__name__)
 
 
-def execute_and_log_output(command, logger):
-    """
-    Execute command and log its output to logger.
-    :param command:
-    :param logger:
-    :return:
-    """
-    logger.info("running: " + command)
-    command_ary = shlex.split(command)
-    p = subprocess.Popen(command_ary, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    stdout, stderr = p.communicate()
-    if stdout:
-        logger.info(stdout)
-    if stderr:
-        logger.error(stderr)
-    return
-
-
 def load_docker_image(dir, job_config, logger, image_name = "docker_image"):
     """
     Load docker_image from dir, writing output to logger.
