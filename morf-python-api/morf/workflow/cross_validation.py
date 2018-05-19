@@ -78,11 +78,12 @@ def create_course_folds(label_type, k = 5, multithread = True, raw_data_dir="mor
                     feat_df = pd.read_csv(feat_csv_path, dtype=object)
                     label_df = pd.read_csv(label_csv_path, dtype=object)
                     feat_label_df = pd.merge(feat_df, label_df, on=user_id_col)
-                    assert feat_df.shape[0] == label_df.shape[0], "features and labels must contain same number of observations"
+                    if feat_df.shape[0] != label_df.shape[0]:
+                        logger.error("number of observations in extracted features and labels do not match for course {}; features contains {} and labels contains {} observations".format(course, feat_df.shape[0], label_df.shape[0]))
                     # create the folds
                     logger.info("creating cv splits with k = {} course {} session {}".format(k, course, session))
                     skf = StratifiedKFold(n_splits=k, shuffle=True)
-                    folds = skf.split(np.zeros(feat_df.shape[0]), feat_label_df.label_value)
+                    folds = skf.split(np.zeros(feat_label_df.shape[0]), feat_label_df.label_value)
                     for fold_num, train_test_indices in enumerate(folds,1): # write each fold train/test data to csv and push to s3
                         train_index, test_index = train_test_indices
                         train_df, test_df = feat_label_df.loc[train_index,].drop(label_col, axis = 1), feat_label_df.loc[test_index,].drop(label_col, axis = 1)
