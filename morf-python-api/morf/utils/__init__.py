@@ -845,7 +845,9 @@ def aggregate_session_input_data(file_type, course_dir, course = None):
             session_df = pd.read_csv(session_feats)
             df_out = pd.concat([df_out, session_df])
             os.remove(session_feats)
-            os.rmdir(os.path.join(root, session))
+            session_dir = os.path.join(root, session)
+            if not os.listdir(session_dir): # if session_dir is now empty, remove it
+                os.rmdir(session_dir)
     # write single csv file
     if file_type == "features":
         outfile = make_feature_csv_name(course, file_type)
