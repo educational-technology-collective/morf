@@ -378,7 +378,9 @@ def initialize_labels(job_config, bucket, course, session, label_type, dest_dir,
                 initialize_session_labels(job_config, bucket, course, session, label_type,
                                           os.path.join(dest_dir, session), data_dir)
             course_label_csv_fp = aggregate_session_input_data("labels", dest_dir, course=course)
-            course_label_df_list.append(pd.read_csv(course_label_csv_fp, dtype=object))
+            course_label_df = pd.read_csv(course_label_csv_fp, dtype=object)
+            course_label_df["course"] = course
+            course_label_df_list.append(course_label_df)
             os.remove(course_label_csv_fp)
         label_csv_fp = os.path.join(dest_dir, "labels.csv")
         pd.concat(course_label_df_list).to_csv(label_csv_fp, index = False)
