@@ -25,9 +25,8 @@ Utility functions for performing cross-validation for model training/testing.
 
 from morf.utils.log import set_logger_handlers
 from morf.utils.config import MorfJobConfig
-from morf.utils import fetch_courses, fetch_sessions, download_train_test_data, initialize_input_output_dirs, make_feature_csv_name, make_label_csv_name, clear_s3_subdirectory, make_s3_key_path, upload_file_to_s3, download_from_s3, initialize_labels, aggregate_session_input_data
-from morf.utils.s3interface import fetch_mode_files
-from morf.utils.job_runner_utils import make_docker_run_command, load_docker_image, execute_and_log_output
+from morf.utils import fetch_courses, fetch_sessions, download_train_test_data, initialize_input_output_dirs, make_feature_csv_name, make_label_csv_name, clear_s3_subdirectory, make_s3_key_path, upload_file_to_s3, download_from_s3, initialize_labels, aggregate_session_input_data, execute_and_log_output
+from morf.utils.job_runner_utils import make_docker_run_command, load_docker_image
 from morf.utils.api_utils import collect_course_cv_results
 from multiprocessing import Pool
 import logging
@@ -36,6 +35,7 @@ import pandas as pd
 import os
 import numpy as np
 from sklearn.model_selection import StratifiedKFold
+
 
 module_logger = logging.getLogger(__name__)
 CONFIG_FILENAME = "config.properties"
@@ -246,12 +246,12 @@ def cross_validate_course(label_type, k=5, multithread=True, raw_data_dir="morf-
     return
 
 
-#todo: implementation not complete and definitely not bug-free! Model this off of cross_validate_course.
 def cross_validate_session(label_type, k = 5, multithread = True, raw_data_dir="morf-data/"):
     """
     Compute k-fold cross-validation across sessions.
     :return:
     """
+    raise NotImplementedError # this is not implemented!
     # todo: call to create_session_folds() goes here
     job_config = MorfJobConfig(CONFIG_FILENAME)
     mode = "cv"
@@ -281,7 +281,9 @@ def cross_validate_session(label_type, k = 5, multithread = True, raw_data_dir="
                             # get labels
                             initialize_labels(job_config, raw_data_bucket, course, session, label_type, session_input_dir, raw_data_dir)
                             # run docker image with mode == cv
+                            #todo
                             # upload results
+                            #todo
         pool.close()
         pool.join()
     return
