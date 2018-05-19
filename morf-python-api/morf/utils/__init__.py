@@ -536,16 +536,10 @@ def delete_s3_keys(job_config, prefix = None):
     :param prefix:
     :return:
     """
-    bucket = job_config.proc_data_bucket
     logger = set_logger_handlers(module_logger, job_config)
-    s3 = boto3.resource('s3')
-    objects_to_delete = s3.meta.client.list_objects(Bucket=bucket, Prefix=prefix)
-    delete_keys = {'Objects': []}
-    delete_keys['Objects'] = [{'Key': k} for k in [obj['Key'] for obj in objects_to_delete.get('Contents', [])]]
-    try:
-        s3.meta.client.delete_objects(Bucket=bucket, Delete=delete_keys)
-    except Exception as e:
-        logger.warning("exception when cleaning S3 bucket: {}; continuing".format(e))
+    # begin
+    cmd = "{} s3 rm --recursive s3://{}".format(job_config.aws_exec, prefix)
+    execute_and_log_output(cmd, logger)
     return
 
 
@@ -856,3 +850,21 @@ def aggregate_session_input_data(file_type, course_dir, course = None):
     outpath = os.path.join(course_dir, outfile)
     df_out.to_csv(outpath, index=False)
     return outpath
+
+
+def execute_and_log_output(command, logger):
+    """
+    Execute command and log its output to logger.
+    :param command:
+    :param logger:
+    :return:
+    """
+    logger.info("running: " + command)
+    command_ary = shlex.split(command)
+    p = subprocess.Popen(command_ary, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    stdout, stderr = p.communicate()
+    if stdout:
+        logger.info(stdout)
+    if stderr:
+        logger.error(stderr)
+    return
