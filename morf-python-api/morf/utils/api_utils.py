@@ -103,7 +103,7 @@ def collect_course_results(job_config, raw_data_dir="morf-data/"):
             else:
                 session = None
             with tempfile.TemporaryDirectory(dir=os.getcwd()) as working_dir:
-                logger.info("fetching extraction results for course {} session {}".format(course, session))
+                logger.info("fetching {} results for course {} session {}".format(mode, course, session))
                 try:
                     fetch_result_file(job_config, dir=working_dir, course=course, session=session)
                     csv = fetch_result_csv_fp(working_dir)
@@ -115,6 +115,45 @@ def collect_course_results(job_config, raw_data_dir="morf-data/"):
                     continue
     master_feat_df = pd.concat(feat_df_list)
     csv_fp = generate_archive_filename(job_config, extension='csv')
+    master_feat_df.to_csv(csv_fp, index=False, header=True)
+    return csv_fp
+
+
+
+def collect_course_cv_results(job_config, k=5, raw_data_dir="morf-data/"):
+    """
+    Iterate through course-level directories in bucket, download individual files from [mode], add column for course and session, and concatenate into single 'master' csv.
+    :param s3: boto3.client object with appropriate access credentials.
+    :param raw_data_buckets: list of buckets containing raw data; used to fetch course names from each bucket.
+    :param raw_data_dir: path to directory in raw_data_bucket containing course-level directories.
+    :param proc_data_bucket: bucket containing session-level archived results from [mode] jobs (i.e., session-level extracted features).
+    :param mode: mode to collect results for, {extract, test}.
+    :param holdout: flag; fetch holdout run only (boolean; default False).
+    :return: path to csv.
+    """
+    logger = set_logger_handlers(module_logger, job_config)
+    raw_data_buckets = job_config.raw_data_buckets
+    mode = job_config.mode
+    pred_df_list = list()
+    session = None
+    for raw_data_bucket in raw_data_buckets:
+        for course in fetch_complete_courses(job_config, raw_data_bucket):
+            with tempfile.TemporaryDirectory(dir=os.getcwd()) as working_dir:
+                for fold_num in range(1, k+1):
+                    logger.info("fetching {} results for course {} session {}".format(mode, course, session))
+                    try:
+                        fold_csv_name = "{}_{}_test.csv".format(course, fold_num)
+                        key = make_s3_key_path(job_config, course, fold_csv_name, mode="test")
+                        pred_fp = download_from_s3(job_config.proc_data_bucket, key, job_config.initialize_s3(), working_dir, dest_filename=fold_csv_name)
+                        pred_df = pd.read_csv(pred_fp, dtype=object)
+                        pred_df['course'] = course
+                        pred_df['fold_num'] = str(fold_num)
+                        pred_df_list.append(pred_df)
+                    except Exception as e:
+                        logger.warning("exception occurred: {} ".format(e))
+                        continue
+    master_feat_df = pd.concat(pred_df_list)
+    csv_fp = generate_archive_filename(job_config, mode="test", extension='csv')
     master_feat_df.to_csv(csv_fp, index=False, header=True)
     return csv_fp
 

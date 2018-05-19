@@ -23,6 +23,7 @@
 import logging
 import os
 import re
+import shlex
 import shutil
 import stat
 import subprocess
@@ -106,12 +107,14 @@ def download_from_s3(bucket, key, s3, dir = os.getcwd(), dest_filename = None):
     :param bucket: an s3 bucket name (string).
     :param key: key of a file in bucket (string).
     :param s3: boto3.client object for s3 connection.
-    :param dir: directory where file should be downloaded (string).
+    :param dir: directory where file should be downloaded (string); will be created if does not exist
     :param dest_filename: base name for file.
     :return: Path to downloaded file inside dir (string).
     """
     if not dest_filename:
         dest_filename = os.path.basename(key)
+    if not os.path.exists(dir):
+        os.makedirs(dir)
     with open(os.path.join(dir, dest_filename), "wb") as resource:
         try:
             s3.download_fileobj(bucket, key, resource)
@@ -173,27 +176,33 @@ def fetch_courses(job_config, data_bucket, data_dir ="morf-data/"):
     return courses
 
 
-def fetch_sessions(job_config, data_bucket, data_dir, course, fetch_holdout_session_only = False):
+def fetch_sessions(job_config, data_bucket, data_dir, course, fetch_holdout_session_only = False, fetch_all_sessions = False):
     """
-    Fetch course sessions in data_bucket/data_dir.
+    Fetch course sessions in data_bucket/data_dir. By default, fetches only training sessions (not holdout session).
     :param job_config: MorfJobConfig object.
     :param data_bucket: name of bucket containing data; s3 should have read/copy access to this bucket.
     :param data_dir: path to directory in data_bucket that contains course-level directories of raw data.
     :param course: string; name of course (should match course-level directory name in s3 directory tree).
-    :param fetch_holdout_session_only: logical; used to determine whether to fetch holdout (final) session or a list of all training sessions (all other sessions besides holdout).
+    :param fetch_holdout_session_only: logical; return only holdout (final) session.
+    :param fetch_all_sessions: logical; return all sessions (training and holdout).
     :return: list of session numbers as strings.
     """
+    assert (not (fetch_holdout_session_only & fetch_all_sessions)), "choose one - fetch holdout sessions or fetch all sessions"
     s3 = job_config.initialize_s3()
     if not data_dir.endswith("/"):
         data_dir = data_dir + "/"
     course_bucket_objects = s3.list_objects(Bucket=data_bucket, Prefix="".join([data_dir, course, "/"]), Delimiter="/")
     sessions = [item.get("Prefix").split("/")[2] for item in course_bucket_objects.get("CommonPrefixes")]
     sessions = sorted(sessions, key = lambda x: x[-3:]) # handles session numbers like "2012-001" by keeping leading digits before "-" but only sorts on last 3 digits
-    holdout_session = sessions.pop(-1)
-    if fetch_holdout_session_only == True:
-        return [holdout_session]
+    if fetch_all_sessions: # return complete list of sessions
+        result = sessions
     else:
-        return sessions
+        holdout_session = sessions.pop(-1)
+        if fetch_holdout_session_only == True:
+            result = [holdout_session] # return only holdout session, but as a list, so type is consistent
+        else:
+            result = sessions # return list of sessions without holdout session
+    return tuple(result)
 
 
 def fetch_complete_courses(job_config, data_bucket, data_dir ="morf-data/", n_train=1):
@@ -304,7 +313,7 @@ def fetch_raw_course_data(job_config, bucket, course, session, input_dir, data_d
     return
 
 
-def initialize_labels(s3, aws_access_key_id, aws_secret_access_key, bucket, course, session, mode, label_type, dest_dir, data_dir):
+def initialize_session_labels(job_config, bucket, course, session, label_type, dest_dir, data_dir):
     """
     Download labels file and extract results for course and session into labels.csv.
     :param s3: boto3.client object for s3 connection.
@@ -319,9 +328,18 @@ def initialize_labels(s3, aws_access_key_id, aws_secret_access_key, bucket, cour
     :param data_dir: directory in bucket containing course-level data directories.
     :return: None
     """
+    s3 = job_config.initialize_s3()
+    if not os.path.exists(dest_dir):
+        os.makedirs(dest_dir)
+    # fetch mode; need to handle special cases of cv
+    if job_config.mode == "cv" and session in fetch_sessions(job_config, bucket, data_dir, course, fetch_holdout_session_only=True):
+        mode = "test" # this is holdout session; use the "test" labels
+    elif job_config.mode == "cv":
+        mode = "train"
+    else:
+        mode = job_config.mode
     label_csv = "labels-{}.csv".format(mode) # file with labels for ALL courses
     label_csv_fp = "{}/{}".format(dest_dir, label_csv)
-    course_label_csv_fp = "{}/{}_{}_labels.csv".format(dest_dir, course, session)
     key = data_dir + label_csv
     with open(label_csv_fp, "wb") as resource:
         s3.download_fileobj(bucket, key, resource)
@@ -329,9 +347,45 @@ def initialize_labels(s3, aws_access_key_id, aws_secret_access_key, bucket, cour
     course_label_df = df.loc[(df["course"] == course) & (df["session"] == session) & (df["label_type"] == label_type)]\
         .copy()
     course_label_df.drop(["course", "session", "label_type"], axis = 1, inplace=True)
+    course_label_csv_fp = os.path.join(dest_dir, make_label_csv_name(course, session))
     course_label_df.to_csv(course_label_csv_fp, index=False)
     os.remove(label_csv_fp)
-    return
+    return course_label_csv_fp
+
+
+def initialize_labels(job_config, bucket, course, session, label_type, dest_dir, data_dir, level = "session"):
+    """
+
+    :param job_config:
+    :param bucket:
+    :param course:
+    :param session:
+    :param label_type:
+    :param dest_dir:
+    :param data_dir:
+    :param level:
+    :return:
+    """
+    if level == "session": #initialize labels for individual session
+        label_csv_fp = initialize_session_labels(job_config, bucket, course, session, label_type, dest_dir, data_dir)
+    elif level == "course": # initialize labels for all sessions in course in a single file
+        for session in fetch_sessions(job_config, bucket, data_dir, course, fetch_all_sessions=True):
+            initialize_session_labels(job_config, bucket, course, session, label_type, os.path.join(dest_dir, session), data_dir)
+        label_csv_fp = aggregate_session_input_data("labels", dest_dir)
+    elif level == "all": # initialize labels for all courses in bucket into a single file
+        course_label_df_list = []
+        for course in fetch_courses(job_config, bucket, data_dir):
+            for session in fetch_sessions(job_config, bucket, data_dir, course, fetch_all_sessions=True):
+                initialize_session_labels(job_config, bucket, course, session, label_type,
+                                          os.path.join(dest_dir, session), data_dir)
+            course_label_csv_fp = aggregate_session_input_data("labels", dest_dir, course=course)
+            course_label_df = pd.read_csv(course_label_csv_fp, dtype=object)
+            course_label_df["course"] = course
+            course_label_df_list.append(course_label_df)
+            os.remove(course_label_csv_fp)
+        label_csv_fp = os.path.join(dest_dir, "labels.csv")
+        pd.concat(course_label_df_list).to_csv(label_csv_fp, index = False)
+    return label_csv_fp
 
 
 def download_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, session, input_dir, label_type):
@@ -348,33 +402,28 @@ def download_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, 
     """
     logger = set_logger_handlers(module_logger, job_config)
     s3 = job_config.initialize_s3()
-    aws_access_key_id = job_config.aws_access_key_id
-    aws_secret_access_key = job_config.aws_secret_access_key
     proc_data_bucket = job_config.proc_data_bucket
-    mode = job_config.mode
-    user_id = job_config.user_id
-    job_id = job_config.job_id
-    if mode == "train":
+    if job_config.mode == "train" or (job_config.mode == "cv" and session in fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course)):
         fetch_mode = "extract"
-    if mode == "test":
+    if job_config.mode == "test" or (job_config.mode == "cv" and session in fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course, fetch_holdout_session_only=True)):
         fetch_mode = "extract-holdout"
     logger.info(" fetching {} data for course {} session {}".format(fetch_mode, course, session))
     session_input_dir = os.path.join(input_dir, course, session)
     os.makedirs(session_input_dir)
     # download features file
     feature_csv = generate_archive_filename(job_config, mode=fetch_mode, extension="csv")
-    key = "{}/{}/{}/{}".format(user_id, job_id, fetch_mode, feature_csv)
+    key = "{}/{}/{}/{}".format(job_config.user_id, job_config.job_id, fetch_mode, feature_csv)
     download_from_s3(proc_data_bucket, key, s3, session_input_dir)
     # read features file and filter to only include specific course/session
     local_feature_csv = os.path.join(session_input_dir, feature_csv)
-    temp_df = pd.read_csv(local_feature_csv, dtype = object)
-    outfile = os.path.join(session_input_dir, "{}_{}_features.csv".format(course, session))
-    temp_df[(temp_df["course"] == course) & (temp_df["session"] == session)].drop(["course", "session"], axis = 1)\
-        .to_csv(outfile, index = False)
+    temp_df = pd.read_csv(local_feature_csv, dtype=object)
+    outfile = os.path.join(session_input_dir, make_feature_csv_name(course, session))
+    temp_df[(temp_df["course"] == course) & (temp_df["session"] == session)].drop(["course", "session"], axis=1) \
+        .to_csv(outfile, index=False)
     os.remove(local_feature_csv)
-    if mode == "train": #download labels only if training job; otherwise no labels needed
-        initialize_labels(s3, aws_access_key_id, aws_secret_access_key, raw_data_bucket, course, session, mode,
-                          label_type, dest_dir = session_input_dir, data_dir = raw_data_dir)
+    if job_config.mode in ("train", "cv"):  # download labels only if training or cv job; otherwise no labels needed
+        initialize_labels(job_config, raw_data_bucket, course, session, label_type, dest_dir=session_input_dir,
+                          data_dir=raw_data_dir)
     return
 
 
@@ -456,7 +505,7 @@ def initialize_train_test_data(job_config, raw_data_bucket, level, label_type, c
     return
 
 
-def upload_file_to_s3(file, bucket, key, job_config=None):
+def upload_file_to_s3(file, bucket, key, job_config=None, remove_on_success = False):
     """
     Upload file to bucket + key in S3.
     :param file: name or path to file.
@@ -473,6 +522,8 @@ def upload_file_to_s3(file, bucket, key, job_config=None):
     logger.info("uploading {} to s3://{}/{}".format(file, bucket, key))
     try:
         t.upload_file(file, bucket, key)
+        if remove_on_success:
+            os.remove(file)
     except Exception as e:
         logger.warn("error caching configurations: {}".format(e))
     return
@@ -486,16 +537,10 @@ def delete_s3_keys(job_config, prefix = None):
     :param prefix:
     :return:
     """
-    bucket = job_config.proc_data_bucket
     logger = set_logger_handlers(module_logger, job_config)
-    s3 = boto3.resource('s3')
-    objects_to_delete = s3.meta.client.list_objects(Bucket=bucket, Prefix=prefix)
-    delete_keys = {'Objects': []}
-    delete_keys['Objects'] = [{'Key': k} for k in [obj['Key'] for obj in objects_to_delete.get('Contents', [])]]
-    try:
-        s3.meta.client.delete_objects(Bucket=bucket, Delete=delete_keys)
-    except Exception as e:
-        logger.warning("exception when cleaning S3 bucket: {}; continuing".format(e))
+    # begin
+    cmd = "{} s3 rm --recursive s3://{}".format(job_config.aws_exec, prefix)
+    execute_and_log_output(cmd, logger)
     return
 
 
@@ -512,57 +557,6 @@ def clear_s3_subdirectory(job_config, course = None, session = None):
     logger.info(" clearing previous job data at s3://{}".format(s3_prefix))
     delete_s3_keys(job_config, prefix = s3_prefix)
     return
-
-  
-# def compile_test_results(s3, courses, bucket, user_id, job_id, temp_dir = "./temp/"):
-#     """
-#     Aggregate model testing results from individual courses, if they exist.
-#     :param s3: boto3.client object for s3 connection.
-#     :param courses: courses to compile results for.
-#     :param bucket: get_bucket_from_url(get_config_properties()['output_data_location'])
-#     :param user_id: user id for job.
-#     :param job_id: job id for job.
-#     :param temp_dir: temporary directory location; cleaned up after course is processed
-#     :return: None
-#     """
-#     summary_df_list = []
-#     for course in courses:
-#         if not os.path.exists(temp_dir):
-#             os.makedirs(temp_dir)
-#         archive_file = "{}-{}-{}-{}.tgz".format(user_id, job_id, "test", course)
-#         key = "{}/{}/{}/{}/{}".format(user_id, job_id, "test", course, archive_file)
-#         dest = temp_dir+archive_file
-#         # download file
-#         with open(dest, "wb") as fil:
-#             # copy docker image into working directory
-#             try:
-#                 s3.download_fileobj(bucket, key, fil)
-#                 logger.info(" fetching test summary for course {}".format(course))
-#             except:
-#                 print("[WARNING] no test data found for course {}; skipping".format(course))
-#                 shutil.rmtree(temp_dir)
-#                 continue
-#         #untar file
-#         tar = tarfile.open(dest)
-#         tar.extractall(temp_dir)
-#         tar.close()
-#         # find all model summary files and read into dataframe
-#         course_summary_file = "{}{}_test_summary.csv".format(temp_dir, course)
-#         try:
-#             course_summary_df = pd.read_csv(course_summary_file)
-#             course_summary_df["course"] = course
-#             summary_df_list.append(course_summary_df)
-#         except FileNotFoundError:
-#             logger.warning("no test summary found for course {}; skipping".format(course))
-#         shutil.rmtree(temp_dir)
-#     master_summary_df = pd.concat(summary_df_list, axis = 0)
-#     master_summary_filename = "{}_{}_model_performace_summary.csv".format(user_id, job_id)
-#     master_summary_df.to_csv(master_summary_filename, index = False, header = True)
-#     upload_key = "{}/{}/test/{}".format(user_id, job_id, master_summary_filename)
-#     logger.info(" uploading results to s3://{}/{}".format(bucket, upload_key))
-#     upload_file_to_s3(master_summary_filename, bucket, upload_key)
-#     os.remove(master_summary_filename)
-#     return None
 
 
 def download_model_from_s3(job_config, bucket, key, dest_dir):
@@ -725,11 +719,11 @@ def move_results_to_destination(archive_file, job_config, course = None, session
     bucket = job_config.proc_data_bucket
     key = make_s3_key_path(job_config, filename=archive_file, course = course, session = session)
     logger.info(" uploading results to bucket {} key {}".format(bucket, key))
-    session = boto3.Session()
-    s3_client = session.client("s3")
-    tc = boto3.s3.transfer.TransferConfig()
-    t = boto3.s3.transfer.S3Transfer(client=s3_client, config=tc)
-    t.upload_file(archive_file, bucket, key)
+    s3 = boto3.client('s3')
+    try:
+        s3.upload_file(archive_file, bucket, key)
+    except Exception as e:
+        logger.error("error uploading result file: {}".format(e))
     os.remove(archive_file)
     return
 
@@ -781,6 +775,7 @@ def remove_readonly(func, path, _):
     """
     os.chmod(path, stat.S_IWRITE)
     func(path)
+    return
 
 
 def cache_job_file_in_s3(job_config, bucket = None, filename ="config.properties"):
@@ -812,3 +807,65 @@ def copy_s3_file(job_config, sourceloc, destloc):
     s3.copy_object(CopySource=copy_source, Bucket=get_bucket_from_url(destloc), Key=get_key_from_url(destloc))
     return
 
+
+def make_feature_csv_name(*args):
+    basename = "features.csv"
+    csvname = "_".join([str(x) for x in args] + [basename])
+    return csvname
+
+
+def make_label_csv_name(*args):
+    basename = "labels.csv"
+    csvname = "_".join([str(x) for x in args] + [basename])
+    return csvname
+
+
+def aggregate_session_input_data(file_type, course_dir, course = None):
+    """
+    Aggregate all csv data files matching pattern within course_dir (recursive file search), and write to a single file in input_dir.
+    :param type: {"labels" or "features"}.
+    :param course_dir: course directory containing session-level subdirectories which contain data
+    :return:
+    """
+    if not course:
+        course = os.path.basename(course_dir)
+    valid_types = ("features", "labels")
+    assert file_type in valid_types, "[ERROR] specify either features or labels as type."
+    df_out = pd.DataFrame()
+    # read file from each session, and concatenate into df_out
+    for root, dirs, files in os.walk(course_dir, topdown=False):
+        for session in dirs:
+            session_csv = "_".join([course, session, file_type]) + ".csv"
+            session_feats = os.path.join(root, session, session_csv)
+            session_df = pd.read_csv(session_feats)
+            df_out = pd.concat([df_out, session_df])
+            os.remove(session_feats)
+            session_dir = os.path.join(root, session)
+            if not os.listdir(session_dir): # if session_dir is now empty, remove it
+                os.rmdir(session_dir)
+    # write single csv file
+    if file_type == "features":
+        outfile = make_feature_csv_name(course, file_type)
+    elif file_type == "labels":
+        outfile = "{}_{}.csv".format(course, file_type) #todo: use make_label_csv_name after updating that function
+    outpath = os.path.join(course_dir, outfile)
+    df_out.to_csv(outpath, index=False)
+    return outpath
+
+
+def execute_and_log_output(command, logger):
+    """
+    Execute command and log its output to logger.
+    :param command:
+    :param logger:
+    :return:
+    """
+    logger.info("running: " + command)
+    command_ary = shlex.split(command)
+    p = subprocess.Popen(command_ary, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    stdout, stderr = p.communicate()
+    if stdout:
+        logger.info(stdout)
+    if stderr:
+        logger.error(stderr)
+    return
