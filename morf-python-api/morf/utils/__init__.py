@@ -800,6 +800,7 @@ def copy_s3_file(job_config, sourceloc, destloc):
     :return:
     """
     #todo: check format of urls; should be s3
+    logger = set_logger_handlers(module_logger, job_config)
     s3 = job_config.initialize_s3()
     assert get_bucket_from_url(sourceloc) == get_bucket_from_url(destloc), "can only copy files within same s3 bucket"
     logger.info(" copying file from {} to {}".format(sourceloc, destloc))
