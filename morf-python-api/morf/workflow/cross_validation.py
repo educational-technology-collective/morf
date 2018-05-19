@@ -25,7 +25,7 @@ Utility functions for performing cross-validation for model training/testing.
 
 from morf.utils.log import set_logger_handlers
 from morf.utils.config import MorfJobConfig
-from morf.utils import fetch_courses, fetch_sessions, download_train_test_data, initialize_input_output_dirs, make_feature_csv_name, make_label_csv_name, clear_s3_subdirectory, make_s3_key_path, upload_file_to_s3, download_from_s3, initialize_labels, aggregate_session_input_data, execute_and_log_output
+from morf.utils import fetch_complete_courses, fetch_sessions, download_train_test_data, initialize_input_output_dirs, make_feature_csv_name, make_label_csv_name, clear_s3_subdirectory, make_s3_key_path, upload_file_to_s3, download_from_s3, initialize_labels, aggregate_session_input_data, execute_and_log_output
 from morf.utils.job_runner_utils import make_docker_run_command, load_docker_image
 from morf.utils.api_utils import collect_course_cv_results
 from multiprocessing import Pool
@@ -65,7 +65,7 @@ def create_course_folds(label_type, k = 5, multithread = True, raw_data_dir="mor
     logger.info("creating cross-validation folds")
     with Pool(num_cores) as pool:
         for raw_data_bucket in job_config.raw_data_buckets:
-            for course in fetch_courses(job_config, raw_data_bucket):
+            for course in fetch_complete_courses(job_config, raw_data_bucket):
                 with tempfile.TemporaryDirectory(dir=job_config.local_working_directory) as working_dir:
                     input_dir, output_dir = initialize_input_output_dirs(working_dir)
                     # download data for each session
@@ -127,7 +127,7 @@ def create_session_folds(label_type, k = 5, multithread = True, raw_data_dir="mo
     logger.info("creating cross-validation folds")
     with Pool(num_cores) as pool:
         for raw_data_bucket in job_config.raw_data_buckets:
-            for course in fetch_courses(job_config, raw_data_bucket):
+            for course in fetch_complete_courses(job_config, raw_data_bucket):
                 for session in fetch_sessions(job_config, raw_data_bucket, data_dir=raw_data_dir, course=course, fetch_all_sessions=True):
                     with tempfile.TemporaryDirectory(dir=job_config.local_working_directory) as working_dir:
                         input_dir, output_dir = initialize_input_output_dirs(working_dir)
@@ -217,7 +217,7 @@ def cross_validate_course(label_type, k=5, multithread=True, raw_data_dir="morf-
     logger.info("conducting cross validation")
     with Pool(num_cores) as pool:
         for raw_data_bucket in job_config.raw_data_buckets:
-            for course in fetch_courses(job_config, raw_data_bucket):
+            for course in fetch_complete_courses(job_config, raw_data_bucket):
                 with tempfile.TemporaryDirectory(dir=job_config.local_working_directory) as working_dir:
                     input_dir, output_dir = initialize_input_output_dirs(working_dir)
                     for fold_num in range(1, k + 1):
@@ -266,7 +266,7 @@ def cross_validate_session(label_type, k = 5, multithread = True, raw_data_dir="
     logger.info("conducting cross validation")
     with Pool(num_cores) as pool:
         for raw_data_bucket in job_config.raw_data_buckets:
-            for course in fetch_courses(job_config, raw_data_bucket):
+            for course in fetch_complete_courses(job_config, raw_data_bucket):
                 for session in fetch_sessions(job_config, raw_data_bucket, data_dir=raw_data_dir, course=course, fetch_all_sessions=True):
                     for fold_num in range(1, k+1):
                         with tempfile.TemporaryDirectory(dir=job_config.local_working_directory) as working_dir:
