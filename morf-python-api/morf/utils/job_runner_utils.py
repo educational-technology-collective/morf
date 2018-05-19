@@ -23,12 +23,10 @@
 Utility functions specifically for running jobs in MORF API.
 """
 
-import shlex
 import tempfile
 from morf.utils import *
 from morf.utils.alerts import send_success_email, send_email_alert
 from morf.utils.caching import update_morf_job_cache
-from urllib.parse import urlparse
 import os
 from morf.utils.log import set_logger_handlers
 
