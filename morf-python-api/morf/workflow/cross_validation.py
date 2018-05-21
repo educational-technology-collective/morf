@@ -63,8 +63,8 @@ def create_course_folds(label_type, k = 5, multithread = True, raw_data_dir="mor
     else:
         num_cores = 1
     logger.info("creating cross-validation folds")
-    with Pool(num_cores) as pool:
-        for raw_data_bucket in job_config.raw_data_buckets:
+    for raw_data_bucket in job_config.raw_data_buckets:
+        with Pool(num_cores) as pool:
             for course in fetch_complete_courses(job_config, raw_data_bucket):
                 with tempfile.TemporaryDirectory(dir=job_config.local_working_directory) as working_dir:
                     input_dir, output_dir = initialize_input_output_dirs(working_dir)
@@ -216,8 +216,8 @@ def cross_validate_course(label_type, k=5, multithread=True, raw_data_dir="morf-
     else:
         num_cores = 1
     logger.info("conducting cross validation")
-    with Pool(num_cores) as pool:
-        for raw_data_bucket in job_config.raw_data_buckets:
+    for raw_data_bucket in job_config.raw_data_buckets:
+        with Pool(num_cores) as pool:
             for course in fetch_complete_courses(job_config, raw_data_bucket):
                 with tempfile.TemporaryDirectory(dir=job_config.local_working_directory) as working_dir:
                     input_dir, output_dir = initialize_input_output_dirs(working_dir)
