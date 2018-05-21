@@ -35,17 +35,18 @@ def set_logger_handlers(logger, job_config=None):
     :param job_config:
     :return:
     """
-    logger.setLevel(logging.DEBUG)
-    # create console handler with a higher log level
-    ch = logging.StreamHandler()
-    ch.setLevel(logging.ERROR)
     # create formatter, this is added to handlers later
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    # set formatter and handler for console handler; this is used even if job_config is not provided
-    ch.setFormatter(formatter)
-    logger.addHandler(ch)
-    # if job_config, create file handler for the job which logs even debug messages
-    if job_config:
+    if sum([isinstance(x, logging.StreamHandler) for x in logger.handlers]) == 0: # no stream handler currently set; set one
+        logger.setLevel(logging.DEBUG)
+        # create console handler with a higher log level
+        ch = logging.StreamHandler()
+        ch.setLevel(logging.ERROR)
+        # set formatter and handler for console handler; this is used even if job_config is not provided
+        ch.setFormatter(formatter)
+        logger.addHandler(ch)
+    # if job_config, create file handler for the job which logs even debug messages, if no file handler is currently set
+    if job_config and (sum([isinstance(x, logging.FileHandler) for x in logger.handlers]) == 0):
         job_log_filename = "{}.log".format(job_config.morf_id)
         fh = logging.FileHandler(os.path.join(job_config.logging_dir, job_log_filename))
         fh.setLevel(logging.DEBUG)
