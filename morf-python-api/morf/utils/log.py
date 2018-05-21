@@ -37,7 +37,6 @@ def set_logger_handlers(logger, job_config=None):
     """
     # create formatter, this is added to handlers later
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    import ipdb;ipdb.set_trace()
     if sum([isinstance(x, logging.StreamHandler) for x in logger.handlers]) == 0: # no stream handler currently set; set one
         logger.setLevel(logging.DEBUG)
         # create console handler with a higher log level
