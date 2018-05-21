@@ -75,13 +75,14 @@ def clean_filename(src):
     :return: None
     """
     src_dir, src_file = os.path.split(src)
-    clean_src_file = re.sub('[\(\)\s]', '', src_file)
+    clean_src_file = re.sub('[\(\)\s&]', '', src_file)
     clean_src_path = os.path.join(src_dir, clean_src_file)
     try:
         os.rename(src, clean_src_path)
     except Exception as e:
         print("[ERROR] error renaming file: {}".format(e))
     return
+
 
 def get_bucket_from_url(url):
     """
@@ -290,9 +291,9 @@ def fetch_raw_course_data(job_config, bucket, course, session, input_dir, data_d
     """
     logger = set_logger_handlers(module_logger, job_config)
     course_date_file = "coursera_course_dates.csv"
-    course_session_cache_dir = os.path.join(job_config.cache_dir, bucket, data_dir, course, session)
     session_input_dir = os.path.join(input_dir, course, session)
-    if job_config.cache_dir:
+    if hasattr(job_config, "cache_dir"):
+        course_session_cache_dir = os.path.join(job_config.cache_dir, bucket, data_dir, course, session)
         try:
             logger.info("copying data from cached location {} to {}".format(course_session_cache_dir, session_input_dir))
             shutil.copytree(course_session_cache_dir, session_input_dir)
