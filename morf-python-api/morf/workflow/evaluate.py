@@ -141,6 +141,8 @@ def evaluate_course(label_type, label_col = "label_type", raw_data_dir = "morf-d
     raw_data_buckets = job_config.raw_data_buckets
     proc_data_bucket = job_config.proc_data_bucket
     s3 = job_config.initialize_s3()
+    # clear any preexisting data for this user/job/mode
+    clear_s3_subdirectory(job_config)
     course_data = []
     for raw_data_bucket in raw_data_buckets:
         pred_file = generate_archive_filename(job_config, mode="test", extension="csv")
@@ -190,6 +192,8 @@ def evaluate_cv_course(label_type, k=5, label_col = "label_type", raw_data_dir =
     raw_data_buckets = job_config.raw_data_buckets
     proc_data_bucket = job_config.proc_data_bucket
     s3 = job_config.initialize_s3()
+    # clear any preexisting data for this user/job/mode
+    clear_s3_subdirectory(job_config)
     course_data = []
     for raw_data_bucket in raw_data_buckets:
         pred_file = generate_archive_filename(job_config, mode="test", extension="csv")
