@@ -253,6 +253,9 @@ def cross_validate_course(label_type, k=5, multithread=True):
     # todo: call to create_course_folds() goes here
     job_config = MorfJobConfig(CONFIG_FILENAME)
     job_config.update_mode(mode)
+    # clear previous test results
+    clear_s3_subdirectory(job_config.update_mode("test"))
+    import ipdb;ipdb.set_trace()
     docker_image_dir = os.getcwd() # directory the function is called from; should contain docker image
     logger = set_logger_handlers(module_logger, job_config)
     if multithread:

@@ -549,7 +549,7 @@ def delete_s3_keys(job_config, prefix = None):
     return
 
 
-def clear_s3_subdirectory(job_config, course = None, session = None):
+def clear_s3_subdirectory(job_config, course = None, session = None, mode = None):
     """
     Clear all files for user_id, job_id, and mode; used to wipe s3 subdirectory before uploading new files.
     :job_config: MorfJobConfig object.
@@ -557,6 +557,8 @@ def clear_s3_subdirectory(job_config, course = None, session = None):
     :param session:
     :return:
     """
+    if mode: # clear s3 subdirectory for specified mode, not for current mode of job
+        job_config.update_mode(mode)
     logger = set_logger_handlers(module_logger, job_config)
     s3_prefix = "/".join([x for x in [job_config.proc_data_bucket, job_config.user_id, job_config.job_id, job_config.mode, course, session] if x is not None]) + "/"
     logger.info(" clearing previous job data at s3://{}".format(s3_prefix))
