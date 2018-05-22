@@ -112,11 +112,16 @@ def create_course_folds(label_type, k = 5, multithread = True):
         num_cores = 1
     logger.info("creating cross-validation folds")
     for raw_data_bucket in job_config.raw_data_buckets:
+        reslist = []
         with Pool(num_cores) as pool:
             for course in fetch_complete_courses(job_config, raw_data_bucket):
-                    pool.apply_async(make_folds, [job_config, raw_data_bucket, course, k, label_type])
-        pool.close()
-        pool.join()
+                    poolres = pool.apply_async(make_folds, [job_config, raw_data_bucket, course, k, label_type])
+                    reslist.append(poolres)
+            pool.close()
+            pool.join()
+        for res in reslist:
+            logger.info(res)
+
     return
 
 
@@ -264,8 +269,8 @@ def cross_validate_course(label_type, k=5, multithread=True, raw_data_dir="morf-
                 with tempfile.TemporaryDirectory(dir=job_config.local_working_directory) as working_dir:
                     for fold_num in range(1, k + 1):
                         pool.apply_async(execute_image_for_cv, [])
-        pool.close()
-        pool.join()
+            pool.close()
+            pool.join()
     test_csv_fp = collect_course_cv_results(job_config)
     pred_key = make_s3_key_path(job_config, os.path.basename(test_csv_fp), mode="test")
     upload_file_to_s3(test_csv_fp, job_config.proc_data_bucket, pred_key, job_config, remove_on_success=True)
