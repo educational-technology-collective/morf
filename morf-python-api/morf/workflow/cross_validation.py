@@ -41,6 +41,7 @@ module_logger = logging.getLogger(__name__)
 CONFIG_FILENAME = "config.properties"
 mode = "cv"
 
+
 def make_folds(job_config, raw_data_bucket, course, k, label_type, raw_data_dir="morf-data/"):
     """
     Utility function to be called by create_course_folds for creating the folds for a specific course.
@@ -49,6 +50,7 @@ def make_folds(job_config, raw_data_bucket, course, k, label_type, raw_data_dir=
     logger = set_logger_handlers(module_logger, job_config)
     user_id_col = "userID"
     label_col = "label_value"
+    logger.info("creating cross-validation folds for course {}".format(course))
     with tempfile.TemporaryDirectory(dir=job_config.local_working_directory) as working_dir:
         input_dir, output_dir = initialize_input_output_dirs(working_dir)
         # download data for each session
@@ -101,6 +103,7 @@ def create_course_folds(label_type, k = 5, multithread = True):
     """
     job_config = MorfJobConfig(CONFIG_FILENAME)
     job_config.update_mode(mode)
+    logger = set_logger_handlers(module_logger, job_config)
     # clear any preexisting data for this user/job/mode
     clear_s3_subdirectory(job_config)
     if multithread:
@@ -111,7 +114,8 @@ def create_course_folds(label_type, k = 5, multithread = True):
     for raw_data_bucket in job_config.raw_data_buckets:
         with Pool(num_cores) as pool:
             for course in fetch_complete_courses(job_config, raw_data_bucket):
-                    pool.apply_async(create_course_folds, [job_config, raw_data_bucket, course, k, label_type])
+                    import ipdb;ipdb.set_trace()
+                    pool.apply_async(make_folds, [job_config, raw_data_bucket, course, k, label_type])
         pool.close()
         pool.join()
     return
@@ -218,10 +222,10 @@ def execute_image_for_cv(job_config, working_dir, course, fold_num, docker_image
     course_input_dir = os.path.join(input_dir, course)
     trainkey = make_s3_key_path(job_config, course, make_feature_csv_name(course, fold_num, "train"))
     train_data_path = download_from_s3(job_config.proc_data_bucket, trainkey, job_config.initialize_s3(),
-                                       dir=course_input_dir)
+                                       dir=course_input_dir, job_config=job_config)
     testkey = make_s3_key_path(job_config, course, make_feature_csv_name(course, fold_num, "test"))
     test_data_path = download_from_s3(job_config.proc_data_bucket, testkey, job_config.initialize_s3(),
-                                      dir=course_input_dir)
+                                      dir=course_input_dir, job_config=job_config)
     # get labels
     train_users = pd.read_csv(train_data_path)[user_id_col]
     train_labels_path = initialize_cv_labels(job_config, train_users, raw_data_bucket, course, label_type, input_dir,
@@ -297,9 +301,9 @@ def cross_validate_session(label_type, k = 5, multithread = True, raw_data_dir="
                             session_input_dir = os.path.join(input_dir, course, session)
                             session_output_dir = os.path.join(output_dir, course, session)
                             trainkey = make_s3_key_path(job_config, course, make_feature_csv_name(course, session, fold_num, "train"), session)
-                            train_data_path = download_from_s3(job_config.proc_data_bucket, trainkey, job_config.initialize_s3(), dir=session_input_dir)
+                            train_data_path = download_from_s3(job_config.proc_data_bucket, trainkey, job_config.initialize_s3(), dir=session_input_dir, job_config=job_config)
                             testkey = make_s3_key_path(job_config, course, make_feature_csv_name(course, session, fold_num, "test"), session)
-                            test_data_path = download_from_s3(job_config.proc_data_bucket, testkey, job_config.initialize_s3(), dir=session_input_dir)
+                            test_data_path = download_from_s3(job_config.proc_data_bucket, testkey, job_config.initialize_s3(), dir=session_input_dir, job_config=job_config)
                             # get labels
                             initialize_labels(job_config, raw_data_bucket, course, session, label_type, session_input_dir, raw_data_dir)
                             # run docker image with mode == cv

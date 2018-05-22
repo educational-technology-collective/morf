@@ -418,7 +418,7 @@ def download_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, 
     # download features file
     feature_csv = generate_archive_filename(job_config, mode=fetch_mode, extension="csv")
     key = "{}/{}/{}/{}".format(job_config.user_id, job_config.job_id, fetch_mode, feature_csv)
-    download_from_s3(proc_data_bucket, key, s3, session_input_dir)
+    download_from_s3(proc_data_bucket, key, s3, session_input_dir, job_config=job_config)
     # read features file and filter to only include specific course/session
     local_feature_csv = os.path.join(session_input_dir, feature_csv)
     temp_df = pd.read_csv(local_feature_csv, dtype=object)
@@ -639,7 +639,7 @@ def fetch_file(s3, dest_dir, remote_file_url, dest_filename = None, job_config=N
         elif url.scheme == "s3":
             bucket = url.netloc
             key = url.path[1:]  # ignore initial /
-            download_from_s3(bucket, key, s3, dest_dir, dest_filename = dest_filename)
+            download_from_s3(bucket, key, s3, dest_dir, dest_filename = dest_filename, job_config=job_config)
         elif url.scheme == "https":
             urllib.request.urlretrieve(remote_file_url, os.path.join(dest_dir, dest_filename))
         else:
