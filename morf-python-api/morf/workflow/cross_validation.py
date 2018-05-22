@@ -120,7 +120,7 @@ def create_course_folds(label_type, k = 5, multithread = True):
             pool.close()
             pool.join()
         for res in reslist:
-            logger.info(res)
+            logger.info(res.get())
 
     return
 

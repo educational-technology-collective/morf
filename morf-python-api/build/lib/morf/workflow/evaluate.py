@@ -148,8 +148,8 @@ def evaluate_course(label_type, label_col = "label_type", raw_data_dir = "morf-d
         label_key = raw_data_dir + labels_file
         # download course prediction and label files, fetch classification metrics at course level
         with tempfile.TemporaryDirectory(dir=os.getcwd()) as working_dir:
-            download_from_s3(proc_data_bucket, pred_key, s3, working_dir)
-            download_from_s3(raw_data_bucket, label_key, s3, working_dir)
+            download_from_s3(proc_data_bucket, pred_key, s3, working_dir, job_config=job_config)
+            download_from_s3(raw_data_bucket, label_key, s3, working_dir, job_config=job_config)
             pred_df = pd.read_csv("/".join([working_dir, pred_file]))
             lab_df = pd.read_csv("/".join([working_dir, labels_file]))
             lab_df = lab_df[lab_df[label_col] == label_type].copy()
