@@ -114,7 +114,6 @@ def create_course_folds(label_type, k = 5, multithread = True):
     for raw_data_bucket in job_config.raw_data_buckets:
         with Pool(num_cores) as pool:
             for course in fetch_complete_courses(job_config, raw_data_bucket):
-                    import ipdb;ipdb.set_trace()
                     pool.apply_async(make_folds, [job_config, raw_data_bucket, course, k, label_type])
         pool.close()
         pool.join()
