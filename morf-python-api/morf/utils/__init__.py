@@ -557,10 +557,10 @@ def clear_s3_subdirectory(job_config, course = None, session = None, mode = None
     :param session:
     :return:
     """
-    if mode: # clear s3 subdirectory for specified mode, not for current mode of job
-        job_config.update_mode(mode)
+    if not mode: # clear s3 subdirectory for specified mode, not for current mode of job
+        mode = job_config.mode
     logger = set_logger_handlers(module_logger, job_config)
-    s3_prefix = "/".join([x for x in [job_config.proc_data_bucket, job_config.user_id, job_config.job_id, job_config.mode, course, session] if x is not None]) + "/"
+    s3_prefix = "/".join([x for x in [job_config.proc_data_bucket, job_config.user_id, job_config.job_id, mode, course, session] if x is not None]) + "/"
     logger.info(" clearing previous job data at s3://{}".format(s3_prefix))
     delete_s3_keys(job_config, prefix = s3_prefix)
     return
