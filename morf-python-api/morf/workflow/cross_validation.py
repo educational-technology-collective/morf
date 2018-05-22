@@ -39,9 +39,58 @@ from sklearn.model_selection import StratifiedKFold
 
 module_logger = logging.getLogger(__name__)
 CONFIG_FILENAME = "config.properties"
+mode = "cv"
+
+def make_folds(job_config, raw_data_bucket, course, k, label_type, raw_data_dir="morf-data/"):
+    """
+    Utility function to be called by create_course_folds for creating the folds for a specific course.
+    :return:
+    """
+    logger = set_logger_handlers(module_logger, job_config)
+    user_id_col = "userID"
+    label_col = "label_value"
+    with tempfile.TemporaryDirectory(dir=job_config.local_working_directory) as working_dir:
+        input_dir, output_dir = initialize_input_output_dirs(working_dir)
+        # download data for each session
+        for session in fetch_sessions(job_config, raw_data_bucket, data_dir=raw_data_dir, course=course,
+                                      fetch_all_sessions=True):
+            # get the session feature and label data
+            download_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, session, input_dir,
+                                     label_type=label_type)
+        # merge features to ensure splits are correct
+        feat_csv_path = aggregate_session_input_data("features", os.path.join(input_dir, course))
+        label_csv_path = aggregate_session_input_data("labels", os.path.join(input_dir, course))
+        feat_df = pd.read_csv(feat_csv_path, dtype=object)
+        label_df = pd.read_csv(label_csv_path, dtype=object)
+        feat_label_df = pd.merge(feat_df, label_df, on=user_id_col)
+        if feat_df.shape[0] != label_df.shape[0]:
+            logger.error(
+                "number of observations in extracted features and labels do not match for course {}; features contains {} and labels contains {} observations".format(
+                    course, feat_df.shape[0], label_df.shape[0]))
+        # create the folds
+        logger.info("creating cv splits with k = {} course {} session {}".format(k, course, session))
+        skf = StratifiedKFold(n_splits=k, shuffle=True)
+        folds = skf.split(np.zeros(feat_label_df.shape[0]), feat_label_df.label_value)
+        for fold_num, train_test_indices in enumerate(folds, 1):  # write each fold train/test data to csv and push to s3
+            train_index, test_index = train_test_indices
+            train_df, test_df = feat_label_df.loc[train_index,].drop(label_col, axis=1), feat_label_df.loc[
+                test_index,].drop(label_col, axis=1)
+            train_df_name = os.path.join(working_dir, make_feature_csv_name(course, fold_num, "train"))
+            test_df_name = os.path.join(working_dir, make_feature_csv_name(course, fold_num, "test"))
+            train_df.to_csv(train_df_name, index=False)
+            test_df.to_csv(test_df_name, index=False)
+            # upload to s3
+            try:
+                train_key = make_s3_key_path(job_config, course, os.path.basename(train_df_name))
+                upload_file_to_s3(train_df_name, job_config.proc_data_bucket, train_key, job_config, remove_on_success=True)
+                test_key = make_s3_key_path(job_config, course, os.path.basename(test_df_name))
+                upload_file_to_s3(test_df_name, job_config.proc_data_bucket, test_key, job_config, remove_on_success=True)
+            except Exception as e:
+                logger.warning("exception occurred while uploading cv results: {}".format(e))
+    return
 
 
-def create_course_folds(label_type, k = 5, multithread = True, raw_data_dir="morf-data/"):
+def create_course_folds(label_type, k = 5, multithread = True):
     """
     From extract and extract-holdout data, create k randomized folds, pooling data by course (across sessions) and archive results to s3.
     :param label_type: type of outcome label to use.
@@ -50,12 +99,8 @@ def create_course_folds(label_type, k = 5, multithread = True, raw_data_dir="mor
     :param raw_data_dir: name of subfolder in s3 buckets containing raw data.
     :return:
     """
-    user_id_col = "userID"
-    label_col = "label_value"
     job_config = MorfJobConfig(CONFIG_FILENAME)
-    mode = "cv"
     job_config.update_mode(mode)
-    logger = set_logger_handlers(module_logger, job_config)
     # clear any preexisting data for this user/job/mode
     clear_s3_subdirectory(job_config)
     if multithread:
@@ -66,39 +111,7 @@ def create_course_folds(label_type, k = 5, multithread = True, raw_data_dir="mor
     for raw_data_bucket in job_config.raw_data_buckets:
         with Pool(num_cores) as pool:
             for course in fetch_complete_courses(job_config, raw_data_bucket):
-                with tempfile.TemporaryDirectory(dir=job_config.local_working_directory) as working_dir:
-                    input_dir, output_dir = initialize_input_output_dirs(working_dir)
-                    # download data for each session
-                    for session in fetch_sessions(job_config, raw_data_bucket, data_dir=raw_data_dir, course=course, fetch_all_sessions=True):
-                        # get the session feature and label data
-                        download_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, session, input_dir, label_type=label_type)
-                    # merge features to ensure splits are correct
-                    feat_csv_path = aggregate_session_input_data("features", os.path.join(input_dir, course))
-                    label_csv_path = aggregate_session_input_data("labels", os.path.join(input_dir, course))
-                    feat_df = pd.read_csv(feat_csv_path, dtype=object)
-                    label_df = pd.read_csv(label_csv_path, dtype=object)
-                    feat_label_df = pd.merge(feat_df, label_df, on=user_id_col)
-                    if feat_df.shape[0] != label_df.shape[0]:
-                        logger.error("number of observations in extracted features and labels do not match for course {}; features contains {} and labels contains {} observations".format(course, feat_df.shape[0], label_df.shape[0]))
-                    # create the folds
-                    logger.info("creating cv splits with k = {} course {} session {}".format(k, course, session))
-                    skf = StratifiedKFold(n_splits=k, shuffle=True)
-                    folds = skf.split(np.zeros(feat_label_df.shape[0]), feat_label_df.label_value)
-                    for fold_num, train_test_indices in enumerate(folds,1): # write each fold train/test data to csv and push to s3
-                        train_index, test_index = train_test_indices
-                        train_df, test_df = feat_label_df.loc[train_index,].drop(label_col, axis = 1), feat_label_df.loc[test_index,].drop(label_col, axis = 1)
-                        train_df_name = os.path.join(working_dir, make_feature_csv_name(course, fold_num, "train"))
-                        test_df_name = os.path.join(working_dir, make_feature_csv_name(course, fold_num, "test"))
-                        train_df.to_csv(train_df_name, index = False)
-                        test_df.to_csv(test_df_name, index=False)
-                        # upload to s3
-                        try:
-                            train_key = make_s3_key_path(job_config, course, os.path.basename(train_df_name))
-                            upload_file_to_s3(train_df_name, job_config.proc_data_bucket, train_key, job_config, remove_on_success=True)
-                            test_key = make_s3_key_path(job_config, course, os.path.basename(test_df_name))
-                            upload_file_to_s3(test_df_name, job_config.proc_data_bucket, test_key, job_config, remove_on_success=True)
-                        except Exception as e:
-                            logger.warning("exception occurred while uploading cv results: {}".format(e))
+                    pool.apply_async(create_course_folds, [job_config, raw_data_bucket, course, k, label_type])
         pool.close()
         pool.join()
     return
@@ -116,7 +129,6 @@ def create_session_folds(label_type, k = 5, multithread = True, raw_data_dir="mo
     user_id_col = "userID"
     label_col = "label_value"
     job_config = MorfJobConfig(CONFIG_FILENAME)
-    mode = "cv"
     job_config.update_mode(mode)
     logger = set_logger_handlers(module_logger, job_config)
     # clear any preexisting data for this user/job/mode
@@ -131,6 +143,7 @@ def create_session_folds(label_type, k = 5, multithread = True, raw_data_dir="mo
             for course in fetch_complete_courses(job_config, raw_data_bucket):
                 for session in fetch_sessions(job_config, raw_data_bucket, data_dir=raw_data_dir, course=course, fetch_all_sessions=True):
                     with tempfile.TemporaryDirectory(dir=job_config.local_working_directory) as working_dir:
+                        # todo: call make_folds() here via apply_async(); currently this is not parallelized!
                         input_dir, output_dir = initialize_input_output_dirs(working_dir)
                         # get the session feature and label data
                         download_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, session, input_dir, label_type=label_type)
@@ -197,6 +210,34 @@ def initialize_cv_labels(job_config, users, raw_data_bucket, course, label_type,
     return out_path
 
 
+def execute_image_for_cv(job_config, working_dir, course, fold_num, docker_image_dir):
+    user_id_col = "userID"
+    logger = set_logger_handlers(module_logger, job_config)
+    input_dir, output_dir = initialize_input_output_dirs(working_dir)
+    # get fold train data
+    course_input_dir = os.path.join(input_dir, course)
+    trainkey = make_s3_key_path(job_config, course, make_feature_csv_name(course, fold_num, "train"))
+    train_data_path = download_from_s3(job_config.proc_data_bucket, trainkey, job_config.initialize_s3(),
+                                       dir=course_input_dir)
+    testkey = make_s3_key_path(job_config, course, make_feature_csv_name(course, fold_num, "test"))
+    test_data_path = download_from_s3(job_config.proc_data_bucket, testkey, job_config.initialize_s3(),
+                                      dir=course_input_dir)
+    # get labels
+    train_users = pd.read_csv(train_data_path)[user_id_col]
+    train_labels_path = initialize_cv_labels(job_config, train_users, raw_data_bucket, course, label_type, input_dir,
+                                             raw_data_dir, fold_num, "train", level="course")
+    # run docker image with mode == cv
+    image_uuid = load_docker_image(docker_image_dir, job_config, logger)
+    cmd = make_docker_run_command(job_config.docker_exec, input_dir, output_dir, image_uuid, course, None, mode,
+                                  job_config.client_args) + " --fold_num {}".format(fold_num)
+    execute_and_log_output(cmd, logger)
+    # upload results
+    pred_csv = os.path.join(output_dir, "{}_{}_test.csv".format(course, fold_num))
+    pred_key = make_s3_key_path(job_config, course, os.path.basename(pred_csv), mode="test")
+    upload_file_to_s3(pred_csv, job_config.proc_data_bucket, pred_key, job_config, remove_on_success=True)
+
+
+
 def cross_validate_course(label_type, k=5, multithread=True, raw_data_dir="morf-data/"):
     """
     Compute k-fold cross-validation across courses.
@@ -204,10 +245,8 @@ def cross_validate_course(label_type, k=5, multithread=True, raw_data_dir="morf-
     """
     # todo: call to create_course_folds() goes here
     job_config = MorfJobConfig(CONFIG_FILENAME)
-    mode = "cv"
-    user_id_col = "userID"
     job_config.update_mode(mode)
-    controller_working_dir = os.getcwd() # directory the function is called from; should contain docker image
+    docker_image_dir = os.getcwd() # directory the function is called from; should contain docker image
     logger = set_logger_handlers(module_logger, job_config)
     # clear any preexisting data for this user/job/mode
     # clear_s3_subdirectory(job_config)
@@ -220,25 +259,8 @@ def cross_validate_course(label_type, k=5, multithread=True, raw_data_dir="morf-
         with Pool(num_cores) as pool:
             for course in fetch_complete_courses(job_config, raw_data_bucket):
                 with tempfile.TemporaryDirectory(dir=job_config.local_working_directory) as working_dir:
-                    input_dir, output_dir = initialize_input_output_dirs(working_dir)
                     for fold_num in range(1, k + 1):
-                        # get fold train data
-                        course_input_dir = os.path.join(input_dir, course)
-                        trainkey = make_s3_key_path(job_config, course, make_feature_csv_name(course, fold_num, "train"))
-                        train_data_path = download_from_s3(job_config.proc_data_bucket, trainkey, job_config.initialize_s3(), dir=course_input_dir)
-                        testkey = make_s3_key_path(job_config, course, make_feature_csv_name(course, fold_num, "test"))
-                        test_data_path = download_from_s3(job_config.proc_data_bucket, testkey, job_config.initialize_s3(), dir=course_input_dir)
-                        # get labels
-                        train_users = pd.read_csv(train_data_path)[user_id_col]
-                        train_labels_path = initialize_cv_labels(job_config, train_users, raw_data_bucket, course, label_type, input_dir, raw_data_dir, fold_num, "train", level="course")
-                        # run docker image with mode == cv
-                        image_uuid = load_docker_image(controller_working_dir, job_config, logger)
-                        cmd = make_docker_run_command(job_config.docker_exec, input_dir, output_dir, image_uuid, course, None, mode, job_config.client_args) + " --fold_num {}".format(fold_num)
-                        execute_and_log_output(cmd, logger)
-                        # upload results
-                        pred_csv = os.path.join(output_dir, "{}_{}_test.csv".format(course, fold_num))
-                        pred_key = make_s3_key_path(job_config, course, os.path.basename(pred_csv), mode="test")
-                        upload_file_to_s3(pred_csv, job_config.proc_data_bucket, pred_key, job_config, remove_on_success=True)
+                        pool.apply_async(execute_image_for_cv, [])
         pool.close()
         pool.join()
     test_csv_fp = collect_course_cv_results(job_config)
@@ -255,7 +277,6 @@ def cross_validate_session(label_type, k = 5, multithread = True, raw_data_dir="
     raise NotImplementedError # this is not implemented!
     # todo: call to create_session_folds() goes here
     job_config = MorfJobConfig(CONFIG_FILENAME)
-    mode = "cv"
     job_config.update_mode(mode)
     logger = set_logger_handlers(module_logger, job_config)
     # clear any preexisting data for this user/job/mode
