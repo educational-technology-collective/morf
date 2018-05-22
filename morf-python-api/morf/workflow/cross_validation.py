@@ -121,7 +121,6 @@ def create_course_folds(label_type, k = 5, multithread = True):
             pool.join()
         for res in reslist:
             logger.info(res.get())
-
     return
 
 
@@ -218,7 +217,7 @@ def initialize_cv_labels(job_config, users, raw_data_bucket, course, label_type,
     return out_path
 
 
-def execute_image_for_cv(job_config, working_dir, course, fold_num, docker_image_dir):
+def execute_image_for_cv(job_config, raw_data_bucket, working_dir, course, fold_num, docker_image_dir, label_type, raw_data_dir="morf-data/"):
     user_id_col = "userID"
     logger = set_logger_handlers(module_logger, job_config)
     input_dir, output_dir = initialize_input_output_dirs(working_dir)
@@ -243,10 +242,10 @@ def execute_image_for_cv(job_config, working_dir, course, fold_num, docker_image
     pred_csv = os.path.join(output_dir, "{}_{}_test.csv".format(course, fold_num))
     pred_key = make_s3_key_path(job_config, course, os.path.basename(pred_csv), mode="test")
     upload_file_to_s3(pred_csv, job_config.proc_data_bucket, pred_key, job_config, remove_on_success=True)
+    return
 
 
-
-def cross_validate_course(label_type, k=5, multithread=True, raw_data_dir="morf-data/"):
+def cross_validate_course(label_type, k=5, multithread=True):
     """
     Compute k-fold cross-validation across courses.
     :return:
@@ -256,21 +255,23 @@ def cross_validate_course(label_type, k=5, multithread=True, raw_data_dir="morf-
     job_config.update_mode(mode)
     docker_image_dir = os.getcwd() # directory the function is called from; should contain docker image
     logger = set_logger_handlers(module_logger, job_config)
-    # clear any preexisting data for this user/job/mode
-    # clear_s3_subdirectory(job_config)
     if multithread:
         num_cores = job_config.max_num_cores
     else:
         num_cores = 1
     logger.info("conducting cross validation")
     for raw_data_bucket in job_config.raw_data_buckets:
+        reslist = []
         with Pool(num_cores) as pool:
             for course in fetch_complete_courses(job_config, raw_data_bucket):
                 with tempfile.TemporaryDirectory(dir=job_config.local_working_directory) as working_dir:
                     for fold_num in range(1, k + 1):
-                        pool.apply_async(execute_image_for_cv, [])
+                        import ipdb;ipdb.set_trace()
+                        # pool.apply_async(execute_image_for_cv, [job_config, raw_data_bucket, working_dir, course, fold_num, docker_image_dir, label_type])
             pool.close()
             pool.join()
+        for res in reslist:
+            logger.info(res.get())
     test_csv_fp = collect_course_cv_results(job_config)
     pred_key = make_s3_key_path(job_config, os.path.basename(test_csv_fp), mode="test")
     upload_file_to_s3(test_csv_fp, job_config.proc_data_bucket, pred_key, job_config, remove_on_success=True)

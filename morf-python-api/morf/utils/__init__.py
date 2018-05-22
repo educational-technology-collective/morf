@@ -765,10 +765,12 @@ def initialize_input_output_dirs(working_dir):
     :param working_dir: local or relative filepath to create input and output directory in.
     :return: None
     """
-    input_dir = "{0}/input/".format(working_dir)
-    os.mkdir(input_dir)
-    output_dir = "{0}/output/".format(working_dir)
-    os.mkdir(output_dir)
+    input_dir = os.path.join(working_dir, "input")
+    if not os.path.exists(input_dir):
+        os.mkdir(input_dir)
+    output_dir =os.path.join(working_dir, "output")
+    if not os.path.exists(output_dir):
+        os.mkdir(output_dir)
     os.chmod(output_dir,stat.S_ISUID | stat.S_ISGID | stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IRWXG | stat.S_IRGRP | stat.S_IWGRP | stat.S_IXGRP)
     return (input_dir, output_dir)
 
