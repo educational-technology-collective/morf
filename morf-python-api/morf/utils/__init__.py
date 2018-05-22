@@ -102,7 +102,7 @@ def get_key_from_url(url):
     return re.search("^s3://[^/]+/(.+)", url).group(1)
 
 
-def download_from_s3(bucket, key, s3, dir = os.getcwd(), dest_filename = None):
+def download_from_s3(bucket, key, s3, dir = os.getcwd(), dest_filename = None, job_config = None):
     """
     Downloads a file from s3 into dir and returns its path as a string for optional use.
     :param bucket: an s3 bucket name (string).
@@ -112,6 +112,10 @@ def download_from_s3(bucket, key, s3, dir = os.getcwd(), dest_filename = None):
     :param dest_filename: base name for file.
     :return: Path to downloaded file inside dir (string).
     """
+    if job_config:
+        logger = set_logger_handlers(module_logger, job_config)
+    else:
+        logger = module_logger
     if not dest_filename:
         dest_filename = os.path.basename(key)
     if not os.path.exists(dir):
@@ -120,10 +124,10 @@ def download_from_s3(bucket, key, s3, dir = os.getcwd(), dest_filename = None):
         try:
             s3.download_fileobj(bucket, key, resource)
         except ClientError as ce:
-            print("[ERROR] boto ClientError downloading from location s3://{}/{}: {}".format(bucket, key, ce))
+            logger.error("boto ClientError downloading from location s3://{}/{}: {}".format(bucket, key, ce))
             raise
         except Exception as e:
-            print("[ERROR] error downloading from location s3://{}/{}: {}".format(bucket, key, e))
+            logger.error("error downloading from location s3://{}/{}: {}".format(bucket, key, e))
             raise
     dest_path = os.path.join(dir, dest_filename)
     return dest_path
