@@ -153,7 +153,7 @@ def evaluate_course(label_type, label_col = "label_type", raw_data_dir = "morf-d
             download_from_s3(proc_data_bucket, pred_key, s3, working_dir)
             download_from_s3(raw_data_bucket, label_key, s3, working_dir)
             pred_df = pd.read_csv("/".join([working_dir, pred_file]))
-            lab_df = pd.read_csv("/".join([working_dir, labels_file]))
+            lab_df = pd.read_csv("/".join([working_dir, labels_file]), dtype=object)
             lab_df = lab_df[lab_df[label_col] == label_type].copy()
             pred_lab_df = pd.merge(lab_df, pred_df, how = "left", on = [user_col, course_col])
             check_dataframe_complete(pred_lab_df, job_config, columns = pred_cols)
@@ -172,7 +172,7 @@ def evaluate_course(label_type, label_col = "label_type", raw_data_dir = "morf-d
 
 def evaluate_cv_course(label_type, k=5, label_col = "label_type", raw_data_dir = "morf-data/",
                     course_col = "course", fold_col = "fold_num", pred_cols = ("prob", "pred"),
-                    user_col = "userID", labels_file = "labels-test.csv"):
+                    user_col = "userID"):
     """
     Fetch metrics by first averaging over folds within course, then returning results by course.
     :param label_type: label type defined by user.
@@ -204,7 +204,7 @@ def evaluate_cv_course(label_type, k=5, label_col = "label_type", raw_data_dir =
             job_config.update_mode("cv") # set mode to cv to fetch correct labels for sessions even if they are train/test sessions
             label_csv = initialize_labels(job_config, raw_data_bucket, None, None, label_type, working_dir, raw_data_dir, level="all")
             pred_df = pd.read_csv(pred_csv)
-            lab_df = pd.read_csv(label_csv)
+            lab_df = pd.read_csv(label_csv, dtype=object)
             pred_lab_df = pd.merge(lab_df, pred_df, how = "left", on = [user_col, course_col])
             check_dataframe_complete(pred_lab_df, job_config, columns = list(pred_cols))
             for course in fetch_complete_courses(job_config, data_bucket = raw_data_bucket, data_dir = raw_data_dir, n_train=1):
