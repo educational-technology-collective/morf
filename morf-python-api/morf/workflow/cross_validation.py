@@ -237,12 +237,10 @@ def execute_image_for_cv(job_config, raw_data_bucket, course, fold_num, docker_i
         trainkey = make_s3_key_path(job_config, course, make_feature_csv_name(course, fold_num, "train"))
         train_data_path = download_from_s3(job_config.proc_data_bucket, trainkey, job_config.initialize_s3(), dir=course_input_dir, job_config=job_config)
         testkey = make_s3_key_path(job_config, course, make_feature_csv_name(course, fold_num, "test"))
-        test_data_path = download_from_s3(job_config.proc_data_bucket, testkey, job_config.initialize_s3(),
-                                          dir=course_input_dir, job_config=job_config)
+        test_data_path = download_from_s3(job_config.proc_data_bucket, testkey, job_config.initialize_s3(), dir=course_input_dir, job_config=job_config)
         # get labels
         train_users = pd.read_csv(train_data_path)[user_id_col]
-        train_labels_path = initialize_cv_labels(job_config, train_users, raw_data_bucket, course, label_type, input_dir,
-                                                 raw_data_dir, fold_num, "train", level="course")
+        train_labels_path = initialize_cv_labels(job_config, train_users, raw_data_bucket, course, label_type, input_dir, raw_data_dir, fold_num, "train", level="course")
         # run docker image with mode == cv
         image_uuid = load_docker_image(docker_image_dir, job_config, logger)
         cmd = make_docker_run_command(job_config.docker_exec, input_dir, output_dir, image_uuid, course, None, mode,
@@ -277,6 +275,7 @@ def cross_validate_course(label_type, k=5, multithread=True):
         with Pool(num_cores) as pool:
             for course in fetch_complete_courses(job_config, raw_data_bucket):
                 for fold_num in range(1, k + 1):
+                    import ipdb;ipdb.set_trace()
                     poolres = pool.apply_async(execute_image_for_cv, [job_config, raw_data_bucket, course, fold_num, docker_image_dir, label_type])
                     reslist.append(poolres)
             pool.close()

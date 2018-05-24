@@ -256,13 +256,12 @@ def fork_features(job_id_to_fork, raw_data_dir = "morf-data/"):
     :return: None.
     """
     job_config = MorfJobConfig(CONFIG_FILENAME)
-    logger = set_logger_handlers(module_logger, job_config)
     #todo: multithread this
     for mode in ["extract", "extract-holdout"]:
         job_config.update_mode(mode)
         clear_s3_subdirectory(job_config)
         for raw_data_bucket in job_config.raw_data_buckets:
-            logger.info("forking features from bucket {} mode {}".format(raw_data_bucket, mode))
+            print("[INFO] forking features from bucket {} mode {}".format(raw_data_bucket, mode))
             courses = fetch_courses(job_config, raw_data_bucket, raw_data_dir)
             for course in courses:
                 for session in fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course,
