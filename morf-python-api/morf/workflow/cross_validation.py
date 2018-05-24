@@ -277,7 +277,6 @@ def cross_validate_course(label_type, k=5, multithread=True):
         with Pool(num_cores) as pool:
             for course in fetch_complete_courses(job_config, raw_data_bucket):
                 for fold_num in range(1, k + 1):
-                    # execute_image_for_cv(job_config, raw_data_bucket, working_dir, course, fold_num, docker_image_dir, label_type)
                     poolres = pool.apply_async(execute_image_for_cv, [job_config, raw_data_bucket, course, fold_num, docker_image_dir, label_type])
                     reslist.append(poolres)
             pool.close()
