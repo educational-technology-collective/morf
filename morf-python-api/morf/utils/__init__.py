@@ -333,6 +333,7 @@ def initialize_session_labels(job_config, bucket, course, session, label_type, d
     :param data_dir: directory in bucket containing course-level data directories.
     :return: None
     """
+    logger = set_logger_handlers(module_logger, job_config)
     s3 = job_config.initialize_s3()
     if not os.path.exists(dest_dir):
         os.makedirs(dest_dir)
@@ -347,7 +348,11 @@ def initialize_session_labels(job_config, bucket, course, session, label_type, d
     label_csv_fp = "{}/{}".format(dest_dir, label_csv)
     key = data_dir + label_csv
     with open(label_csv_fp, "wb") as resource:
-        s3.download_fileobj(bucket, key, resource)
+        logger.info("fetching {}".format(key))
+        try:
+            s3.download_fileobj(bucket, key, resource)
+        except Exception as e:
+            logger.error(str(e))
     df = pd.read_csv(label_csv_fp, dtype=object)
     course_label_df = df.loc[(df["course"] == course) & (df["session"] == session) & (df["label_type"] == label_type)]\
         .copy()
