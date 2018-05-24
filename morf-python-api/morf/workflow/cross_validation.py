@@ -272,7 +272,6 @@ def cross_validate_course(label_type, k=5, multithread=True):
     else:
         num_cores = 1
     logger.info("conducting cross validation")
-    # todo: can we load the docker image here, just once, and execute it repeatedly?
     for raw_data_bucket in job_config.raw_data_buckets:
         reslist = []
         with Pool(num_cores) as pool:
