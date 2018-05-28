@@ -84,7 +84,7 @@ def fetch_from_cache(job_config, cache_file_path, dest_dir):
     if hasattr(job_config, "cache_dir") and os.path.exists(cache_file_path):
         if not os.path.exists(dest_dir):
             os.makedirs(dest_dir)
-        dest_fp = shutil.copy(cache_file_path, dest_dir)
+        dest_fp = shutil.copy(os.path.join(job_config.cache_dir, cache_file_path), dest_dir)
     else:
         logger.warning("file {} does not exist in cache".format(cache_file_path))
         dest_fp = None
