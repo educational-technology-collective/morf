@@ -75,17 +75,18 @@ def fetch_from_cache(job_config, cache_file_path, dest_dir):
     """
     Fetch a file from the cache for job_config into dest_dir, if it exists.
     :param job_config:
-    :param cache_file_path: string, relative path to file in cache (this is identical to the directory path in s3; e.g. "/bucket/path/to/sometfile.csv"
+    :param cache_file_path: string, relative path to file in cache (this is identical to the directory path in s3; e.g. "/bucket/path/to/somefile.csv"
     :param dest_dir: absolute path of directory to fetch file into (will be created if not exists)
     :return: path to fetched file (string); return None if cache is not used.
     """
     logger = set_logger_handlers(module_logger, job_config)
-    logger.info("fetching file {} from cache".format(file))
-    if hasattr(job_config, "cache_dir") and os.path.exists(cache_file_path):
+    logger.info("fetching file {} from cache".format(cache_file_path))
+    abs_cache_file_path = os.path.join(getattr(job_config, "cache_dir", None), cache_file_path)
+    if hasattr(job_config, "cache_dir") and os.path.exists(abs_cache_file_path):
         if not os.path.exists(dest_dir):
             os.makedirs(dest_dir)
-        dest_fp = shutil.copy(os.path.join(job_config.cache_dir, cache_file_path), dest_dir)
+        dest_fp = shutil.copy(abs_cache_file_path, dest_dir)
     else:
-        logger.warning("file {} does not exist in cache".format(cache_file_path))
+        logger.warning("file {} does not exist in cache".format(abs_cache_file_path))
         dest_fp = None
     return dest_fp
