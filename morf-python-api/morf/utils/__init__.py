@@ -35,7 +35,8 @@ import boto3
 from botocore.exceptions import ClientError
 import pandas as pd
 from urllib.parse import urlparse
-from morf.utils.log import set_logger_handlers, fetch_from_cache
+from morf.utils.log import set_logger_handlers
+from morf.utils.caching import fetch_from_cache
 
 
 # create logger
