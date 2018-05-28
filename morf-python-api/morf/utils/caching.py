@@ -25,10 +25,12 @@ Functions for caching data for MORF jobs.
 
 import os
 import subprocess
+import shutil
 from urllib.parse import urlparse
 import logging
+from morf.utils.log import set_logger_handlers
 
-logger = logging.getLogger()
+module_logger = logging.getLogger(__name__)
 
 def cache_s3_to_local(job_config, bucket):
     """
@@ -37,6 +39,7 @@ def cache_s3_to_local(job_config, bucket):
     :param bucket: path to s3 bucket.
     :return:
     """
+    logger = set_logger_handlers(module_logger, job_config)
     s3bucket = "s3://{}".format(bucket)
     bucket_cache_dir = os.path.join(job_config.cache_dir, bucket)
     # create job_config.cache_dir directory if not exists
@@ -66,3 +69,23 @@ def update_morf_job_cache(job_config):
     for raw_data_bucket in job_config.raw_data_buckets:
         cache_s3_to_local(job_config, raw_data_bucket)
     return
+
+
+def fetch_from_cache(job_config, cache_file_path, dest_dir):
+    """
+    Fetch a file from the cache for job_config into dest_dir, if it exists.
+    :param job_config:
+    :param cache_file_path: string, relative path to file in cache (this is identical to the directory path in s3; e.g. "/bucket/path/to/sometfile.csv"
+    :param dest_dir: absolute path of directory to fetch file into (will be created if not exists)
+    :return: path to fetched file (string); return None if cache is not used.
+    """
+    logger = set_logger_handlers(module_logger, job_config)
+    logger.info("fetching file {} from cache".format(file))
+    if hasattr(job_config, "cache_dir") and os.path.exists(cache_file_path):
+        if not os.path.exists(dest_dir):
+            os.makedirs(dest_dir)
+        dest_fp = shutil.copy(cache_file_path, dest_dir)
+    else:
+        logger.warning("file {} does not exist in cache".format(cache_file_path))
+        dest_fp = None
+    return dest_fp

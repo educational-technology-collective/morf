@@ -320,39 +320,39 @@ def fetch_raw_course_data(job_config, bucket, course, session, input_dir, data_d
 
 def initialize_session_labels(job_config, bucket, course, session, label_type, dest_dir, data_dir):
     """
-    Download labels file and extract results for course and session into labels.csv.
-    :param s3: boto3.client object for s3 connection.
-    :param aws_access_key_id: aws_access_key_id.
-    :param aws_secret_access_key: aws_secret_access_key.
+    Fetch labels file and extract results for course and session into labels.csv.
+    :param job_config: MorfJobConfig object.
     :param bucket: bucket with extracted data.
     :param course: course to fetch data for.
     :param session: session to fetch data for.
-    :param mode: mode of job.
     :param label_type: valid label type to place in 'label' column
     :param dest_dir: directory to load data into. This should be same directory mounted to Docker image in docker run command.
     :param data_dir: directory in bucket containing course-level data directories.
-    :return: None
+    :return: Path to labels (string).
     """
     logger = set_logger_handlers(module_logger, job_config)
-    s3 = job_config.initialize_s3()
     if not os.path.exists(dest_dir):
         os.makedirs(dest_dir)
     # fetch mode; need to handle special cases of cv
-    if job_config.mode == "cv" and session in fetch_sessions(job_config, bucket, data_dir, course, fetch_holdout_session_only=True):
-        mode = "test" # this is holdout session; use the "test" labels
-    elif job_config.mode == "cv":
+    if job_config.mode == "cv" and session in fetch_sessions(job_config, bucket, data_dir, course, fetch_holdout_session_only=True): # this is holdout session; use the "test" labels
+        mode = "test"
+    elif job_config.mode == "cv": # this is not holdout session; use the "train" labels
         mode = "train"
     else:
         mode = job_config.mode
+    # create filename
     label_csv = "labels-{}.csv".format(mode) # file with labels for ALL courses
-    label_csv_fp = "{}/{}".format(dest_dir, label_csv)
-    key = data_dir + label_csv
-    with open(label_csv_fp, "wb") as resource:
-        logger.info("fetching {}".format(key))
-        try:
-            s3.download_fileobj(bucket, key, resource)
-        except Exception as e:
-            logger.error(str(e))
+    # fetch from cache, or download if not using cache
+    if hasattr(job_config, "cache_dir"):
+        logger.info("fetching labels file from cache for course {} session {} mode {}".format(course, session, mode))
+        # fetch file from cache
+        label_csv_fp = os.path.join(dest_dir, label_csv)
+    else:
+        logger.info("fetching labels file from s3 for course {} session {} mode {}".format(course, session, mode))
+        s3 = job_config.initialize_s3()
+        key = data_dir + label_csv
+        label_csv_fp = download_from_s3(bucket, key, s3, dest_dir, label_csv, job_config)
+    # read dataframe and filter for correct course/session/labels
     df = pd.read_csv(label_csv_fp, dtype=object)
     course_label_df = df.loc[(df["course"] == course) & (df["session"] == session) & (df["label_type"] == label_type)]\
         .copy()
