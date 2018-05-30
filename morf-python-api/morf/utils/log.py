@@ -36,8 +36,8 @@ def set_logger_handlers(logger, job_config=None):
     :return:
     """
     # create formatter, this is added to handlers later
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     if sum([isinstance(x, logging.StreamHandler) for x in logger.handlers]) == 0: # no stream handler currently set; set one
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         logger.setLevel(logging.DEBUG)
         # create console handler with a higher log level
         ch = logging.StreamHandler()
@@ -47,9 +47,11 @@ def set_logger_handlers(logger, job_config=None):
         logger.addHandler(ch)
     # if job_config, create file handler for the job which logs even debug messages, if no file handler is currently set
     if job_config and (sum([isinstance(x, logging.FileHandler) for x in logger.handlers]) == 0):
+        # logger = CustomAdapter(logger, {'morf_id': job_config.morf_id})
         job_log_filename = "{}.log".format(job_config.morf_id)
         fh = logging.FileHandler(os.path.join(job_config.logging_dir, job_log_filename))
         fh.setLevel(logging.DEBUG)
+        formatter = logging.Formatter('%(asctime)s - %(name)s - {} - {} - {} - %(levelname)s - %(message)s'.format(job_config.morf_id, job_config.user_id, job_config.job_id))
         fh.setFormatter(formatter)
         logger.addHandler(fh)
     return logger
