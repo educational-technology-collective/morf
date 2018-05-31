@@ -20,6 +20,7 @@
 # SOFTWARE.
 
 import hashlib
+import pandas as pd
 
 
 def hash_df_column(column, user_id, hash_secret):
@@ -56,6 +57,6 @@ def check_email_logging_authorized(job_config, auth_colname = "email_logging_aut
     """
     auth_dict = {"T": True, "F": False} # mapping of plain-text boolean values used in table to Python logicals
     access_table = pd.read_csv(job_config.access_table_url, index_col=0)
-    if email_to in access_table.index:
-        email_logging_auth = access_table.loc[email_to, auth_colname]
+    if job_config.email_to in access_table.index:
+        email_logging_auth = access_table.loc[job_config.email_to, auth_colname]
     return auth_dict.get(email_logging_auth)
