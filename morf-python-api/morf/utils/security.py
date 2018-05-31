@@ -45,3 +45,17 @@ def generate_md5(fname):
         for chunk in iter(lambda: f.read(4096), b""):
             hash_md5.update(chunk)
     return hash_md5.hexdigest()
+
+
+def check_email_logging_authorized(job_config, auth_colname = "email_logging_authorized"):
+    """
+    Check whether a user is permitted to receive email logging updates.
+    :param job_config: MorfJobConfig object.
+    :param auth_colname: name of column in authorization table that is used to check auth values.
+    :return: Boolean indicating whether user is permitted to receive email logging.
+    """
+    auth_dict = {"T": True, "F": False} # mapping of plain-text boolean values used in table to Python logicals
+    access_table = pd.read_csv(job_config.access_table_url, index_col=0)
+    if email_to in access_table.index:
+        email_logging_auth = access_table.loc[email_to, auth_colname]
+    return auth_dict.get(email_logging_auth)
