@@ -120,7 +120,7 @@ def docker_cloud_push(job_config, image_uuid):
     # push the image to docker cloud
     push_cmd = "docker push {}".format(docker_cloud_repo_and_tag_path)
     execute_and_log_output(push_cmd, logger)
-    return
+    return docker_cloud_repo_and_tag_path
 
 
 def cache_to_docker_hub(job_config, dir, image_name):
@@ -132,5 +132,5 @@ def cache_to_docker_hub(job_config, dir, image_name):
     logger = set_logger_handlers(module_logger, job_config)
     image_uuid = load_docker_image(dir, job_config, logger, image_name)
     docker_cloud_login(job_config)
-    docker_cloud_push(job_config, image_uuid)
-    return
+    docker_cloud_repo_and_tag_path = docker_cloud_push(job_config, image_uuid)
+    return docker_cloud_repo_and_tag_path

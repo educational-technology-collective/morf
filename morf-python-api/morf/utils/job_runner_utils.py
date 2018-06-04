@@ -100,7 +100,6 @@ def run_morf_job(job_config, no_cache = False, no_morf_cache = False):
     s3 = job_config.initialize_s3()
     # create temporary directory in local_working_directory from server.config
     with tempfile.TemporaryDirectory(dir=job_config.local_working_directory) as working_dir:
-        import ipdb;ipdb;set_trace()
         # copy config file into new directory
         shutil.copy(combined_config_filename, working_dir)
         os.chdir(working_dir)
@@ -123,6 +122,8 @@ def run_morf_job(job_config, no_cache = False, no_morf_cache = False):
         send_email_alert(job_config)
         subprocess.call("python3 {}".format(controller_script_name), shell = True)
         job_config.update_status("SUCCESS")
-        cache_to_docker_hub(job_config, working_dir, docker_image_name)
+        # push image to docker cloud and send success email
+        docker_cloud_path = cache_to_docker_hub(job_config, working_dir, docker_image_name)
+        setattr(job_config, "docker_cloud_path", docker_cloud_path)
         send_success_email(job_config)
         return
