@@ -96,7 +96,7 @@ def docker_cloud_login(job_config):
     """
     Log into docker cloud using creds in job_config.
     :param job_config: MorfJobConfig object.
-    :return:
+    :return: None
     """
     cmd = "docker login --username={} --password={}".format(job_config.docker_cloud_username, job_config.docker_cloud_password)
     logger = set_logger_handlers(module_logger, job_config)
@@ -105,6 +105,12 @@ def docker_cloud_login(job_config):
 
 
 def docker_cloud_push(job_config, image_uuid):
+    """
+    Push image to Docker Cloud repo in job_config; tagging the image with its morf_id.
+    :param job_config: MorfJobConfig object
+    :param image_uuid: Docker image uuid
+    :return: None
+    """
     logger = set_logger_handlers(module_logger, job_config)
     docker_cloud_repo_and_tag_path = "{}:{}".format(job_config.docker_cloud_repo, job_config.morf_id)
     # tag the docker image using the morf_id
@@ -120,7 +126,7 @@ def cache_to_docker_hub(job_config, image_uuid):
     """
     Push image to MORF repo in Docker Hub.
     :param job_config: MorfJobConfig object.
-    :return:
+    :return: None
     """
     docker_cloud_login(job_config)
     docker_cloud_push(job_config, image_uuid)
