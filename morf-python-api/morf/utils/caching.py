@@ -104,10 +104,24 @@ def docker_cloud_login(job_config):
     return
 
 
-def cache_to_docker_hub(job_config):
+def docker_cloud_push(job_config, image_uuid):
+    logger = set_logger_handlers(module_logger, job_config)
+    docker_cloud_repo_and_tag_path = "{}:{}".format(job_config.docker_cloud_repo, job_config.morf_id)
+    # tag the docker image using the morf_id
+    tag_cmd = "docker tag {} {}".format(image_uuid, docker_cloud_repo_and_tag_path)
+    execute_and_log_output(tag_cmd, logger)
+    # push the image to docker cloud
+    push_cmd = "docker push {}".format(docker_cloud_repo_and_tag_path)
+    execute_and_log_output(push_cmd, logger)
+    return
+
+
+def cache_to_docker_hub(job_config, image_uuid):
     """
     Push image to MORF repo in Docker Hub.
     :param job_config: MorfJobConfig object.
     :return:
     """
+    docker_cloud_login(job_config)
+    docker_cloud_push(job_config, image_uuid)
     return
