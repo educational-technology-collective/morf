@@ -127,6 +127,6 @@ def run_morf_job(job_config, no_cache = False, no_morf_cache = False):
         # push image to docker cloud, create doi for job files in zenodo, and send success email
         docker_cloud_path = cache_to_docker_hub(job_config, working_dir, docker_image_name)
         setattr(job_config, "docker_cloud_path", docker_cloud_path)
-        upload_files_to_zenodo()
+        upload_files_to_zenodo(job_config, files = (job_config.controller_url, job_config.client_config_url))
         send_success_email(job_config)
         return

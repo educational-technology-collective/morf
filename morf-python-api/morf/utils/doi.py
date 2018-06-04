@@ -26,6 +26,8 @@ Utility functions for creating Digital Object Identifiers (doi) for executables 
 import requests
 import collections
 from morf.utils.log import set_logger_handlers
+import os
+from morf.utils import fetch_file
 
 module_logger = logging.getLogger(__name__)
 
@@ -51,6 +53,7 @@ def upload_files_to_zenodo(job_config, files, deposition_id = None):
     :param access_token:
     :return: deposition_id of Zenodo files
     """
+    working_dir = os.getcwd()
     logger = set_logger_handlers(module_logger, job_config)
     access_token = getattr(job_config, "zenodo_access_token")
     # check inputs

@@ -629,7 +629,7 @@ def download_models(job_config, course, dest_dir, level, session = None):
 
 def fetch_file(s3, dest_dir, remote_file_url, dest_filename = None, job_config=None):
     """
-
+    Fetch a file into dest_dir.
     :param s3: boto3.client object for s3 connection.
     :param dest_dir: directory to download file to (string).
     :param remote_file_url: url of remote file; must be either file://, s3, or http format (string).
