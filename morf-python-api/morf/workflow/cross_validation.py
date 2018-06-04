@@ -23,9 +23,9 @@
 Utility functions for performing cross-validation for model training/testing.
 """
 
-from morf.utils.log import set_logger_handlers
+from morf.utils.log import set_logger_handlers, execute_and_log_output
 from morf.utils.config import MorfJobConfig
-from morf.utils import fetch_complete_courses, fetch_sessions, download_train_test_data, initialize_input_output_dirs, make_feature_csv_name, make_label_csv_name, clear_s3_subdirectory, make_s3_key_path, upload_file_to_s3, download_from_s3, initialize_labels, aggregate_session_input_data, execute_and_log_output
+from morf.utils import fetch_complete_courses, fetch_sessions, download_train_test_data, initialize_input_output_dirs, make_feature_csv_name, make_label_csv_name, clear_s3_subdirectory, make_s3_key_path, upload_file_to_s3, download_from_s3, initialize_labels, aggregate_session_input_data
 from morf.utils.job_runner_utils import make_docker_run_command, load_docker_image
 from morf.utils.api_utils import collect_course_cv_results
 from multiprocessing import Pool
