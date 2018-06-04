@@ -29,6 +29,7 @@ from morf.utils.log import set_logger_handlers
 import os
 from morf.utils import fetch_file
 import logging
+import json
 
 module_logger = logging.getLogger(__name__)
 
@@ -58,7 +59,7 @@ def generate_zenodo_metadata(job_config, deposition_id):
         'metadata': {
             'title': 'MORF job id {}'.format(job_config.morf_id),
             'upload_type': 'software',
-            'description': 'Job files for job id {} from the MOOC Replication Framework {}'.format(job_config.morf_id),
+            'description': 'Job files for job id {} from the MOOC Replication Framework'.format(job_config.morf_id),
             'creators': [{'name': '{}'.format(job_config.user_id), 'affiliation': 'None'}]
         }
     }
@@ -78,7 +79,7 @@ def publish_zenodo_deposition(job_config, deposition_id):
     return
 
 
-def upload_files_to_zenodo(job_config, files, deposition_id = None, publish = True):
+def upload_files_to_zenodo(job_config, upload_files, deposition_id = None, publish = True):
     """
     Upload each file in files to Zenodo, and publish the repo.
     :param deposition_id:
@@ -91,11 +92,11 @@ def upload_files_to_zenodo(job_config, files, deposition_id = None, publish = Tr
     logger = set_logger_handlers(module_logger, job_config)
     access_token = getattr(job_config, "zenodo_access_token")
     # check inputs
-    assert isinstance(files, collections.Iterable), "param 'files' must be an iterable"
+    assert isinstance(upload_files, collections.Iterable), "param 'files' must be an iterable"
     if not deposition_id: # create an empty upload and get its deposition id
         deposition_id = create_empty_zenodo_upload(access_token).json()['id']
     # upload each file
-    for f in files:
+    for f in upload_files:
         fp = fetch_file(s3, working_dir, f, job_config=job_config)
         data = {'filename': fp}
         files = {'file': open(fp, 'rb')}

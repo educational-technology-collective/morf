@@ -105,7 +105,6 @@ def run_morf_job(job_config, no_cache = False, no_morf_cache = False):
         # copy config file into new directory
         shutil.copy(combined_config_filename, working_dir)
         os.chdir(working_dir)
-        import ipdb; ipdb.set_trace()
         # from job_config, fetch and download the following: docker image, controller script, cached config file
         if not no_morf_cache:
             update_morf_job_cache(job_config)
@@ -128,7 +127,7 @@ def run_morf_job(job_config, no_cache = False, no_morf_cache = False):
         # push image to docker cloud, create doi for job files in zenodo, and send success email
         docker_cloud_path = cache_to_docker_hub(job_config, working_dir, docker_image_name)
         setattr(job_config, "docker_cloud_path", docker_cloud_path)
-        zenodo_deposition_id = upload_files_to_zenodo(job_config, files = (job_config.controller_url, job_config.client_config_url))
+        zenodo_deposition_id = upload_files_to_zenodo(job_config, upload_files=(job_config.controller_url, job_config.client_config_url))
         setattr(job_config, "zenodo_deposition_id", zenodo_deposition_id)
         send_success_email(job_config)
         return
