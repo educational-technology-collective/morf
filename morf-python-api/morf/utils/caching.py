@@ -28,7 +28,7 @@ import subprocess
 import shutil
 from urllib.parse import urlparse
 import logging
-from morf.utils.log import set_logger_handlers
+from morf.utils.log import set_logger_handlers, execute_and_log_output
 
 module_logger = logging.getLogger(__name__)
 
@@ -99,7 +99,8 @@ def docker_cloud_login(job_config):
     :return:
     """
     cmd = "docker login --username={} --password={}".format(job_config.docker_cloud_username, job_config.docker_cloud_password)
-    subprocess.call(cmd, shell=True)
+    logger = set_logger_handlers(module_logger, job_config)
+    execute_and_log_output(cmd, logger)
     return
 
 
@@ -109,3 +110,4 @@ def cache_to_docker_hub(job_config):
     :param job_config: MorfJobConfig object.
     :return:
     """
+    return
