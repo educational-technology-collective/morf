@@ -46,9 +46,41 @@ def create_empty_zenodo_upload(access_token):
     return r
 
 
-def upload_files_to_zenodo(job_config, files, deposition_id = None):
+def generate_zenodo_metadata(job_config, deposition_id):
     """
+    Create metadata for a MORF job.
+    :param job_config:
+    :param deposition_id:
+    :return:
+    """
+    logger = set_logger_handlers(module_logger, job_config)
+    data = {
+        'metadata': {
+            'title': 'MORF job id {}'.format(job_config.morf_id),
+            'upload_type': 'software',
+            'description': 'Job files for job id {} from the MOOC Replication Framework {}'.format(job_config.morf_id),
+            'creators': [{'name': '{}'.format(job_config.user_id), 'affiliation': 'None'}]
+        }
+    }
+    headers = {"Content-Type": "application/json"}
+    r = requests.put('https://zenodo.org/api/deposit/depositions/%s' % deposition_id,
+                     params = {'access_token': getattr(job_config, "zenodo_access_token")},
+                     data = json.dumps(data), headers = headers)
+    logger.info(r.json())
+    return 
 
+
+def publish_zenodo_deposition(job_config, deposition_id):
+    logger = set_logger_handlers(module_logger, job_config)
+    r = requests.post('https://zenodo.org/api/deposit/depositions/%s/actions/publish' % deposition_id,
+                      params={'access_token': getattr(job_config, "zenodo_access_token")})
+    logger.info(r.json())
+    return
+
+
+def upload_files_to_zenodo(job_config, files, deposition_id = None, publish = True):
+    """
+    Upload each file in files to Zenodo, and publish the repo.
     :param deposition_id:
     :param files: a tuple of filenames to upload. These should be locally available.
     :param access_token:
@@ -64,11 +96,14 @@ def upload_files_to_zenodo(job_config, files, deposition_id = None):
         deposition_id = create_empty_zenodo_upload(access_token).json()['id']
     # upload each file
     for f in files:
-        fetch_file(s3, working_dir, f, job_config=job_config)
-
-        data = {'filename': f}
-        files = {'file': open(f, 'rb')}
+        fp = fetch_file(s3, working_dir, f, job_config=job_config)
+        data = {'filename': fp}
+        files = {'file': open(fp, 'rb')}
         r = requests.post('https://zenodo.org/api/deposit/depositions/%s/files' % deposition_id, params = {'access_token': access_token}, data = data, files = files)
         logger.info(r.json())
+    # generate metadata for the zenodo repo and publish it
+    generate_zenodo_metadata(job_config, deposition_id)
+    if publish:
+        publish_zenodo_deposition(job_config, deposition_id)
     return deposition_id
 
