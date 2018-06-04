@@ -25,8 +25,10 @@ Helper functions for job submission to the MORF platform.
 
 import requests
 
+SQS_QUEUE_URL = "https://dcd97aapz1.execute-api.us-east-1.amazonaws.com/dev/morf/"
+MWE_CONFIG_URL = "https://raw.githubusercontent.com/educational-technology-collective/morf/master/mwe/client.config"
 
-def easy_submit(client_config_url, email_to, sqs_queue_url = "https://dcd97aapz1.execute-api.us-east-1.amazonaws.com/dev/morf/"):
+def easy_submit(client_config_url, email_to):
     """
     Submit a job to the MORF platform.
     :param client_config_url: URL for config file.
@@ -35,6 +37,11 @@ def easy_submit(client_config_url, email_to, sqs_queue_url = "https://dcd97aapz1
     :return:
     """
     params = {"url" : client_config_url, "email_to" : email_to}
-    r = requests.get(sqs_queue_url, params=params)
+    r = requests.get(SQS_QUEUE_URL, params=params)
     print(r.text)
+    return
+
+
+def submit_mwe(email_to):
+    easy_submit(MWE_CONFIG_URL, email_to)
     return
