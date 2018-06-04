@@ -30,45 +30,8 @@ from morf.utils import *
 from morf.utils.alerts import send_success_email, send_email_alert
 from morf.utils.caching import update_morf_job_cache
 from morf.utils.log import set_logger_handlers, execute_and_log_output
-
+from morf.utils.docker import load_docker_image, make_docker_run_command
 module_logger = logging.getLogger(__name__)
-
-
-def load_docker_image(dir, job_config, logger, image_name = "docker_image"):
-    """
-    Load docker_image from dir, writing output to logger.
-    :param dir: Path to directory containing image_name.
-    :param job_config: MorfJobConfig object.
-    :param logger: Logger to log output to.
-    :param image_name: base name of docker image.
-    :return: SHA256 or tag name of loaded docker image
-    """
-    # load the docker image and get its key
-    local_docker_file_location = os.path.join(dir, image_name)
-    cmd = "{} load -i {};".format(job_config.docker_exec, local_docker_file_location)
-    logger.info("running: " + cmd)
-    output = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
-    logger.info(output.stdout.decode("utf-8"))
-    load_output = output.stdout.decode("utf-8")
-    if "sha256:" in load_output:
-        image_uuid = output.stdout.decode("utf-8").split("sha256:")[-1].strip()
-    else:  # image is tagged
-        image_uuid = load_output.split()[-1].strip()
-    return image_uuid
-
-
-def make_docker_run_command(docker_exec, input_dir, output_dir, image_uuid, course, session, mode, client_args = None):
-    """
-    Make docker run command, inserting MORF requirements along with any named arguments.
-    :param client_args: doct of {argname, argvalue} pairs to add to command.
-    :return:
-    """
-    cmd = "{} run --network=\"none\" --rm=true --volume={}:/input --volume={}:/output {} --course {} --session {} --mode {}".format(
-        docker_exec, input_dir, output_dir, image_uuid, course, session, mode)
-    if client_args:# add any additional client args to cmd
-        for argname, argval in client_args.items():
-            cmd += " --{} {}".format(argname, argval)
-    return cmd
 
 
 def run_image(job_config, raw_data_bucket, course=None, session=None, level=None, label_type=None):
