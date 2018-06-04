@@ -23,13 +23,13 @@
 Utility functions specifically for running jobs in MORF API.
 """
 
+import os
 import tempfile
+
 from morf.utils import *
 from morf.utils.alerts import send_success_email, send_email_alert
 from morf.utils.caching import update_morf_job_cache
-import os
-from morf.utils.log import set_logger_handlers
-
+from morf.utils.log import set_logger_handlers, execute_and_log_output
 
 module_logger = logging.getLogger(__name__)
 

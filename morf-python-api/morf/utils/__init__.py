@@ -20,24 +20,23 @@
 # SOFTWARE.
 
 
+import gzip
 import logging
 import os
 import re
-import shlex
 import shutil
 import stat
 import subprocess
 import sys
 import tarfile
 import urllib.request
-import gzip
-import boto3
-from botocore.exceptions import ClientError
-import pandas as pd
 from urllib.parse import urlparse
-from morf.utils.log import set_logger_handlers
-from morf.utils.caching import fetch_from_cache
 
+import boto3
+import pandas as pd
+from botocore.exceptions import ClientError
+from morf.utils.caching import fetch_from_cache
+from morf.utils.log import set_logger_handlers, execute_and_log_output
 
 # create logger
 module_logger = logging.getLogger(__name__)
@@ -871,19 +870,3 @@ def aggregate_session_input_data(file_type, course_dir, course = None):
     return outpath
 
 
-def execute_and_log_output(command, logger):
-    """
-    Execute command and log its output to logger.
-    :param command:
-    :param logger:
-    :return:
-    """
-    logger.info("running: " + command)
-    command_ary = shlex.split(command)
-    p = subprocess.Popen(command_ary, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    stdout, stderr = p.communicate()
-    if stdout:
-        logger.info(stdout)
-    if stderr:
-        logger.error(stderr)
-    return

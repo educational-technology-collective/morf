@@ -90,3 +90,22 @@ def fetch_from_cache(job_config, cache_file_path, dest_dir):
         logger.warning("file {} does not exist in cache".format(abs_cache_file_path))
         dest_fp = None
     return dest_fp
+
+
+def docker_cloud_login(job_config):
+    """
+    Log into docker cloud using creds in job_config.
+    :param job_config: MorfJobConfig object.
+    :return:
+    """
+    cmd = "docker login --username={} --password={}".format(job_config.docker_cloud_username, job_config.docker_cloud_password)
+    subprocess.call(cmd, shell=True)
+    return
+
+
+def cache_to_docker_hub(job_config):
+    """
+    Push image to MORF repo in Docker Hub.
+    :param job_config: MorfJobConfig object.
+    :return:
+    """
