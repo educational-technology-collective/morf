@@ -19,7 +19,7 @@ The MORF API is used to construct and evaluate predictive models from raw MOOC p
 5. Upload the the controller script, docker image, and configuration file to public locations (you need to provide either HTTPS or S3 URLs to these files).
 6. Submit your job to the MORF web API. You will receive notifications and results via email as your job is queued, initiated, and completed.
 
-To execute a complete example on MORF which extracts features from course clickstream data, trains a predictive model using logistic regression, and evaluates its dropout predictions, see the examples in  the [github repository](https://github.com/jpgard/morf) and the instruction on the [getting started](https://jpgard.github.io/morf/getting-started/) page.
+To execute a complete example on MORF which extracts features from course clickstream data, trains a predictive model using logistic regression, and evaluates its dropout predictions, see the examples in  the [github repository](https://github.com/educational-technology-collective/morf) and the instruction on the [getting started](https://educational-technology-collective.github.io/morf/getting-started/) page.
 
 # API Overview
 
@@ -74,7 +74,7 @@ Your code is expected to output one file at the level of aggregation of the `tra
 
 To test your models, MORF applies the trained models to the features extracted from the holdout session of each course, using the features extracted in the `extract-holdout` step. 
 
-Note that while there are several options for feature extraction and predictive model construction, there is only one method available for predictive model evaluation. This is because no matter how models are constructed, they are evaluated on held-out runs of the same courses used for training. No matter whether models are trained at the session, course, or overall level, they will be used to predict on features from the held-out datasets extracted using the method specified above, and these performance results are aggregated and returned to you. For more information on why MORF uses this prediction architecture, see the MORF software paper in [publications](https://jpgard.github.io/morf/publications/).
+Note that while there are several options for feature extraction and predictive model construction, there is only one method available for predictive model evaluation. This is because no matter how models are constructed, they are evaluated on held-out runs of the same courses used for training. No matter whether models are trained at the session, course, or overall level, they will be used to predict on features from the held-out datasets extracted using the method specified above, and these performance results are aggregated and returned to you. For more information on why MORF uses this prediction architecture, see the MORF software paper in [publications](https://educational-technology-collective.github.io/morf/publications/).
 
 | Function name            | Description                    |
 | ------------------------ | ------------------------------ |
@@ -100,7 +100,7 @@ e3eec6238a6693ee403106ac69bab9ae6c1d921a,6114,2642,3472,0.586195616617599,0.5321
 
 ```
 
-These results can also be obtained by running the example code in the [getting started](https://jpgard.github.io/morf/getting-started/) section. If you'd like to use an additional outcome metric for your experiment that is currently not included in MORF's output, please contact us at morf-info@umich.edu.
+These results can also be obtained by running the example code in the [getting started](https://educational-technology-collective.github.io//morf/getting-started/) section. If you'd like to use an additional outcome metric for your experiment that is currently not included in MORF's output, please contact us at morf-info@umich.edu.
 
 # MORF input-output contract
 
