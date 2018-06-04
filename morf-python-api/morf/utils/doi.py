@@ -28,6 +28,7 @@ import collections
 from morf.utils.log import set_logger_handlers
 import os
 from morf.utils import fetch_file
+import logging
 
 module_logger = logging.getLogger(__name__)
 
@@ -54,6 +55,7 @@ def upload_files_to_zenodo(job_config, files, deposition_id = None):
     :return: deposition_id of Zenodo files
     """
     working_dir = os.getcwd()
+    s3 = job_config.initialize_s3()
     logger = set_logger_handlers(module_logger, job_config)
     access_token = getattr(job_config, "zenodo_access_token")
     # check inputs
@@ -62,9 +64,11 @@ def upload_files_to_zenodo(job_config, files, deposition_id = None):
         deposition_id = create_empty_zenodo_upload(access_token).json()['id']
     # upload each file
     for f in files:
+        fetch_file(s3, working_dir, f, job_config=job_config)
+
         data = {'filename': f}
         files = {'file': open(f, 'rb')}
         r = requests.post('https://zenodo.org/api/deposit/depositions/%s/files' % deposition_id, params = {'access_token': access_token}, data = data, files = files)
         logger.info(r.json())
-    return
+    return deposition_id
 
