@@ -122,5 +122,6 @@ def run_morf_job(job_config, no_cache = False, no_morf_cache = False):
         send_email_alert(job_config)
         subprocess.call("python3 {}".format(controller_script_name), shell = True)
         job_config.update_status("SUCCESS")
+
         send_success_email(job_config)
         return

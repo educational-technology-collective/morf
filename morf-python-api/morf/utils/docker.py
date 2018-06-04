@@ -21,6 +21,7 @@
 
 """
 Utility functions specifically for working with Docker images in MORF.
+Note: functions for working with docker cloud are located in morf.utils.caching
 """
 
 
