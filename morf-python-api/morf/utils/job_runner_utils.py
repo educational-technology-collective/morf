@@ -31,6 +31,7 @@ from morf.utils.alerts import send_success_email, send_email_alert
 from morf.utils.caching import update_morf_job_cache, cache_to_docker_hub
 from morf.utils.log import set_logger_handlers, execute_and_log_output
 from morf.utils.docker import load_docker_image, make_docker_run_command
+from morf.utils.doi import upload_files_to_zenodo
 module_logger = logging.getLogger(__name__)
 
 
@@ -88,8 +89,9 @@ def run_image(job_config, raw_data_bucket, course=None, session=None, level=None
 def run_morf_job(job_config, no_cache = False, no_morf_cache = False):
     """
     Wrapper function to run complete MORF job.
-    :param client_config_url: url to client.config file.
-    :param server_config_url: url to server.config file.
+    :param job_config: MorfJobConfig object
+    :param no_cache: boolean, indicator whether docker_image should be cached in s3
+    :param no_morf_cache: boolean, indicator for whether to cache morf data locally
     :return:
     """
     combined_config_filename = "config.properties"
@@ -122,8 +124,9 @@ def run_morf_job(job_config, no_cache = False, no_morf_cache = False):
         send_email_alert(job_config)
         subprocess.call("python3 {}".format(controller_script_name), shell = True)
         job_config.update_status("SUCCESS")
-        # push image to docker cloud and send success email
+        # push image to docker cloud, create doi for job files in zenodo, and send success email
         docker_cloud_path = cache_to_docker_hub(job_config, working_dir, docker_image_name)
         setattr(job_config, "docker_cloud_path", docker_cloud_path)
+        upload_files_to_zenodo()
         send_success_email(job_config)
         return

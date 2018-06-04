@@ -43,14 +43,16 @@ def create_empty_zenodo_upload(access_token):
     return r
 
 
-def upload_files_to_zenodo(access_token, files, deposition_id = None):
+def upload_files_to_zenodo(job_config, files, deposition_id = None):
     """
 
     :param deposition_id:
     :param files: a tuple of filenames to upload. These should be locally available.
     :param access_token:
-    :return:
+    :return: deposition_id of Zenodo files
     """
+    logger = set_logger_handlers(module_logger, job_config)
+    access_token = getattr(job_config, "zenodo_access_token")
     # check inputs
     assert isinstance(files, collections.Iterable), "param 'files' must be an iterable"
     if not deposition_id: # create an empty upload and get its deposition id
@@ -59,9 +61,7 @@ def upload_files_to_zenodo(access_token, files, deposition_id = None):
     for f in files:
         data = {'filename': f}
         files = {'file': open(f, 'rb')}
-        # DEV for binary file
-        r = requests.post('https://zenodo.org/api/deposit/depositions/%s/files' % deposition_id, params={'access_token': access_token}, data=data, files=files, headers={'Content-Type': 'application/octet-stream'})
-        # prev version, works for non-binary file
         r = requests.post('https://zenodo.org/api/deposit/depositions/%s/files' % deposition_id, params = {'access_token': access_token}, data = data, files = files)
+        logger.info(r.json())
     return
 
