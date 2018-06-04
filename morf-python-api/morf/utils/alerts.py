@@ -52,7 +52,7 @@ def construct_message_body(job_config, docs_url = "https://jpgard.github.io/morf
 
 
 def construct_message_subject(job_config):
-    subject = "MORF notification: job {}".format(job_config.job_id)
+    subject = "MORF notification: job {}".format(job_config.morf_id)
     return subject
 
 

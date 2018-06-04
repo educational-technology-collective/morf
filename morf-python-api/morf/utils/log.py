@@ -25,6 +25,8 @@ Functions for logging MORF activity.
 
 import json
 import logging
+import shlex
+import subprocess
 from logging.handlers import SMTPHandler
 import os
 from boto.ses.connection import SESConnection
@@ -128,3 +130,19 @@ def initialize_logger(job_config, logger_name = "morf_api"):
     return logger
 
 
+def execute_and_log_output(command, logger):
+    """
+    Execute command and log its output to logger.
+    :param command:
+    :param logger:
+    :return:
+    """
+    logger.info("running: " + command)
+    command_ary = shlex.split(command)
+    p = subprocess.Popen(command_ary, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    stdout, stderr = p.communicate()
+    if stdout:
+        logger.info(stdout)
+    if stderr:
+        logger.error(stderr)
+    return

@@ -28,7 +28,8 @@ import subprocess
 import shutil
 from urllib.parse import urlparse
 import logging
-from morf.utils.log import set_logger_handlers
+from morf.utils.docker import load_docker_image
+from morf.utils.log import set_logger_handlers, execute_and_log_output
 
 module_logger = logging.getLogger(__name__)
 
@@ -90,3 +91,46 @@ def fetch_from_cache(job_config, cache_file_path, dest_dir):
         logger.warning("file {} does not exist in cache".format(abs_cache_file_path))
         dest_fp = None
     return dest_fp
+
+
+def docker_cloud_login(job_config):
+    """
+    Log into docker cloud using creds in job_config.
+    :param job_config: MorfJobConfig object.
+    :return: None
+    """
+    cmd = "docker login --username={} --password={}".format(job_config.docker_cloud_username, job_config.docker_cloud_password)
+    logger = set_logger_handlers(module_logger, job_config)
+    execute_and_log_output(cmd, logger)
+    return
+
+
+def docker_cloud_push(job_config, image_uuid):
+    """
+    Push image to Docker Cloud repo in job_config; tagging the image with its morf_id.
+    :param job_config: MorfJobConfig object
+    :param image_uuid: Docker image uuid
+    :return: None
+    """
+    logger = set_logger_handlers(module_logger, job_config)
+    docker_cloud_repo_and_tag_path = "{}:{}".format(job_config.docker_cloud_repo, job_config.morf_id)
+    # tag the docker image using the morf_id
+    tag_cmd = "docker tag {} {}".format(image_uuid, docker_cloud_repo_and_tag_path)
+    execute_and_log_output(tag_cmd, logger)
+    # push the image to docker cloud
+    push_cmd = "docker push {}".format(docker_cloud_repo_and_tag_path)
+    execute_and_log_output(push_cmd, logger)
+    return docker_cloud_repo_and_tag_path
+
+
+def cache_to_docker_hub(job_config, dir, image_name):
+    """
+    Push image to MORF repo in Docker Hub.
+    :param job_config: MorfJobConfig object.
+    :return: None
+    """
+    logger = set_logger_handlers(module_logger, job_config)
+    image_uuid = load_docker_image(dir, job_config, logger, image_name)
+    docker_cloud_login(job_config)
+    docker_cloud_repo_and_tag_path = docker_cloud_push(job_config, image_uuid)
+    return docker_cloud_repo_and_tag_path

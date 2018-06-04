@@ -20,24 +20,23 @@
 # SOFTWARE.
 
 
+import gzip
 import logging
 import os
 import re
-import shlex
 import shutil
 import stat
 import subprocess
 import sys
 import tarfile
 import urllib.request
-import gzip
-import boto3
-from botocore.exceptions import ClientError
-import pandas as pd
 from urllib.parse import urlparse
-from morf.utils.log import set_logger_handlers
-from morf.utils.caching import fetch_from_cache
 
+import boto3
+import pandas as pd
+from botocore.exceptions import ClientError
+from morf.utils.caching import fetch_from_cache
+from morf.utils.log import set_logger_handlers, execute_and_log_output
 
 # create logger
 module_logger = logging.getLogger(__name__)
@@ -630,7 +629,7 @@ def download_models(job_config, course, dest_dir, level, session = None):
 
 def fetch_file(s3, dest_dir, remote_file_url, dest_filename = None, job_config=None):
     """
-
+    Fetch a file into dest_dir.
     :param s3: boto3.client object for s3 connection.
     :param dest_dir: directory to download file to (string).
     :param remote_file_url: url of remote file; must be either file://, s3, or http format (string).
@@ -643,15 +642,16 @@ def fetch_file(s3, dest_dir, remote_file_url, dest_filename = None, job_config=N
     try:
         if not dest_filename:
             dest_filename = os.path.basename(remote_file_url)
+        dest_fp = os.path.join(dest_dir, dest_filename)
         url = urlparse(remote_file_url)
         if url.scheme == "file":
-            shutil.copyfile(url.path, os.path.join(dest_dir, dest_filename))
+            shutil.copyfile(url.path, dest_fp)
         elif url.scheme == "s3":
             bucket = url.netloc
             key = url.path[1:]  # ignore initial /
             download_from_s3(bucket, key, s3, dest_dir, dest_filename = dest_filename, job_config=job_config)
         elif url.scheme == "https":
-            urllib.request.urlretrieve(remote_file_url, os.path.join(dest_dir, dest_filename))
+            urllib.request.urlretrieve(remote_file_url, dest_fp)
         else:
             logger.error(
             "A URL which was not s3:// or file:// or https:// was passed in for a file location, this is not supported. {}"
@@ -659,7 +659,7 @@ def fetch_file(s3, dest_dir, remote_file_url, dest_filename = None, job_config=N
             sys.exit(-1)
     except Exception as e:
         logger.error("{} when attempting to fetch and copy file at {}".format(e, remote_file_url))
-    return
+    return dest_fp
 
 
 def generate_archive_filename(job_config, course=None, session=None, extension ="tgz", mode = None, job_id = None):
@@ -871,19 +871,3 @@ def aggregate_session_input_data(file_type, course_dir, course = None):
     return outpath
 
 
-def execute_and_log_output(command, logger):
-    """
-    Execute command and log its output to logger.
-    :param command:
-    :param logger:
-    :return:
-    """
-    logger.info("running: " + command)
-    command_ary = shlex.split(command)
-    p = subprocess.Popen(command_ary, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    stdout, stderr = p.communicate()
-    if stdout:
-        logger.info(stdout)
-    if stderr:
-        logger.error(stderr)
-    return

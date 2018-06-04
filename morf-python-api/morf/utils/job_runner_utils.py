@@ -23,52 +23,16 @@
 Utility functions specifically for running jobs in MORF API.
 """
 
+import os
 import tempfile
+
 from morf.utils import *
 from morf.utils.alerts import send_success_email, send_email_alert
-from morf.utils.caching import update_morf_job_cache
-import os
-from morf.utils.log import set_logger_handlers
-
-
+from morf.utils.caching import update_morf_job_cache, cache_to_docker_hub
+from morf.utils.log import set_logger_handlers, execute_and_log_output
+from morf.utils.docker import load_docker_image, make_docker_run_command
+from morf.utils.doi import upload_files_to_zenodo
 module_logger = logging.getLogger(__name__)
-
-
-def load_docker_image(dir, job_config, logger, image_name = "docker_image"):
-    """
-    Load docker_image from dir, writing output to logger.
-    :param dir: Path to directory containing image_name.
-    :param job_config: MorfJobConfig object.
-    :param logger: Logger to log output to.
-    :param image_name: base name of docker image.
-    :return: SHA256 or tag name of loaded docker image
-    """
-    # load the docker image and get its key
-    local_docker_file_location = os.path.join(dir, image_name)
-    cmd = "{} load -i {};".format(job_config.docker_exec, local_docker_file_location)
-    logger.info("running: " + cmd)
-    output = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
-    logger.info(output.stdout.decode("utf-8"))
-    load_output = output.stdout.decode("utf-8")
-    if "sha256:" in load_output:
-        image_uuid = output.stdout.decode("utf-8").split("sha256:")[-1].strip()
-    else:  # image is tagged
-        image_uuid = load_output.split()[-1].strip()
-    return image_uuid
-
-
-def make_docker_run_command(docker_exec, input_dir, output_dir, image_uuid, course, session, mode, client_args = None):
-    """
-    Make docker run command, inserting MORF requirements along with any named arguments.
-    :param client_args: doct of {argname, argvalue} pairs to add to command.
-    :return:
-    """
-    cmd = "{} run --network=\"none\" --rm=true --volume={}:/input --volume={}:/output {} --course {} --session {} --mode {}".format(
-        docker_exec, input_dir, output_dir, image_uuid, course, session, mode)
-    if client_args:# add any additional client args to cmd
-        for argname, argval in client_args.items():
-            cmd += " --{} {}".format(argname, argval)
-    return cmd
 
 
 def run_image(job_config, raw_data_bucket, course=None, session=None, level=None, label_type=None):
@@ -125,8 +89,9 @@ def run_image(job_config, raw_data_bucket, course=None, session=None, level=None
 def run_morf_job(job_config, no_cache = False, no_morf_cache = False):
     """
     Wrapper function to run complete MORF job.
-    :param client_config_url: url to client.config file.
-    :param server_config_url: url to server.config file.
+    :param job_config: MorfJobConfig object
+    :param no_cache: boolean, indicator whether docker_image should be cached in s3
+    :param no_morf_cache: boolean, indicator for whether to cache morf data locally
     :return:
     """
     combined_config_filename = "config.properties"
@@ -159,5 +124,10 @@ def run_morf_job(job_config, no_cache = False, no_morf_cache = False):
         send_email_alert(job_config)
         subprocess.call("python3 {}".format(controller_script_name), shell = True)
         job_config.update_status("SUCCESS")
+        # push image to docker cloud, create doi for job files in zenodo, and send success email
+        docker_cloud_path = cache_to_docker_hub(job_config, working_dir, docker_image_name)
+        setattr(job_config, "docker_cloud_path", docker_cloud_path)
+        zenodo_deposition_id = upload_files_to_zenodo(job_config, upload_files=(job_config.controller_url, job_config.client_config_url))
+        setattr(job_config, "zenodo_deposition_id", zenodo_deposition_id)
         send_success_email(job_config)
         return
