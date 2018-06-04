@@ -100,6 +100,7 @@ def run_morf_job(job_config, no_cache = False, no_morf_cache = False):
     s3 = job_config.initialize_s3()
     # create temporary directory in local_working_directory from server.config
     with tempfile.TemporaryDirectory(dir=job_config.local_working_directory) as working_dir:
+        import ipdb;ipdb;set_trace()
         # copy config file into new directory
         shutil.copy(combined_config_filename, working_dir)
         os.chdir(working_dir)
