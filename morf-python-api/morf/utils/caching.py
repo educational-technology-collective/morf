@@ -28,6 +28,7 @@ import subprocess
 import shutil
 from urllib.parse import urlparse
 import logging
+from morf.utils.docker import load_docker_image
 from morf.utils.log import set_logger_handlers, execute_and_log_output
 
 module_logger = logging.getLogger(__name__)
@@ -122,12 +123,14 @@ def docker_cloud_push(job_config, image_uuid):
     return
 
 
-def cache_to_docker_hub(job_config, image_uuid):
+def cache_to_docker_hub(job_config, dir, image_name):
     """
     Push image to MORF repo in Docker Hub.
     :param job_config: MorfJobConfig object.
     :return: None
     """
+    logger = set_logger_handlers(module_logger, job_config)
+    image_uuid = load_docker_image(dir, job_config, logger, image_name)
     docker_cloud_login(job_config)
     docker_cloud_push(job_config, image_uuid)
     return

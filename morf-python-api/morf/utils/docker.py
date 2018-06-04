@@ -25,6 +25,12 @@ Note: functions for working with docker cloud are located in morf.utils.caching
 """
 
 
+from morf.utils import *
+
+module_logger = logging.getLogger(__name__)
+
+
+
 def load_docker_image(dir, job_config, logger, image_name = "docker_image"):
     """
     Load docker_image from dir, writing output to logger.

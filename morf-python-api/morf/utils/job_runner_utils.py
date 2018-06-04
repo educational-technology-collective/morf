@@ -28,7 +28,7 @@ import tempfile
 
 from morf.utils import *
 from morf.utils.alerts import send_success_email, send_email_alert
-from morf.utils.caching import update_morf_job_cache
+from morf.utils.caching import update_morf_job_cache, cache_to_docker_hub
 from morf.utils.log import set_logger_handlers, execute_and_log_output
 from morf.utils.docker import load_docker_image, make_docker_run_command
 module_logger = logging.getLogger(__name__)
@@ -122,6 +122,6 @@ def run_morf_job(job_config, no_cache = False, no_morf_cache = False):
         send_email_alert(job_config)
         subprocess.call("python3 {}".format(controller_script_name), shell = True)
         job_config.update_status("SUCCESS")
-
+        cache_to_docker_hub(job_config, working_dir, docker_image_name)
         send_success_email(job_config)
         return
