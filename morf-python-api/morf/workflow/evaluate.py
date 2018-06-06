@@ -33,7 +33,8 @@ import tempfile
 import pandas as pd
 import numpy as np
 import sklearn.metrics
-from morf.utils.job_runner_utils import make_docker_run_command, load_docker_image
+from morf.utils.job_runner_utils import load_docker_image
+from urllib.parse import urlparse
 
 mode = "evaluate"
 # define module-level variables for config.properties
@@ -233,11 +234,12 @@ def evaluate_cv_course(label_type, k=5, label_col = "label_type", raw_data_dir =
     return
 
 
-def evaluate_prule_session(raw_data_dir = "morf-data/"):
+def evaluate_prule_session():
     """
-
-    :return:
+    Perform statistical testing for prule analysis.
+    :return: None
     """
+    raw_data_dir = "morf-data/"
     job_config = MorfJobConfig(CONFIG_FILENAME)
     job_config.update_mode(mode)
     logger = set_logger_handlers(module_logger, job_config)
@@ -248,6 +250,7 @@ def evaluate_prule_session(raw_data_dir = "morf-data/"):
     # clear any preexisting data for this user/job/mode
     clear_s3_subdirectory(job_config)
     with tempfile.TemporaryDirectory(dir=os.getcwd()) as working_dir:
+        input_dir, output_dir = initialize_input_output_dirs(working_dir)
         # pull extraction results from every course into working_dir
         for raw_data_bucket in raw_data_buckets:
             for course in fetch_courses(job_config, raw_data_bucket):
@@ -259,12 +262,25 @@ def evaluate_prule_session(raw_data_dir = "morf-data/"):
                         fetch_mode = "extract-holdout"
                     feat_file = generate_archive_filename(job_config, course=course, session=session, mode=fetch_mode)
                     feat_key = make_s3_key_path(job_config, filename=feat_file, course=course, session=session, mode=fetch_mode)
-                    feat_local_fp = download_from_s3(proc_data_bucket, feat_key, s3, working_dir, job_config=job_config)
-                    unarchive_file(feat_local_fp, working_dir)
-        import ipdb;ipdb.set_trace()
-        image_uuid = load_docker_image(os.path.dirname(job_config.prule_evaluate_image), job_config, logger, image_name=os.path.basename(job_config.prule_evaluate_image))
-        cmd = "{} run --network=\"none\" --rm=true {} --data_dir {} --prule_file {} --output_file {}".format(job_config.docker_exec, image_uuid, working_dir, prule_file, os.path.join(working_dir, output.csv))
+                    feat_local_fp = download_from_s3(proc_data_bucket, feat_key, s3, input_dir, job_config=job_config)
+                    unarchive_file(feat_local_fp, input_dir)
+        docker_image_fp = urlparse(job_config.prule_evaluate_image).path
+        docker_image_dir = os.path.dirname(docker_image_fp)
+        docker_image_name = os.path.basename(docker_image_fp)
+        image_uuid = load_docker_image(docker_image_dir, job_config, logger, image_name=docker_image_name)
+        # create a directory for prule file and copy into it; this will be mounted to docker image
+        prule_dir = os.path.join(working_dir, "prule")
+        os.makedirs(prule_dir)
+        shutil.copy(urlparse(prule_file).path, prule_dir)
+        cmd = "{} run --network=\"none\" --rm=true --volume={}:/input --volume={}:/output --volume={}:/prule {} ".format(job_config.docker_exec, input_dir, output_dir, prule_dir, image_uuid)
         subprocess.call(cmd, shell=True)
+        # rename result file and upload results to s3
+        final_output_file = os.path.join(output_dir, "output.csv")
+        final_output_archive_name = generate_archive_filename(job_config, extension="csv")
+        final_output_archive_fp = os.path.join(output_dir, final_output_archive_name)
+        os.rename(final_output_file, final_output_archive_fp)
+        output_key = make_s3_key_path(job_config, filename = final_output_archive_name, mode = "test")
+        upload_file_to_s3(final_output_archive_fp, proc_data_bucket, output_key, job_config, remove_on_success=True)
         return
 
 
