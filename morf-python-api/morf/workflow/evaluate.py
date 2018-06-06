@@ -33,6 +33,7 @@ import tempfile
 import pandas as pd
 import numpy as np
 import sklearn.metrics
+from morf.utils.job_runner_utils import make_docker_run_command, load_docker_image
 
 mode = "evaluate"
 # define module-level variables for config.properties
@@ -230,3 +231,40 @@ def evaluate_cv_course(label_type, k=5, label_col = "label_type", raw_data_dir =
     upload_file_to_s3(csv_fp, bucket=proc_data_bucket, key=upload_key)
     os.remove(csv_fp)
     return
+
+
+def evaluate_prule_session(raw_data_dir = "morf-data/"):
+    """
+
+    :return:
+    """
+    job_config = MorfJobConfig(CONFIG_FILENAME)
+    job_config.update_mode(mode)
+    logger = set_logger_handlers(module_logger, job_config)
+    raw_data_buckets = job_config.raw_data_buckets
+    proc_data_bucket = job_config.proc_data_bucket
+    prule_file = job_config.prule_url
+    s3 = job_config.initialize_s3()
+    # clear any preexisting data for this user/job/mode
+    clear_s3_subdirectory(job_config)
+    with tempfile.TemporaryDirectory(dir=os.getcwd()) as working_dir:
+        # pull extraction results from every course into working_dir
+        for raw_data_bucket in raw_data_buckets:
+            for course in fetch_courses(job_config, raw_data_bucket):
+                for session in fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course, fetch_all_sessions=True):
+                    if session in fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course):
+                        ## session is a non-holdout session
+                        fetch_mode = "extract"
+                    else:
+                        fetch_mode = "extract-holdout"
+                    feat_file = generate_archive_filename(job_config, course=course, session=session, mode=fetch_mode)
+                    feat_key = make_s3_key_path(job_config, filename=feat_file, course=course, session=session, mode=fetch_mode)
+                    feat_local_fp = download_from_s3(proc_data_bucket, feat_key, s3, working_dir, job_config=job_config)
+                    unarchive_file(feat_local_fp, working_dir)
+        import ipdb;ipdb.set_trace()
+        image_uuid = load_docker_image(os.path.dirname(job_config.prule_evaluate_image), job_config, logger, image_name=os.path.basename(job_config.prule_evaluate_image))
+        cmd = "{} run --network=\"none\" --rm=true {} --data_dir {} --prule_file {} --output_file {}".format(job_config.docker_exec, image_uuid, working_dir, prule_file, os.path.join(working_dir, output.csv))
+        subprocess.call(cmd, shell=True)
+        return
+
+

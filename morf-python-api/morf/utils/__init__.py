@@ -54,6 +54,7 @@ def unarchive_file(src, dest):
         tar = tarfile.open(src)
         tar.extractall(dest)
         tar.close()
+        os.remove(src)
         outpath = os.path.join(dest, os.path.basename(src))
     elif src.endswith(".gz"):
         with gzip.open(src, "rb") as f_in:
