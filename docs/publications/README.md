@@ -1,8 +1,8 @@
 # Publications
 
-Josh Gardner, Yuming Yang, Ryan S. Baker, and Christopher Brooks. Enabling End-To-End Machine Learning Replicability: A Case Study in Educational Data Mining. Workshop on Enabling Reproducibility in Machine Learning at the Thirty-fifth International Conference on Machine Learning. [arXiv](https://arxiv.org/abs/1806.05208). [Github](https://github.com/educational-technology-collective/fy2015-replication).
+Josh Gardner, Yuming Yang, Ryan S. Baker, and Christopher Brooks (2018). Enabling End-To-End Machine Learning Replicability: A Case Study in Educational Data Mining. Workshop on Enabling Reproducibility in Machine Learning at the Thirty-fifth International Conference on Machine Learning. [arXiv](https://arxiv.org/abs/1806.05208). [Github](https://github.com/educational-technology-collective/fy2015-replication).
 
-Josh Gardner, Christopher Brooks, Juan Miguel Andres, and Ryan Baker. Replicating MOOC Predictive Models at Scale. Proceedings of the Fifth Annual Meeting of the ACM Conference on Learning@Scale; June 2018; London, UK.
+Josh Gardner, Christopher Brooks, Juan Miguel Andres, and Ryan Baker (2018). Replicating MOOC Predictive Models at Scale. Proceedings of the Fifth Annual Meeting of the ACM Conference on Learning@Scale; London, UK.
 
 Josh Gardner, Christopher Brooks, Juan Miguel L. Andres, and Ryan Baker (2018). MORF: A Framework for MOOC Predictive Modeling and Replication At Scale. [arXiv](http://arxiv.org/abs/1205.2525).
 
