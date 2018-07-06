@@ -1,8 +1,10 @@
 # Publications
 
-Josh Gardner, Christopher Brooks, Juan Miguel Andres, and Ryan Baker. Replicating MOOC Predictive Models at Scale. To appear in: Proceedings of the Fifth Annual Meeting of the ACM Conference on Learning@Scale; June 2018; London, UK.
+Josh Gardner, Yuming Yang, Ryan S. Baker, and Christopher Brooks. Enabling End-To-End Machine Learning Replicability: A Case Study in Educational Data Mining. Workshop on Enabling Reproducibility in Machine Learning at the Thirty-fifth International Conference on Machine Learning. [arXiv](https://arxiv.org/abs/1806.05208). [Github](https://github.com/educational-technology-collective/fy2015-replication).
 
-Josh Gardner, Christopher Brooks, Juan Miguel L. Andres, and Ryan Baker (2018). MORF: A Framework for MOOC Predictive Modeling and Replication At Scale. [Arxiv Preprint](http://arxiv.org/abs/1205.2525).
+Josh Gardner, Christopher Brooks, Juan Miguel Andres, and Ryan Baker. Replicating MOOC Predictive Models at Scale. Proceedings of the Fifth Annual Meeting of the ACM Conference on Learning@Scale; June 2018; London, UK.
+
+Josh Gardner, Christopher Brooks, Juan Miguel L. Andres, and Ryan Baker (2018). MORF: A Framework for MOOC Predictive Modeling and Replication At Scale. [arXiv](http://arxiv.org/abs/1205.2525).
 
 Miguel Andres, Ryan S. Baker, Dragan Gašević, George Siemens, Scott A. Crossley, Srećko Joksimović (2018). Studying MOOC Completion at Scale Using the MOOC Replication Framework. Proceedings of the
 International Conference on Learning Analytics and Knowledge (LAK'18) (pp. 71-78).
