@@ -23,63 +23,21 @@
 Utility functions specifically for running jobs in MORF API.
 """
 
-import shlex
+import os
 import tempfile
+
 from morf.utils import *
 from morf.utils.alerts import send_success_email, send_email_alert
-from morf.utils.caching import update_morf_job_cache
-from urllib.parse import urlparse
-import os
-from morf.utils.log import set_logger_handlers
-
-
+from morf.utils.caching import update_morf_job_cache, cache_to_docker_hub
+from morf.utils.log import set_logger_handlers, execute_and_log_output
+from morf.utils.docker import load_docker_image, make_docker_run_command
+from morf.utils.doi import upload_files_to_zenodo
 module_logger = logging.getLogger(__name__)
-
-
-def execute_and_log_output(command, logger):
-    """
-    Execute command and log its output to logger.
-    :param command:
-    :param logger:
-    :return:
-    """
-    logger.info("running: " + command)
-    command_ary = shlex.split(command)
-    p = subprocess.Popen(command_ary, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    stdout, stderr = p.communicate()
-    if stdout:
-        logger.info(stdout)
-    if stderr:
-        logger.error(stderr)
-    return
-
-
-def load_docker_image(dir, job_config, logger, image_name = "docker_image"):
-    """
-    Load docker_image from dir, writing output to logger.
-    :param dir: Path to directory containing image_name.
-    :param job_config: MorfJobConfig object.
-    :param logger: Logger to log output to.
-    :param image_name: base name of docker image.
-    :return: SHA256 or tag name of loaded docker image
-    """
-    # load the docker image and get its key
-    local_docker_file_location = os.path.join(dir, image_name)
-    cmd = "{} load -i {};".format(job_config.docker_exec, local_docker_file_location)
-    logger.info("running: " + cmd)
-    output = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
-    logger.info(output.stdout.decode("utf-8"))
-    load_output = output.stdout.decode("utf-8")
-    if "sha256:" in load_output:
-        image_uuid = output.stdout.decode("utf-8").split("sha256:")[-1].strip()
-    else:  # image is tagged
-        image_uuid = load_output.split()[-1].strip()
-    return image_uuid
 
 
 def run_image(job_config, raw_data_bucket, course=None, session=None, level=None, label_type=None):
     """
-    Run a docker image with the specified parameters.
+    Run a docker image with the specified parameters, initializing any data as necessary and archiving results to s3.
     :param docker_url: URL for a built and compressed (.tar) docker image
     :param user_id: unique user id (string).
     :param job_id: unique job id (string).
@@ -108,6 +66,7 @@ def run_image(job_config, raw_data_bucket, course=None, session=None, level=None
             initialize_raw_course_data(job_config,
                                        raw_data_bucket=raw_data_bucket, mode=mode, course=course,
                                        session=session, level=level, input_dir=input_dir)
+            mode = "extract" # sets mode to "extract" in case of "extract-holdout"
         # fetch training/testing data
         if mode in ["train", "test"]:
             initialize_train_test_data(job_config, raw_data_bucket=raw_data_bucket, level=level,
@@ -117,16 +76,7 @@ def run_image(job_config, raw_data_bucket, course=None, session=None, level=None
             download_models(job_config, course=course, session=session, dest_dir=input_dir, level=level)
         image_uuid = load_docker_image(dir=working_dir, job_config=job_config, logger=logger)
         # build docker run command and execute the image
-        if mode == "extract-holdout":  # call docker image with mode == extract
-            cmd = "{} run --network=\"none\" --rm=true --volume={}:/input --volume={}:/output {} --course {} --session {} --mode {}".format(
-                docker_exec, input_dir, output_dir, image_uuid, course, session, "extract")
-        else:  # proceed as normal
-            cmd = "{} run --network=\"none\" --rm=true --volume={}:/input --volume={}:/output {} --course {} --session {} --mode {}".format(
-                docker_exec, input_dir, output_dir, image_uuid, course, session, mode)
-        # add any additional client args to cmd
-        if job_config.client_args:
-            for argname, argval in job_config.client_args.items():
-                cmd += " --{} {}".format(argname, argval)
+        cmd = make_docker_run_command(docker_exec, input_dir, output_dir, image_uuid, course, session, mode, client_args=job_config.client_args)
         execute_and_log_output(cmd, logger)
         # cleanup
         execute_and_log_output("{} rmi --force {}".format(docker_exec, image_uuid), logger)
@@ -136,11 +86,12 @@ def run_image(job_config, raw_data_bucket, course=None, session=None, level=None
     return
 
 
-def run_morf_job(job_config, no_cache = False):
+def run_morf_job(job_config, no_cache = False, no_morf_cache = False):
     """
     Wrapper function to run complete MORF job.
-    :param client_config_url: url to client.config file.
-    :param server_config_url: url to server.config file.
+    :param job_config: MorfJobConfig object
+    :param no_cache: boolean, indicator whether docker_image should be cached in s3
+    :param no_morf_cache: boolean, indicator for whether to cache morf data locally
     :return:
     """
     combined_config_filename = "config.properties"
@@ -155,7 +106,8 @@ def run_morf_job(job_config, no_cache = False):
         shutil.copy(combined_config_filename, working_dir)
         os.chdir(working_dir)
         # from job_config, fetch and download the following: docker image, controller script, cached config file
-        update_morf_job_cache(job_config)
+        if not no_morf_cache:
+            update_morf_job_cache(job_config)
         # from client.config, fetch and download the following: docker image, controller script
         try:
             fetch_file(s3, working_dir, job_config.docker_url, dest_filename=docker_image_name, job_config=job_config)
@@ -172,5 +124,10 @@ def run_morf_job(job_config, no_cache = False):
         send_email_alert(job_config)
         subprocess.call("python3 {}".format(controller_script_name), shell = True)
         job_config.update_status("SUCCESS")
+        # push image to docker cloud, create doi for job files in zenodo, and send success email
+        docker_cloud_path = cache_to_docker_hub(job_config, working_dir, docker_image_name)
+        setattr(job_config, "docker_cloud_path", docker_cloud_path)
+        zenodo_deposition_id = upload_files_to_zenodo(job_config, upload_files=(job_config.controller_url, job_config.client_config_url))
+        setattr(job_config, "zenodo_deposition_id", zenodo_deposition_id)
         send_success_email(job_config)
         return

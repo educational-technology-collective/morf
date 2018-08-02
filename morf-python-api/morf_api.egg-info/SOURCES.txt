@@ -7,10 +7,15 @@ morf/utils/alerts.py
 morf/utils/api_utils.py
 morf/utils/caching.py
 morf/utils/config.py
+morf/utils/docker.py
+morf/utils/doi.py
 morf/utils/job_runner_utils.py
 morf/utils/log.py
+morf/utils/s3interface.py
 morf/utils/security.py
+morf/utils/submit.py
 morf/workflow/__init__.py
+morf/workflow/cross_validation.py
 morf/workflow/evaluate.py
 morf/workflow/extract.py
 morf/workflow/test.py
