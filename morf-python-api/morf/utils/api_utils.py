@@ -158,7 +158,7 @@ def collect_course_cv_results(job_config, k=5, raw_data_dir="morf-data/"):
     return csv_fp
 
 
-def collect_all_results(job_config, raw_data_dir = "morf-data/"):
+def collect_all_results(job_config):
     """
     Pull results for all-level job and return path to csv.
     Similar wrapper to replicated workflow for collect_course_results and collect_session_results, but no iteration over courses/sessions required.
