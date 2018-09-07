@@ -43,18 +43,20 @@ module_logger = logging.getLogger(__name__)
 
 
 
-def unarchive_file(src, dest):
+def unarchive_file(src, dest, remove=True):
     """
     Untar or un-gzip a file from src into dest. Supports file extensions: .zip, .tgz, .gz.
     :param src: path to source file to unarchive (string).
     :param dest: directory to unarchive result into (string).
+    :param remove: should file be removed after it is unarchived?
     :return: None
     """
+    success = False
     if src.endswith(".zip") or src.endswith(".tgz"):
         tar = tarfile.open(src)
         tar.extractall(dest)
         tar.close()
-        os.remove(src)
+        success = True
         outpath = os.path.join(dest, os.path.basename(src))
     elif src.endswith(".gz"):
         with gzip.open(src, "rb") as f_in:
@@ -62,10 +64,16 @@ def unarchive_file(src, dest):
             destpath = os.path.join(dest, destfile)
             with open(destpath, "wb") as f_out:
                 shutil.copyfileobj(f_in, f_out)
-        os.remove(src)
+        success = True
         outpath = destpath
     else:
         raise NotImplementedError("Passed in a file with an extension not supported by unarchive_file: {}".format(src))
+    # cleanup after unarchive
+    if success and remove:
+        try:
+            os.remove(src)
+        except Exception as e:
+            print("[ERROR] error removing file {}: {}".format(src, e))
     return outpath
 
 
@@ -766,7 +774,6 @@ def fetch_result_file(job_config, dir, course = None, session = None):
         except Exception as e:
             logger.warning("exception while fetching results for mode {} course {} session {}:{}".format(job_config.mode, course, session, e))
     unarchive_file(dest, dir)
-    os.remove(dest)
     return
 
 
