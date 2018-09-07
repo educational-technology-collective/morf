@@ -66,7 +66,6 @@ def collect_session_results(job_config, holdout = False, raw_data_dir = "morf-da
                 with tempfile.TemporaryDirectory(dir=os.getcwd()) as working_dir:
                     logger.info("[INFO] fetching extraction results for course {} run {}".format(course, run))
                     try:
-                        import ipdb;ipdb.set_trace()
                         fetch_result_file(job_config, course=course, session= run, dir = working_dir)
                         csv = fetch_result_csv_fp(working_dir)
                         feat_df = pd.read_csv(csv, dtype=object)
