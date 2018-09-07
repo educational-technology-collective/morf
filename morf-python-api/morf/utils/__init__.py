@@ -774,7 +774,6 @@ def fetch_result_file(job_config, dir, course = None, session = None):
         except Exception as e:
             logger.warning("exception while fetching results for mode {} course {} session {}:{}".format(job_config.mode, course, session, e))
     unarchive_file(dest, dir)
-    os.remove(dest)
     return
 
 
