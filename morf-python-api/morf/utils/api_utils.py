@@ -23,7 +23,6 @@
 Utility functions used throughout MORF API.
 """
 
-import logging
 from morf.utils import *
 import tempfile
 import pandas as pd
@@ -38,9 +37,10 @@ def fetch_result_csv_fp(dir):
     :param dir: directory to search in.
     :return: path to csv.
     """
-    # todo: check that there is only one CSV file
-    # todo: check column names
-    csv = [os.path.join(dir, x) for x in os.listdir(dir) if x.endswith(".csv") and not x.startswith(".")][0]
+    csv = [os.path.join(dir, x) for x in os.listdir(dir) if x.endswith(".csv") and not x.startswith(".")]
+    if not len(csv) == 1: # check that only one csv file is in dir; if not, use the first one by default
+        csv = csv[0]
+        print("[WARNING] multiple feature files detected in results, defaulting to use {}".format(csv))
     return csv
 
 
@@ -66,6 +66,7 @@ def collect_session_results(job_config, holdout = False, raw_data_dir = "morf-da
                 with tempfile.TemporaryDirectory(dir=os.getcwd()) as working_dir:
                     logger.info("[INFO] fetching extraction results for course {} run {}".format(course, run))
                     try:
+                        import ipdb;ipdb.set_trace()
                         fetch_result_file(job_config, course=course, session= run, dir = working_dir)
                         csv = fetch_result_csv_fp(working_dir)
                         feat_df = pd.read_csv(csv, dtype=object)
