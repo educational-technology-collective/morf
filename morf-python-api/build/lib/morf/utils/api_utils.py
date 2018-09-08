@@ -38,9 +38,10 @@ def fetch_result_csv_fp(dir):
     :return: path to csv.
     """
     csv = [os.path.join(dir, x) for x in os.listdir(dir) if x.endswith(".csv") and not x.startswith(".")]
-    if not len(csv) == 1: # check that only one csv file is in dir; if not, use the first one by default
-        csv = csv[0]
+    if len(csv) > 1: # check that only one csv file is in dir; if not, use the first one by default
         print("[WARNING] multiple feature files detected in results, defaulting to use {}".format(csv))
+    # "unlist" result; use first file by default if len > 1
+    csv = csv[0]
     return csv
 
 
