@@ -242,7 +242,7 @@ def extract_holdout_session(labels=False, raw_data_dir="morf-data/", label_type=
     else:  # label extraction job; copy file into raw course data dir instead of proc_data_bucket, creating separate label files for each bucket
         for raw_data_bucket in job_config.raw_data_buckets:
             result_file = collect_session_results(job_config, raw_data_buckets=[raw_data_bucket])
-            upload_key = raw_data_dir + "{}.csv".format(label_type)
+            upload_key = raw_data_dir + "{}-test.csv".format(label_type)
             upload_file_to_s3(result_file, bucket=raw_data_bucket, key=upload_key)
     os.remove(result_file)
     send_email_alert(job_config)
