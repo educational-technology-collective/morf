@@ -33,7 +33,7 @@ from morf.utils.log import set_logger_handlers, execute_and_log_output
 
 module_logger = logging.getLogger(__name__)
 
-def cache_s3_to_local(job_config, bucket):
+def sync_s3_bucket_cache(job_config, bucket):
     """
     Cache all data in an s3 bucket to job_config.cache_dir, creating a complete copy of files and directory structure.
     :param job_config: MorfJobConfig object.
@@ -68,7 +68,7 @@ def update_morf_job_cache(job_config):
     """
     # cache each bucket in a named directory within job_cache_dir
     for raw_data_bucket in job_config.raw_data_buckets:
-        cache_s3_to_local(job_config, raw_data_bucket)
+        sync_s3_bucket_cache(job_config, raw_data_bucket)
     return
 
 
