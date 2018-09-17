@@ -456,10 +456,8 @@ def download_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, 
     feature_csv = generate_archive_filename(job_config, mode=fetch_mode, extension="csv")
     key = "{}/{}/{}/{}".format(job_config.user_id, job_config.job_id, fetch_mode, feature_csv)
     download_from_s3(proc_data_bucket, key, s3, session_input_dir, job_config=job_config)
-    # todo: break this into separate function
     # read features file and filter to only include specific course/session
     filter_train_test_data(course, session, input_dir, feature_csv)
-
     if job_config.mode in ("train", "cv"):  # download labels only if training or cv job; otherwise no labels needed
         initialize_labels(job_config, raw_data_bucket, course, session, label_type, dest_dir=session_input_dir,
                           data_dir=raw_data_dir)
@@ -472,22 +470,28 @@ def fetch_train_test_data(job_config, raw_data_bucket, course, session, input_di
     :return:
     """
     logger = set_logger_handlers(module_logger, job_config)
-    course_date_file = "coursera_course_dates.csv"
     proc_data_bucket = getattr(job_config, "proc_data_bucket")
     session_input_dir = os.path.join(input_dir, course, session)
-    # update cache of processed data
+    # find mode to fetch data for
+    if job_config.mode == "train":
+        fetch_mode = "extract"
+    elif job_config.mode == "test":
+        fetch_mode = "extract-holdout"
+    else:
+        logger.error("attempting to fetch train/test data while in mode {}".format(job_config.mode))
+    # fetch train/test from cache, if exists; otherwise fetch from s3
     if hasattr(job_config, "cache_dir"):
-        course_session_cache_dir = make_course_session_cache_dir_fp(job_config, proc_data_bucket, data_dir, course, session)
+        feature_file_name = make_feature_csv_name(job_config.user_id, job_config.job_id, job_config.mode)
+        feature_file_cache_fp = os.path.join(proc_data_bucket, job_config.user_id, job_config.job_id, fetch_mode, feature_file_name)
+        feature_file_dest_fp = os.path.join(session_input_dir, feature_file_name)
         try:
-            logger.info("copying data from cached location {} to {}".format(course_session_cache_dir, session_input_dir))
-            shutil.copytree(course_session_cache_dir, session_input_dir)
-            course_date_file = os.path.join(job_config.cache_dir, raw_data_bucket, data_dir, course_date_file)
-            shutil.copy(course_date_file, session_input_dir)
+            logger.info("copying feature data from cached location {} to {}".format(feature_file_cache_fp, feature_file_dest_fp))
+            shutil.copy(feature_file_cache_fp, feature_file_dest_fp)
+            filter_train_test_data(course, session, input_dir, feature_file_name)
         except Exception as e:
-            logger.error("exception while attempting to copy from cache: {}".format(e))
+            logger.error("exception while attempting to copy train/test data from cache: {}".format(e))
     else:
         download_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, session, input_dir, label_type)
-    # todo: here, call function that filters train/test data to specific course/session; remove that functionality from download_train_test_data()
     return
 
 
