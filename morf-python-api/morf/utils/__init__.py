@@ -35,7 +35,7 @@ from urllib.parse import urlparse
 import boto3
 import pandas as pd
 from botocore.exceptions import ClientError
-from morf.utils.caching import fetch_from_cache
+from morf.utils.caching import fetch_from_cache, make_course_session_cache_dir_fp
 from morf.utils.log import set_logger_handlers, execute_and_log_output
 
 # create logger
@@ -306,7 +306,7 @@ def fetch_raw_course_data(job_config, bucket, course, session, input_dir, data_d
     course_date_file = "coursera_course_dates.csv"
     session_input_dir = os.path.join(input_dir, course, session)
     if hasattr(job_config, "cache_dir"):
-        course_session_cache_dir = os.path.join(job_config.cache_dir, bucket, data_dir, course, session)
+        course_session_cache_dir = make_course_session_cache_dir_fp(job_config, bucket, data_dir, course, session)
         try:
             logger.info("copying data from cached location {} to {}".format(course_session_cache_dir, session_input_dir))
             shutil.copytree(course_session_cache_dir, session_input_dir)

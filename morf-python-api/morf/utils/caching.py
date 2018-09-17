@@ -35,6 +35,11 @@ from morf.utils.s3interface import sync_s3_bucket_cache
 module_logger = logging.getLogger(__name__)
 
 
+def make_course_session_cache_dir_fp(job_config, bucket, data_dir, course, session):
+    fp = os.path.join(job_config.cache_dir, bucket, data_dir, course, session)
+    return fp
+
+
 def update_raw_data_cache(job_config):
     """
     Update the raw data cache using the parameters in job_config; if job_config contains multiple raw data buckets, cache all of them.
