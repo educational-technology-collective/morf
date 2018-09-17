@@ -47,6 +47,17 @@ def update_raw_data_cache(job_config):
     return
 
 
+def update_proc_data_cache(job_config):
+    """
+    Update the processed data cache using the parameters in job_config. Assumes job_config contains only a single proc_data_bucket.
+    :param job_config: MorfJobConfig object.
+    :return:
+    """
+    proc_data_bucket = getattr(job_config, "proc_data_bucket", None)
+    sync_s3_bucket_cache(job_config, proc_data_bucket)
+    return
+
+
 def fetch_from_cache(job_config, cache_file_path, dest_dir):
     """
     Fetch a file from the cache for job_config into dest_dir, if it exists.
