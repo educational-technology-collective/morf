@@ -30,37 +30,17 @@ from urllib.parse import urlparse
 import logging
 from morf.utils.docker import load_docker_image
 from morf.utils.log import set_logger_handlers, execute_and_log_output
+from morf.utils.s3interface import sync_s3_bucket_cache
 
 module_logger = logging.getLogger(__name__)
 
-def cache_s3_to_local(job_config, bucket):
-    """
-    Cache all data in an s3 bucket to job_config.cache_dir, creating a complete copy of files and directory structure.
-    :param job_config: MorfJobConfig object.
-    :param bucket: path to s3 bucket.
-    :return:
-    """
-    logger = set_logger_handlers(module_logger, job_config)
-    s3bucket = "s3://{}".format(bucket)
-    bucket_cache_dir = os.path.join(job_config.cache_dir, bucket)
-    # create job_config.cache_dir directory if not exists
-    if not os.path.exists(job_config.cache_dir):
-        try:
-            os.makedirs(job_config.cache_dir)
-        except exception as e:
-            logger.error("error creating cache: {}".format(e))
-            raise
-    # execute s3 sync command
-    cmd = "{} s3 sync {} {}".format(job_config.aws_exec, s3bucket, bucket_cache_dir)
-    logger.info("running {}".format(cmd))
-    try:
-        subprocess.call(cmd, shell=True)
-    except Exception as e:
-        logger.warning("exception when executing sync: {}".format(e))
-    return
+
+def make_course_session_cache_dir_fp(job_config, bucket, data_dir, course, session):
+    fp = os.path.join(job_config.cache_dir, bucket, data_dir, course, session)
+    return fp
 
 
-def update_morf_job_cache(job_config):
+def update_raw_data_cache(job_config):
     """
     Update the raw data cache using the parameters in job_config; if job_config contains multiple raw data buckets, cache all of them.
     :param job_config: MorfJobConfig object.
@@ -68,7 +48,18 @@ def update_morf_job_cache(job_config):
     """
     # cache each bucket in a named directory within job_cache_dir
     for raw_data_bucket in job_config.raw_data_buckets:
-        cache_s3_to_local(job_config, raw_data_bucket)
+        sync_s3_bucket_cache(job_config, raw_data_bucket)
+    return
+
+
+def update_proc_data_cache(job_config):
+    """
+    Update the processed data cache using the parameters in job_config. Assumes job_config contains only a single proc_data_bucket.
+    :param job_config: MorfJobConfig object.
+    :return:
+    """
+    proc_data_bucket = getattr(job_config, "proc_data_bucket", None)
+    sync_s3_bucket_cache(job_config, proc_data_bucket)
     return
 
 

@@ -35,7 +35,7 @@ from urllib.parse import urlparse
 import boto3
 import pandas as pd
 from botocore.exceptions import ClientError
-from morf.utils.caching import fetch_from_cache
+from morf.utils.caching import fetch_from_cache, make_course_session_cache_dir_fp
 from morf.utils.log import set_logger_handlers, execute_and_log_output
 
 # create logger
@@ -306,7 +306,7 @@ def fetch_raw_course_data(job_config, bucket, course, session, input_dir, data_d
     course_date_file = "coursera_course_dates.csv"
     session_input_dir = os.path.join(input_dir, course, session)
     if hasattr(job_config, "cache_dir"):
-        course_session_cache_dir = os.path.join(job_config.cache_dir, bucket, data_dir, course, session)
+        course_session_cache_dir = make_course_session_cache_dir_fp(job_config, bucket, data_dir, course, session)
         try:
             logger.info("copying data from cached location {} to {}".format(course_session_cache_dir, session_input_dir))
             shutil.copytree(course_session_cache_dir, session_input_dir)
@@ -409,6 +409,27 @@ def initialize_labels(job_config, bucket, course, session, label_type, dest_dir,
     return label_csv_fp
 
 
+def filter_train_test_data(course, session, input_dir, feature_csv, remove=True):
+    """
+    Filter feature_csv to include only data from the specified course and session.
+    :param course: course slug.
+    :param session: session number.
+    :param input_dir: input directorty which should contain feature_csv at input_dir/course/session location.
+    :param feature_csv: base name of feature csv file.
+    :param remove: indicator for whether feature_csv should be removed after its results are filtered.
+    :return: None
+    """
+    session_input_dir = os.path.join(input_dir, course, session)
+    local_feature_csv = os.path.join(session_input_dir, feature_csv)
+    temp_df = pd.read_csv(local_feature_csv, dtype=object)
+    outfile = os.path.join(session_input_dir, make_feature_csv_name(course, session))
+    temp_df[(temp_df["course"] == course) & (temp_df["session"] == session)].drop(["course", "session"], axis=1) \
+        .to_csv(outfile, index=False)
+    if remove:
+        os.remove(local_feature_csv)
+    return
+
+
 def download_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, session, input_dir, label_type):
     """
     Download pre-extracted train or test data (specified by mode) for course/session into input_dir.
@@ -436,15 +457,41 @@ def download_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, 
     key = "{}/{}/{}/{}".format(job_config.user_id, job_config.job_id, fetch_mode, feature_csv)
     download_from_s3(proc_data_bucket, key, s3, session_input_dir, job_config=job_config)
     # read features file and filter to only include specific course/session
-    local_feature_csv = os.path.join(session_input_dir, feature_csv)
-    temp_df = pd.read_csv(local_feature_csv, dtype=object)
-    outfile = os.path.join(session_input_dir, make_feature_csv_name(course, session))
-    temp_df[(temp_df["course"] == course) & (temp_df["session"] == session)].drop(["course", "session"], axis=1) \
-        .to_csv(outfile, index=False)
-    os.remove(local_feature_csv)
+    filter_train_test_data(course, session, input_dir, feature_csv)
     if job_config.mode in ("train", "cv"):  # download labels only if training or cv job; otherwise no labels needed
         initialize_labels(job_config, raw_data_bucket, course, session, label_type, dest_dir=session_input_dir,
                           data_dir=raw_data_dir)
+    return
+
+
+def fetch_train_test_data(job_config, raw_data_bucket, course, session, input_dir, label_type):
+    """
+    Fetch train and test data from job_config.cache_dir, if exists; otherwise fetch from s3.
+    :return:
+    """
+    logger = set_logger_handlers(module_logger, job_config)
+    proc_data_bucket = getattr(job_config, "proc_data_bucket")
+    session_input_dir = os.path.join(input_dir, course, session)
+    # find mode to fetch data for
+    if job_config.mode == "train":
+        fetch_mode = "extract"
+    elif job_config.mode == "test":
+        fetch_mode = "extract-holdout"
+    else:
+        logger.error("attempting to fetch train/test data while in mode {}".format(job_config.mode))
+    # fetch train/test from cache, if exists; otherwise fetch from s3
+    if hasattr(job_config, "cache_dir"):
+        feature_file_name = make_feature_csv_name(job_config.user_id, job_config.job_id, job_config.mode)
+        feature_file_cache_fp = os.path.join(proc_data_bucket, job_config.user_id, job_config.job_id, fetch_mode, feature_file_name)
+        feature_file_dest_fp = os.path.join(session_input_dir, feature_file_name)
+        try:
+            logger.info("copying feature data from cached location {} to {}".format(feature_file_cache_fp, feature_file_dest_fp))
+            shutil.copy(feature_file_cache_fp, feature_file_dest_fp)
+            filter_train_test_data(course, session, input_dir, feature_file_name)
+        except Exception as e:
+            logger.error("exception while attempting to copy train/test data from cache: {}".format(e))
+    else:
+        download_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, session, input_dir, label_type)
     return
 
 
@@ -513,16 +560,16 @@ def initialize_train_test_data(job_config, raw_data_bucket, level, label_type, c
                 elif mode == "test":
                     sessions = fetch_sessions(job_config, bucket, raw_data_dir, course, fetch_holdout_session_only=True)
                 for session in sessions:
-                    download_train_test_data(job_config, bucket, raw_data_dir, course, session, input_dir, label_type)
+                    fetch_train_test_data(job_config, bucket, raw_data_dir, course, session, input_dir, label_type)
     if level == "course": # download data for every session of course
         if mode == "train":
             sessions = fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course)
         elif mode == "test":
             sessions = fetch_sessions(job_config, raw_data_bucket, raw_data_dir, course, fetch_holdout_session_only=True)
         for session in sessions:
-            download_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, session, input_dir, label_type)
+            fetch_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, session, input_dir, label_type)
     if level == "session": # download data for this session only
-        download_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, session, input_dir, label_type)
+        fetch_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, session, input_dir, label_type)
     return
 
 
