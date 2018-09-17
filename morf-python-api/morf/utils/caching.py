@@ -30,37 +30,12 @@ from urllib.parse import urlparse
 import logging
 from morf.utils.docker import load_docker_image
 from morf.utils.log import set_logger_handlers, execute_and_log_output
+from morf.utils.s3interface import sync_s3_bucket_cache
 
 module_logger = logging.getLogger(__name__)
 
-def sync_s3_bucket_cache(job_config, bucket):
-    """
-    Cache all data in an s3 bucket to job_config.cache_dir, creating a complete copy of files and directory structure.
-    :param job_config: MorfJobConfig object.
-    :param bucket: path to s3 bucket.
-    :return:
-    """
-    logger = set_logger_handlers(module_logger, job_config)
-    s3bucket = "s3://{}".format(bucket)
-    bucket_cache_dir = os.path.join(job_config.cache_dir, bucket)
-    # create job_config.cache_dir directory if not exists
-    if not os.path.exists(job_config.cache_dir):
-        try:
-            os.makedirs(job_config.cache_dir)
-        except exception as e:
-            logger.error("error creating cache: {}".format(e))
-            raise
-    # execute s3 sync command
-    cmd = "{} s3 sync {} {}".format(job_config.aws_exec, s3bucket, bucket_cache_dir)
-    logger.info("running {}".format(cmd))
-    try:
-        subprocess.call(cmd, shell=True)
-    except Exception as e:
-        logger.warning("exception when executing sync: {}".format(e))
-    return
 
-
-def update_morf_job_cache(job_config):
+def update_raw_data_cache(job_config):
     """
     Update the raw data cache using the parameters in job_config; if job_config contains multiple raw data buckets, cache all of them.
     :param job_config: MorfJobConfig object.

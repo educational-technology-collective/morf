@@ -28,7 +28,7 @@ import tempfile
 
 from morf.utils import *
 from morf.utils.alerts import send_success_email, send_email_alert
-from morf.utils.caching import update_morf_job_cache, cache_to_docker_hub
+from morf.utils.caching import update_raw_data_cache, cache_to_docker_hub
 from morf.utils.log import set_logger_handlers, execute_and_log_output
 from morf.utils.docker import load_docker_image, make_docker_run_command
 from morf.utils.doi import upload_files_to_zenodo
@@ -107,7 +107,7 @@ def run_morf_job(job_config, no_cache = False, no_morf_cache = False):
         os.chdir(working_dir)
         # from job_config, fetch and download the following: docker image, controller script, cached config file
         if not no_morf_cache:
-            update_morf_job_cache(job_config)
+            update_raw_data_cache(job_config)
         # from client.config, fetch and download the following: docker image, controller script
         try:
             fetch_file(s3, working_dir, job_config.docker_url, dest_filename=docker_image_name, job_config=job_config)
