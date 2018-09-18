@@ -410,7 +410,7 @@ def initialize_labels(job_config, bucket, course, session, label_type, dest_dir,
     return label_csv_fp
 
 
-def filter_train_test_data(course, session, input_dir, feature_csv, remove=True):
+def filter_train_test_data(job_config, course, session, input_dir, feature_csv, remove=True):
     """
     Filter feature_csv to include only data from the specified course and session.
     :param course: course slug.
@@ -420,14 +420,19 @@ def filter_train_test_data(course, session, input_dir, feature_csv, remove=True)
     :param remove: indicator for whether feature_csv should be removed after its results are filtered.
     :return: None
     """
+    logger = set_logger_handlers(module_logger, job_config)
     session_input_dir = os.path.join(input_dir, course, session)
     local_feature_csv = os.path.join(session_input_dir, feature_csv)
-    temp_df = pd.read_csv(local_feature_csv, dtype=object)
-    outfile = os.path.join(session_input_dir, make_feature_csv_name(course, session))
-    temp_df[(temp_df["course"] == course) & (temp_df["session"] == session)].drop(["course", "session"], axis=1) \
-        .to_csv(outfile, index=False)
-    if remove:
-        os.remove(local_feature_csv)
+    try:
+        logger.info("reading feature file from {} and filtering for features from course {} session {}".format(local_feature_csv, course, session))
+        temp_df = pd.read_csv(local_feature_csv, dtype=object)
+        outfile = os.path.join(session_input_dir, make_feature_csv_name(course, session))
+        temp_df[(temp_df["course"] == course) & (temp_df["session"] == session)].drop(["course", "session"], axis=1) \
+            .to_csv(outfile, index=False)
+        if remove:
+            os.remove(local_feature_csv)
+    except Exception as e:
+        logger.warning("exception while filtering feature file to create train/test data for course {} session {}: {}".format(course, session, e))
     return
 
 
@@ -458,7 +463,7 @@ def download_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, 
     key = "{}/{}/{}/{}".format(job_config.user_id, job_config.job_id, fetch_mode, feature_csv)
     download_from_s3(proc_data_bucket, key, s3, session_input_dir, job_config=job_config)
     # read features file and filter to only include specific course/session
-    filter_train_test_data(course, session, input_dir, feature_csv)
+    filter_train_test_data(job_config, course, session, input_dir, feature_csv)
     if job_config.mode in ("train", "cv"):  # download labels only if training or cv job; otherwise no labels needed
         initialize_labels(job_config, raw_data_bucket, course, session, label_type, dest_dir=session_input_dir,
                           data_dir=raw_data_dir)
@@ -491,7 +496,7 @@ def fetch_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, ses
             logger.info("copying feature data from cached location {} to {}".format(feature_file_cache_fp, feature_file_dest_fp))
             os.makedirs(session_input_dir, exist_ok=True)
             shutil.copy(feature_file_cache_fp, feature_file_dest_fp)
-            filter_train_test_data(course, session, input_dir, feature_file_dest_fname)
+            filter_train_test_data(job_config, course, session, input_dir, feature_file_dest_fname)
         except Exception as e:
             logger.error("exception while attempting to copy train/test data from cache: {}".format(e))
     else:
