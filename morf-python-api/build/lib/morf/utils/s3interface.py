@@ -27,6 +27,7 @@ import os
 import subprocess
 import logging
 from morf.utils.log import set_logger_handlers
+from morf.utils import make_s3_key_path
 
 module_logger = logging.getLogger(__name__)
 
@@ -70,4 +71,36 @@ def sync_s3_bucket_cache(job_config, bucket):
         subprocess.call(cmd, shell=True)
     except Exception as e:
         logger.warning("exception when executing sync: {}".format(e))
+    return
+
+
+def sync_s3_job_cache(job_config, modes=("extract", "extract-holdout", "train", "test")):
+    """
+    Sync data in s3 just for this specific job (better for large buckets or when the entire bucket is not actually needed).
+    :param job_config:
+    :param bucket:
+    :param modes: modes to update cache for; by default to all modes
+    :return:
+    """
+    bucket = job_config.proc_data_bucket
+    logger = set_logger_handlers(module_logger, job_config)
+    s3bucket = "s3://{}".format(bucket)
+    bucket_cache_dir = os.path.join(job_config.cache_dir, bucket)
+    # create job_config.cache_dir directory if not exists
+    if not os.path.exists(job_config.cache_dir):
+        try:
+            os.makedirs(job_config.cache_dir)
+        except exception as e:
+            logger.error("error creating cache: {}".format(e))
+            raise
+    for m in modes:
+        s3_prefix = make_s3_key_path(job_config, mode=m)
+        mode_cache_dir = os.path.join(bucket_cache_dir, job_config.user_id, job_config.job_id, m)
+        # execute s3 sync command
+        cmd = "{} s3 sync {}/{} {}".format(job_config.aws_exec, s3bucket, s3_prefix, mode_cache_dir)
+        logger.info("running {}".format(cmd))
+        try:
+            subprocess.call(cmd, shell=True)
+        except Exception as e:
+            logger.warning("exception when executing sync: {}".format(e))
     return
