@@ -28,7 +28,8 @@ from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 import io
 import logging
-from morf.utils import download_from_s3, generate_archive_filename, make_s3_key_path
+from morf.utils import download_from_s3, generate_archive_filename
+from morf.utils.s3interface import make_s3_key_path
 from morf.utils.log import set_logger_handlers
 
 module_logger = logging.getLogger(__name__)

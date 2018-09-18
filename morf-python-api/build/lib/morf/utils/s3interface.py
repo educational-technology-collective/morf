@@ -27,7 +27,6 @@ import os
 import subprocess
 import logging
 from morf.utils.log import set_logger_handlers
-from morf.utils import make_s3_key_path
 
 module_logger = logging.getLogger(__name__)
 
@@ -104,3 +103,23 @@ def sync_s3_job_cache(job_config, modes=("extract", "extract-holdout", "train", 
         except Exception as e:
             logger.warning("exception when executing sync: {}".format(e))
     return
+
+
+def make_s3_key_path(job_config, course = None, filename = None, session = None, mode = None, job_id = None):
+    """
+    Create a key path following MORF's subdirectory organization and any non-null parameters provided.
+    :param job_config: MorfJobConfig object.
+    :param course: course slug (string).
+    :param filename: file name (string; base filename only - no path).
+    :param session: course session (string).
+    :param mode: optional mode to override job_config.mode attribute (string).
+    :return: key path (string) for use in s3.
+    """
+    if not mode:
+        mode = job_config.mode
+    if not job_id: # users have option to specify another job_id for forking features
+        job_id = job_config.job_id
+    job_attributes = [job_config.user_id, job_id, mode, course, session, filename]
+    active_attributes = [x for x in job_attributes if x is not None]
+    key = "/".join(active_attributes)
+    return key

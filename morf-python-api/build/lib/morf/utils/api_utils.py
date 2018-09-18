@@ -27,7 +27,7 @@ import tempfile
 
 import pandas as pd
 from morf.utils import *
-from morf.utils import make_s3_key_path
+from morf.utils.s3interface import make_s3_key_path
 from morf.utils.log import set_logger_handlers
 
 module_logger = logging.getLogger(__name__)

@@ -31,6 +31,7 @@ from morf.utils.config import MorfJobConfig
 from morf.utils.job_runner_utils import load_docker_image
 from morf.utils.log import set_logger_handlers
 from morf.utils.security import hash_df_column
+from morf.utils.s3interface import make_s3_key_path
 
 mode = "evaluate"
 # define module-level variables for config.properties
