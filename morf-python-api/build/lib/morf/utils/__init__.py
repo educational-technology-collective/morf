@@ -465,7 +465,7 @@ def download_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, 
     return
 
 
-def fetch_train_test_data(job_config, raw_data_bucket, course, session, input_dir, label_type):
+def fetch_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, session, input_dir, label_type):
     """
     Fetch train and test data from job_config.cache_dir, if exists; otherwise fetch from s3.
     :return:
