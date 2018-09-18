@@ -54,14 +54,26 @@ def load_docker_image(dir, job_config, logger, image_name = "docker_image"):
     return image_uuid
 
 
+def make_docker_image_name(job_config, course, session, mode, prefix="MORF"):
+    """
+    Create a uniqe name for the current job_config
+    :param job_config:
+    :return:
+    """
+
+    name = "{}-{}-{}-{}-{}".format(prefix, job_config.morf_id, mode, course, session)
+    return name
+
+
 def make_docker_run_command(docker_exec, input_dir, output_dir, image_uuid, course, session, mode, client_args = None):
     """
     Make docker run command, inserting MORF requirements along with any named arguments.
     :param client_args: doct of {argname, argvalue} pairs to add to command.
     :return:
     """
-    cmd = "{} run --network=\"none\" --rm=true --volume={}:/input --volume={}:/output {} --course {} --session {} --mode {}".format(
-        docker_exec, input_dir, output_dir, image_uuid, course, session, mode)
+    image_name = make_docker_image_name(job_config, course, session, mode)
+    cmd = "{} run --name {} --network=\"none\" --rm=true --volume={}:/input --volume={}:/output {} --course {} --session {} --mode {}".format(
+        docker_exec, image_name, input_dir, output_dir, image_uuid, course, session, mode)
     if client_args:# add any additional client args to cmd
         for argname, argval in client_args.items():
             cmd += " --{} {}".format(argname, argval)
