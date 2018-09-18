@@ -24,14 +24,14 @@
 Testing functions for the MORF 2.0 API. For more information about the API, see the documentation.
 """
 
-from morf.utils import *
-from morf.utils.api_utils import *
-from morf.utils.job_runner_utils import run_image
-from morf.utils.alerts import send_email_alert
-from morf.utils.config import get_config_properties, fetch_data_buckets_from_config, MorfJobConfig
-from morf.utils.log import set_logger_handlers
 from multiprocessing import Pool
 
+from morf.utils.alerts import send_email_alert
+from morf.utils.api_utils import *
+from morf.utils.config import MorfJobConfig
+from morf.utils.job_runner_utils import run_image
+from morf.utils.log import set_logger_handlers
+from morf.utils.s3interface import make_s3_key_path
 
 mode = "test"
 # define module-level variables for config.properties

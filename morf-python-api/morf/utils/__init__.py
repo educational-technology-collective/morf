@@ -35,10 +35,12 @@ from urllib.parse import urlparse
 import boto3
 import pandas as pd
 from botocore.exceptions import ClientError
+from morf.utils import make_s3_key_path
 from morf.utils.caching import fetch_from_cache, make_course_session_cache_dir_fp
 from morf.utils.log import set_logger_handlers, execute_and_log_output
-
 # create logger
+from morf.utils.s3interface import make_s3_key_path
+
 module_logger = logging.getLogger(__name__)
 
 
@@ -665,7 +667,7 @@ def download_models(job_config, course, dest_dir, level, session = None):
     if level == "all":
         # just one model file
         mod_archive_file = generate_archive_filename(job_config, mode = "train")
-        key = make_s3_key_path(job_config, mode = "train", filename = mod_archive_file)
+        key = make_s3_key_path(job_config, mode ="train", filename = mod_archive_file)
         download_model_from_s3(job_config, bucket, key, dest_dir)
     elif level in ["course","session"]: # model files might be in either course- or session-level directories
         train_files = [obj.key
@@ -757,26 +759,6 @@ def make_output_archive_file(output_dir, job_config, course=None, session = None
     cmd = "tar -cvf {} -C {} .".format(archive_file, output_dir)
     subprocess.call(cmd, shell = True, stdout=open(os.devnull, "wb"), stderr=open(os.devnull, "wb"))
     return archive_file
-
-
-def make_s3_key_path(job_config, course = None, filename = None, session = None, mode = None, job_id = None):
-    """
-    Create a key path following MORF's subdirectory organization and any non-null parameters provided.
-    :param job_config: MorfJobConfig object.
-    :param course: course slug (string).
-    :param filename: file name (string; base filename only - no path).
-    :param session: course session (string).
-    :param mode: optional mode to override job_config.mode attribute (string).
-    :return: key path (string) for use in s3.
-    """
-    if not mode:
-        mode = job_config.mode
-    if not job_id: # users have option to specify another job_id for forking features
-        job_id = job_config.job_id
-    job_attributes = [job_config.user_id, job_id, mode, course, session, filename]
-    active_attributes = [x for x in job_attributes if x is not None]
-    key = "/".join(active_attributes)
-    return key
 
 
 def move_results_to_destination(archive_file, job_config, course = None, session = None):

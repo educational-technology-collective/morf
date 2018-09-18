@@ -24,13 +24,13 @@
 Feature extraction functions for the MORF 2.0 API. For more information about the API, see the documentation.
 """
 
+from multiprocessing import Pool
 
 from morf.utils.alerts import send_email_alert
 from morf.utils.api_utils import *
 from morf.utils.config import MorfJobConfig
 from morf.utils.job_runner_utils import run_image
 from morf.utils.log import set_logger_handlers
-from multiprocessing import Pool
 
 # define module-level variables for config.properties
 CONFIG_FILENAME = "config.properties"

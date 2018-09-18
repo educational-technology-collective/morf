@@ -24,17 +24,13 @@
 Evaluation utility functions for the MORF 2.0 API. For more information about the API, see the documentation [HERE].
 """
 
-from morf.utils import *
-from morf.utils.api_utils import *
-from morf.utils.security import hash_df_column
-from morf.utils.config import MorfJobConfig
-from morf.utils.log import set_logger_handlers
-import tempfile
-import pandas as pd
 import numpy as np
 import sklearn.metrics
+from morf.utils.api_utils import *
+from morf.utils.config import MorfJobConfig
 from morf.utils.job_runner_utils import load_docker_image
-from urllib.parse import urlparse
+from morf.utils.log import set_logger_handlers
+from morf.utils.security import hash_df_column
 
 mode = "evaluate"
 # define module-level variables for config.properties
