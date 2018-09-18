@@ -482,13 +482,14 @@ def fetch_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, ses
         logger.error("attempting to fetch train/test data while in mode {}".format(job_config.mode))
     # fetch train/test from cache, if exists; otherwise fetch from s3
     if hasattr(job_config, "cache_dir"):
-        feature_file_name = make_feature_csv_name(job_config.user_id, job_config.job_id, job_config.mode)
-        feature_file_cache_fp = os.path.join(proc_data_bucket, job_config.user_id, job_config.job_id, fetch_mode, feature_file_name)
-        feature_file_dest_fp = os.path.join(session_input_dir, feature_file_name)
+        feature_file_src_fname = generate_archive_filename(job_config, extension='csv', mode=fetch_mode)
+        feature_file_dest_fname = make_feature_csv_name(job_config.user_id, job_config.job_id, job_config.mode)
+        feature_file_cache_fp = os.path.join(proc_data_bucket, job_config.user_id, job_config.job_id, fetch_mode, feature_file_src_fname)
+        feature_file_dest_fp = os.path.join(session_input_dir, feature_file_dest_fname)
         try:
             logger.info("copying feature data from cached location {} to {}".format(feature_file_cache_fp, feature_file_dest_fp))
             shutil.copy(feature_file_cache_fp, feature_file_dest_fp)
-            filter_train_test_data(course, session, input_dir, feature_file_name)
+            filter_train_test_data(course, session, input_dir, feature_file_dest_fname)
         except Exception as e:
             logger.error("exception while attempting to copy train/test data from cache: {}".format(e))
     else:
