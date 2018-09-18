@@ -78,7 +78,7 @@ def run_image(job_config, raw_data_bucket, course=None, session=None, level=None
             download_models(job_config, course=course, session=session, dest_dir=input_dir, level=level)
         image_uuid = load_docker_image(dir=working_dir, job_config=job_config, logger=logger)
         # build docker run command and execute the image
-        cmd = make_docker_run_command(docker_exec, input_dir, output_dir, image_uuid, course, session, mode, client_args=job_config.client_args)
+        cmd = make_docker_run_command(job_config, docker_exec, input_dir, output_dir, image_uuid, course, session, mode, client_args=job_config.client_args)
         execute_and_log_output(cmd, logger)
         # cleanup
         execute_and_log_output("{} rmi --force {}".format(docker_exec, image_uuid), logger)
