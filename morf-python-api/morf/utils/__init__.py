@@ -489,6 +489,7 @@ def fetch_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, ses
         feature_file_dest_fp = os.path.join(session_input_dir, feature_file_dest_fname)
         try:
             logger.info("copying feature data from cached location {} to {}".format(feature_file_cache_fp, feature_file_dest_fp))
+            os.makedirs(session_input_dir, exist_ok=True)
             shutil.copy(feature_file_cache_fp, feature_file_dest_fp)
             filter_train_test_data(course, session, input_dir, feature_file_dest_fname)
         except Exception as e:
