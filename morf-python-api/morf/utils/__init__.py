@@ -413,6 +413,7 @@ def initialize_labels(job_config, bucket, course, session, label_type, dest_dir,
 def filter_train_test_data(job_config, course, session, input_dir, feature_csv, remove=True):
     """
     Filter feature_csv to include only data from the specified course and session.
+    :param job_config: MorfJobConfig object.
     :param course: course slug.
     :param session: session number.
     :param input_dir: input directorty which should contain feature_csv at input_dir/course/session location.
