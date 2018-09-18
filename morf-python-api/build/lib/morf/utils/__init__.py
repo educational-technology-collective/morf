@@ -500,6 +500,9 @@ def fetch_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, ses
             filter_train_test_data(job_config, course, session, input_dir, feature_file_dest_fname)
         except Exception as e:
             logger.error("exception while attempting to copy train/test data from cache: {}".format(e))
+        # labels
+        if job_config.mode in ( "train", "cv"):  # download labels only if training or cv job; otherwise no labels needed
+            initialize_labels(job_config, raw_data_bucket, course, session, label_type, dest_dir=session_input_dir, data_dir=raw_data_dir)
     else:
         download_train_test_data(job_config, raw_data_bucket, raw_data_dir, course, session, input_dir, label_type)
     return
