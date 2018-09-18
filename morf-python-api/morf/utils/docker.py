@@ -60,12 +60,11 @@ def make_docker_image_name(job_config, course, session, mode, prefix="MORF"):
     :param job_config:
     :return:
     """
-
     name = "{}-{}-{}-{}-{}".format(prefix, job_config.morf_id, mode, course, session)
     return name
 
 
-def make_docker_run_command(docker_exec, input_dir, output_dir, image_uuid, course, session, mode, client_args = None):
+def make_docker_run_command(job_config, docker_exec, input_dir, output_dir, image_uuid, course, session, mode, client_args = None):
     """
     Make docker run command, inserting MORF requirements along with any named arguments.
     :param client_args: doct of {argname, argvalue} pairs to add to command.
