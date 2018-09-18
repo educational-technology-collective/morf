@@ -244,7 +244,7 @@ def execute_image_for_cv(job_config, raw_data_bucket, course, fold_num, docker_i
         train_labels_path = initialize_cv_labels(job_config, train_users, raw_data_bucket, course, label_type, input_dir, raw_data_dir, fold_num, "train", level="course")
         # run docker image with mode == cv
         image_uuid = load_docker_image(docker_image_dir, job_config, logger)
-        cmd = make_docker_run_command(job_config.docker_exec, input_dir, output_dir, image_uuid, course, None, mode,
+        cmd = make_docker_run_command(job_config, job_config.docker_exec, input_dir, output_dir, image_uuid, course, None, mode,
                                       job_config.client_args) + " --fold_num {}".format(fold_num)
         execute_and_log_output(cmd, logger)
         # upload results
