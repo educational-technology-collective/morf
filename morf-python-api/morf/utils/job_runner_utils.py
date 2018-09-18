@@ -28,7 +28,8 @@ import tempfile
 
 from morf.utils import *
 from morf.utils.alerts import send_success_email, send_email_alert
-from morf.utils.caching import update_raw_data_cache, update_proc_data_cache, cache_to_docker_hub
+from morf.utils.caching import update_raw_data_cache, cache_to_docker_hub
+from morf.utils.s3interface import sync_s3_job_cache
 from morf.utils.log import set_logger_handlers, execute_and_log_output
 from morf.utils.docker import load_docker_image, make_docker_run_command
 from morf.utils.doi import upload_files_to_zenodo
@@ -69,7 +70,7 @@ def run_image(job_config, raw_data_bucket, course=None, session=None, level=None
             mode = "extract" # sets mode to "extract" in case of "extract-holdout"
         # fetch training/testing data
         if mode in ["train", "test"]:
-            update_proc_data_cache(job_config)
+            sync_s3_job_cache(job_config)
             initialize_train_test_data(job_config, raw_data_bucket=raw_data_bucket, level=level,
                                        label_type=label_type, course=course, session=session,
                                        input_dir=input_dir)
