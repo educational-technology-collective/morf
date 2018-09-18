@@ -35,7 +35,6 @@ from urllib.parse import urlparse
 import boto3
 import pandas as pd
 from botocore.exceptions import ClientError
-from morf.utils import make_s3_key_path
 from morf.utils.caching import fetch_from_cache, make_course_session_cache_dir_fp
 from morf.utils.log import set_logger_handlers, execute_and_log_output
 # create logger
