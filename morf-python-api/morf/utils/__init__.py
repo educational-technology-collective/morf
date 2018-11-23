@@ -85,7 +85,7 @@ def clean_filename(src):
     :return: None
     """
     src_dir, src_file = os.path.split(src)
-    clean_src_file = re.sub('[\(\)\s&]', '', src_file)
+    clean_src_file = re.sub(r"[\(\)\s&]", "", src_file)
     clean_src_path = os.path.join(src_dir, clean_src_file)
     try:
         os.rename(src, clean_src_path)
@@ -100,7 +100,7 @@ def get_bucket_from_url(url):
     :param url: string url for S3 file.
     :return: bucket name (string)
     """
-    return re.search("^s3://([^/]+)", url).group(1)
+    return re.search(r"^s3://([^/]+)", url).group(1)
 
 
 def get_key_from_url(url):
@@ -109,7 +109,7 @@ def get_key_from_url(url):
     :param url: string url for S3 file.
     :return: key name (string)
     """
-    return re.search("^s3://[^/]+/(.+)", url).group(1)
+    return re.search(r"^s3://[^/]+/(.+)", url).group(1)
 
 
 def download_from_s3(bucket, key, s3, dir = os.getcwd(), dest_filename = None, job_config = None):
@@ -277,7 +277,7 @@ def download_raw_course_data(job_config, bucket, course, session, input_dir, dat
     for obj in boto3.resource("s3", aws_access_key_id=job_config.aws_access_key_id, aws_secret_access_key=job_config.aws_secret_access_key)\
             .Bucket(bucket).objects.filter(Prefix="{}/{}/{}/".format(data_dir, course, session)):
         filename = obj.key.split("/")[-1]
-        filename = re.sub('[\s\(\)":!&]', "", filename)
+        filename = re.sub(r'[\s\(\)":!&]', "", filename)
         filepath = os.path.join(session_input_dir, filename)
         try:
             with open(filepath, "wb") as resource:
