@@ -1,0 +1,9 @@
+language: python
+python:
+  - "3.4"
+  - "3.5"
+  - "3.6"
+script:
+  - echo "script start"
+  - ./morf-python-api/morf/tests/test_s3_utils.py
+
