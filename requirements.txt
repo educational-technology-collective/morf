@@ -1,0 +1,5 @@
+pandas
+sklearn
+boto3
+boto
+scipy
