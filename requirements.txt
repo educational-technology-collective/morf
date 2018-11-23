@@ -3,3 +3,4 @@ sklearn
 boto3
 boto
 scipy
+google_compute_engine
