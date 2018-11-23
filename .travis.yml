@@ -6,7 +6,7 @@ python:
 sudo: required
 before_script:
   - chmod -R +x ./morf-python-api/morf/
-script:
-  - echo "script start"
-  - ./morf-python-api/morf/tests/test_s3_utils.py
+#script:
+#  - echo "script start"
+#  - ./morf-python-api/morf/tests/test_s3_utils.py
 
