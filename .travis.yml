@@ -3,6 +3,7 @@ python:
   - "3.4"
   - "3.5"
   - "3.6"
+sudo: required
 script:
   - echo "script start"
   - ./morf-python-api/morf/tests/test_s3_utils.py
