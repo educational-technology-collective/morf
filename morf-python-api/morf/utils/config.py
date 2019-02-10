@@ -143,19 +143,37 @@ class MorfJobConfig:
         self.mode = None
         self.status = "START"
         properties = get_config_properties(config_file)
-        client_args = get_config_properties(config_file, sections_to_fetch="args")
+        self.client_args = get_config_properties(config_file, sections_to_fetch="args")
         # add properties to class as attributes
         for prop in properties.items():
             setattr(self, prop[0], prop[1])
+        # if client_args are specified, add these to job_id to ensure unique
+        if self.client_args:
+            self.generate_job_id()
         # fetch raw data buckets as list
         self.raw_data_buckets = fetch_data_buckets_from_config()
-        # set client_args dict; this is used to pass arguments to docker image at runtime
-        self.client_args = client_args
         self.generate_morf_id(config_file)
         # if maximum number of cores is not specified, set to one less than half of current machine's cores; otherwise cast to int
         self.setcores()
 
+    def generate_job_id(self, client_args):
+        """
+        Generate and set a unique job_id by appending client-supplied arg names and values.
+        This makes submitting multiple jobs by simply altering the 'args' field much easier for users.
+        :return: None
+        """
+        new_job_id = self.job_id
+        for arg_name, arg_value in self.client_args.items():
+            new_job_id += '_'.join([arg_name, arg_value])
+        setattr(self, "job_id", new_job_id)
+        return
+
     def generate_morf_id(self, config_file):
+        """
+        Generate a unique MORF identifier via hashing of the config file.
+        :param config_file:
+        :return:
+        """
         self.morf_id = generate_md5(config_file)
 
     def check_configurations(self):
