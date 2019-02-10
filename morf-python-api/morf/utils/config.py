@@ -163,7 +163,7 @@ class MorfJobConfig:
         :return: None
         """
         new_job_id = self.job_id
-        for arg_name, arg_value in self.client_args.items():
+        for arg_name, arg_value in sorted(self.client_args.items()):
             new_job_id += '_'.join([arg_name, arg_value])
         setattr(self, "job_id", new_job_id)
         return
