@@ -51,37 +51,34 @@ def run_image(job_config, raw_data_bucket, course=None, session=None, level=None
     :return:
     """
     logger = set_logger_handlers(module_logger, job_config)
-    docker_url = job_config.docker_url
-    mode = job_config.mode
     s3 = job_config.initialize_s3()
-    docker_exec = job_config.docker_exec
     # create local directory for processing on this instance
     with tempfile.TemporaryDirectory(dir=job_config.local_working_directory) as working_dir:
         try:
-            fetch_file(s3, working_dir, docker_url, dest_filename="docker_image")
+            fetch_file(s3, working_dir, job_config.docker_url, dest_filename="docker_image")
         except Exception as e:
-            logger.error("[ERROR] Error downloading file {} to {}".format(docker_url, working_dir))
+            logger.error("[ERROR] Error downloading file {} to {}".format(job_config.docker_url, working_dir))
         input_dir, output_dir = initialize_input_output_dirs(working_dir)
         # fetch any data or models needed
-        if "extract" in mode:  # download raw data
+        if "extract" in job_config.mode:  # download raw data
             initialize_raw_course_data(job_config,
-                                       raw_data_bucket=raw_data_bucket, mode=mode, course=course,
+                                       raw_data_bucket=raw_data_bucket, mode=job_config.mode, course=course,
                                        session=session, level=level, input_dir=input_dir)
-            mode = "extract" # sets mode to "extract" in case of "extract-holdout"
+            job_config.mode = "extract" # sets mode to "extract" in case of "extract-holdout"
         # fetch training/testing data
-        if mode in ["train", "test"]:
+        if job_config.mode in ["train", "test"]:
             sync_s3_job_cache(job_config)
             initialize_train_test_data(job_config, raw_data_bucket=raw_data_bucket, level=level,
                                        label_type=label_type, course=course, session=session,
                                        input_dir=input_dir)
-        if mode == "test":  # fetch models and untar
+        if job_config.mode == "test":  # fetch models and untar
             download_models(job_config, course=course, session=session, dest_dir=input_dir, level=level)
         image_uuid = load_docker_image(dir=working_dir, job_config=job_config, logger=logger)
         # build docker run command and execute the image
-        cmd = make_docker_run_command(job_config, docker_exec, input_dir, output_dir, image_uuid, course, session, mode, client_args=job_config.client_args)
+        cmd = make_docker_run_command(job_config, job_config.docker_exec, input_dir, output_dir, image_uuid, course, session, job_config.mode, client_args=job_config.client_args)
         execute_and_log_output(cmd, logger)
         # cleanup
-        execute_and_log_output("{} rmi --force {}".format(docker_exec, image_uuid), logger)
+        execute_and_log_output("{} rmi --force {}".format(job_config.docker_exec, image_uuid), logger)
         # archive and write output
         archive_file = make_output_archive_file(output_dir, job_config, course = course, session = session)
         move_results_to_destination(archive_file, job_config, course = course, session = session)
