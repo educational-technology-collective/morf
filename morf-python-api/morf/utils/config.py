@@ -156,7 +156,7 @@ class MorfJobConfig:
         # if maximum number of cores is not specified, set to one less than half of current machine's cores; otherwise cast to int
         self.setcores()
 
-    def generate_job_id(self, client_args):
+    def generate_job_id(self):
         """
         Generate and set a unique job_id by appending client-supplied arg names and values.
         This makes submitting multiple jobs by simply altering the 'args' field much easier for users.
