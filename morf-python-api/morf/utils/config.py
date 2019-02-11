@@ -30,6 +30,7 @@ import json
 import logging
 import multiprocessing
 import os
+import re
 from morf.utils import get_bucket_from_url, get_key_from_url
 from morf.utils.security import generate_md5
 
@@ -164,7 +165,9 @@ class MorfJobConfig:
         """
         new_job_id = self.job_id
         for arg_name, arg_value in sorted(self.client_args.items()):
-            new_job_id += '_'.join([arg_name, arg_value])
+            name = re.sub("[./]", "", arg_name)
+            value = re.sub("[./]", "", arg_value)
+            new_job_id += '_'.join([name, value])
         setattr(self, "job_id", new_job_id)
         return
 
