@@ -1,3 +1,5 @@
+# Joining MORF as an Institutional Partner
+
 We are currently seeking additional partner institutions to join the MORF consortium. A larger, more diverse data repository benefits students, researchers, and institutions alike. Currently, we are particularly interested in institutions interested in contributing data from the Coursera or edX platforms. 
 
 If your institution is interested in contributing their data to the MORF consortium, here is what we’ll need:
