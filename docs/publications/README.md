@@ -1,5 +1,7 @@
 # Publications
 
+Ryan Baker and Stephen Hutt (2025). MORF: A Post-Mortem. Proceedings of the 15th International Learning Analytics and Knowledge Conference (LAK25) (pp. 797-802). [ACM](https://doi.org/10.1145/3706468.3706478)
+
 Juan Miguel Andres-Bray, Jaclyn Ocumpaugh and Ryan S. Baker (2019). Hello? Who is posting, who is answering, and who is succeeding in Massive Open Online Courses. Proceedings of the 12th International Conference on Educational Data Mining (EDM19). [PDF](http://www.upenn.edu/learninganalytics/ryanbaker/EDM2019_paper284.pdf)
 
 Josh Gardner, Yuming Yang, Ryan Baker and Christopher Brooks (2019). Modeling and Experimental Design for MOOC Dropout Prediction: A Replication Perspective. To appear in: Proceedings of the 12th International Conference on Educational Data Mining (EDM19). [PDF](http://www.jpgard.com/s/EDM_2019_MORF_CAMERA.pdf)
